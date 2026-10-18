@@ -1,0 +1,35 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PROMETEO Studio",
+  "version": "0.3.0",
+  "identifier": "com.prometeo.studio",
+  "build": {
+    "frontendDist": "../../studio/frontend/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "cd ../studio/frontend && npm run dev",
+    "beforeBuildCommand": "cd ../studio/frontend && npm run build"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "android": {
+      "debugApplicationIdSuffix": ".debug"
+    },
+    "copyright": "PROMETEO",
+    "category": "Productivity",
+    "shortDescription": "Edición documental verificada"
+  }
+}

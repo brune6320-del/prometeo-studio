@@ -1,0 +1,50 @@
+{
+  "profile_name": "RASTER_PATCH_VERIFY_V0_1",
+  "version": "0.1.0",
+  "description": "PROMETEO Raster Patch Verification Profile v0.1 — Physical Containment, Ring Stability, Conservative Background Reconstruction & Semantic OCR Readback",
+  "canonical_render": {
+    "dpi": 300,
+    "colorspace": "GRAY",
+    "alpha_handling": "ignore_composite_white"
+  },
+  "geometry": {
+    "margin_pt": 3.0,
+    "ring_width_px": 8,
+    "min_target_height_pt": 4.0,
+    "max_target_height_pt": 72.0
+  },
+  "background_classifier": {
+    "class_a_ring_variance_max": 25.0,
+    "class_a_ring_std_max": 5.0,
+    "class_a_edge_density_max": 0.02,
+    "class_a_ring_delta_max": 10.0,
+    "class_a_min_ocr_conf": 60.0,
+    "class_b_ring_variance_max": 180.0,
+    "class_b_edge_density_max": 0.12,
+    "gradient_detection_threshold": 0.15,
+    "line_structure_min_frac": 0.35,
+    "line_structure_min_px": 60
+  },
+  "physical_verifier": {
+    "outside_diff_max": 0.0,
+    "outside_pixel_intensity_tol": 20,
+    "outside_allowed_pixel_count_max": 0,
+    "border_ring_mae_max": 2.5,
+    "border_ring_max_delta": 20.0,
+    "background_score_min": 0.75,
+    "background_residual_max": 15.0,
+    "structural_line_overlap_allowed": false
+  },
+  "semantic_readback": {
+    "min_confidence": 50.0,
+    "cer_max": 0.34,
+    "require_new_text_observed": true,
+    "require_old_text_absent": true
+  },
+  "policies": {
+    "supported_classes_for_edit": ["RASTER_CLASS_A"],
+    "review_required": true,
+    "atomic_transactions": true,
+    "double_authority_required": true
+  }
+}

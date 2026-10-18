@@ -1,0 +1,30 @@
+[package]
+name = "app"
+version = "0.2.0"
+description = "PROMETEO Studio desktop host"
+authors = ["PROMETEO"]
+license = ""
+repository = ""
+edition = "2024"
+rust-version = "1.90"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.1", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.12.1", features = ["custom-protocol"] }
+tauri-plugin-log = "2"
+
+# Guarda de cierre: applicationShouldTerminate (⌘Q, Dock, cierre de sesión). Ya era dependencia
+# transitiva de Tauri (misma versión del Cargo.lock); se usa directamente.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6.5"
