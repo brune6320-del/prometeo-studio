@@ -36,9 +36,9 @@ const renderContent = (card: BoardCard) =>
   renderToStaticMarkup(<BoardCardContent card={card} editar={NOOP} />);
 
 describe('registro de herramientas del tablero', () => {
-  it('registra note, link, media, etiqueta y marco con su contrato', () => {
-    expect(listBoardTools().map((tool) => tool.id)).toEqual(['note', 'link', 'media', 'etiqueta', 'marco']);
-    for (const id of ['note', 'link', 'media', 'etiqueta', 'marco']) {
+  it('registra note, link, media, etiqueta, referente y marco con su contrato', () => {
+    expect(listBoardTools().map((tool) => tool.id)).toEqual(['note', 'link', 'media', 'etiqueta', 'referente', 'marco']);
+    for (const id of ['note', 'link', 'media', 'etiqueta', 'referente', 'marco']) {
       const tool = getBoardTool(id);
       expect(tool).toBeDefined();
       expect(tool?.tipo).toBe(id === 'marco' ? 'marco' : 'tarjeta');
@@ -49,16 +49,16 @@ describe('registro de herramientas del tablero', () => {
     expect(getBoardTool('muro')).toBeUndefined();
   });
 
-  it('el menú se arma desde el registro y muestra las 5 herramientas', () => {
+  it('el menú se arma desde el registro y muestra las 6 herramientas', () => {
     const html = renderToStaticMarkup(<BoardToolMenu onChoose={NOOP} />);
-    expect((html.match(/role="menuitem"/g) ?? []).length).toBe(5);
-    for (const nombre of ['Nota', 'Enlace', 'Multimedia', 'Etiqueta', 'Marco']) {
+    expect((html.match(/role="menuitem"/g) ?? []).length).toBe(6);
+    for (const nombre of ['Nota', 'Enlace', 'Multimedia', 'Etiqueta', 'Referente', 'Marco']) {
       expect(html).toContain(nombre);
     }
   });
 
   it('crear con cualquier herramienta y deshacer devuelve el tablero a su estado anterior', () => {
-    for (const id of ['note', 'link', 'media', 'etiqueta', 'marco']) {
+    for (const id of ['note', 'link', 'media', 'etiqueta', 'referente', 'marco']) {
       const tool = getBoardTool(id);
       const before = createBoard('Prueba');
       const card = tool!.crear(120, 80);

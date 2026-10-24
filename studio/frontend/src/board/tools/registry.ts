@@ -5,6 +5,7 @@ import { mediaTool } from './media';
 import { noteTool } from './note';
 import { etiquetaTool } from './etiqueta';
 import { marcoTool } from './marco';
+import { referenteTool } from './referente';
 
 /**
  * Contrato de una herramienta de la pizarra (skill prometeo-herramientas).
@@ -45,4 +46,5 @@ registerBoardTool(noteTool);
 registerBoardTool(linkTool);
 registerBoardTool(mediaTool);
 registerBoardTool(etiquetaTool);
+registerBoardTool(referenteTool);
 registerBoardTool(marcoTool);

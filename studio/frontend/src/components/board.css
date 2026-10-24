@@ -1894,3 +1894,303 @@
 .mesa-media-file audio {
   width: 100%;
 }
+
+/* Herramienta Referente: ficha de biblioteca y editor en la propia tarjeta. */
+.board-referente {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 3px;
+  cursor: default;
+}
+
+.board-referente-imagen {
+  display: block;
+  width: 100%;
+  max-height: 230px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: rgba(40, 38, 36, 0.09);
+}
+
+.board-referente-noimg {
+  display: grid;
+  place-items: center;
+  min-height: 74px;
+  border: 1px dashed rgba(42, 39, 42, 0.28);
+  border-radius: 6px;
+  color: #77746e;
+  background: rgba(40, 38, 36, 0.05);
+  font-size: 10px;
+}
+
+.board-referente-nombre {
+  margin: 1px 0 0;
+  color: #29272a;
+  font-size: 14px;
+  font-weight: 720;
+  line-height: 1.25;
+}
+
+.board-referente-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: #5d5a62;
+  font-size: 10px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.board-referente-meta a {
+  flex: 0 0 auto;
+  color: #315c7c;
+  font-weight: 650;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.board-referente-etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.board-referente-etiquetas span {
+  padding: 1px 5px;
+  border: 1px solid rgba(42, 39, 42, 0.16);
+  border-radius: 999px;
+  color: #5d5a62;
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.board-referente-label {
+  display: block;
+  color: #77746e;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.board-referente-porque p {
+  margin: 2px 0 0;
+  color: #3b393d;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.board-referente-lectura {
+  margin: 1px 0 0;
+  padding: 5px 7px;
+  border-left: 2px solid #b8b4bd;
+  border-radius: 0 4px 4px 0;
+  color: #6c6972;
+  background: rgba(42, 39, 42, 0.055);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.board-referente-lectura > span {
+  display: block;
+  color: #807d86;
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.board-referente-lectura p {
+  margin: 3px 0 0;
+  white-space: pre-wrap;
+}
+
+.board-referente-hint {
+  color: #77746e;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+}
+
+.board-referente-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 3px;
+  cursor: default;
+}
+
+.board-referente-form,
+.board-referente-seccion {
+  display: grid;
+  gap: 5px;
+}
+
+.board-referente-form label,
+.board-referente-lectura-edit label {
+  display: grid;
+  gap: 2px;
+  color: #5d5a62;
+  font-size: 8px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.board-referente-form input,
+.board-referente-form textarea,
+.board-referente-lectura-edit input,
+.board-referente-lectura-edit textarea {
+  width: 100%;
+  padding: 4px 5px;
+  border: 1px solid rgba(42, 39, 42, 0.24);
+  border-radius: 4px;
+  outline: 0;
+  color: #2c2a2e;
+  background: rgba(255, 255, 255, 0.55);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.board-referente-form input:focus,
+.board-referente-form textarea:focus,
+.board-referente-lectura-edit input:focus,
+.board-referente-lectura-edit textarea:focus {
+  border-color: rgba(42, 39, 42, 0.55);
+  background: #fff;
+}
+
+.board-referente-form textarea,
+.board-referente-lectura-edit textarea {
+  min-height: 44px;
+  resize: vertical;
+}
+
+.board-referente-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.board-referente-seccion-head,
+.board-referente-lectura-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.board-referente-seccion-head button,
+.board-referente-lectura-foot button,
+.board-referente-actions button,
+.board-referente-file {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid rgba(42, 39, 42, 0.22);
+  border-radius: 4px;
+  color: #3b393d;
+  background: rgba(255, 255, 255, 0.42);
+  font: inherit;
+  font-size: 9px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.board-referente-seccion-head button:hover,
+.board-referente-lectura-foot button:hover,
+.board-referente-actions button:hover,
+.board-referente-file:hover {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.board-referente-file {
+  justify-self: start;
+}
+
+.board-referente-file input {
+  display: none;
+}
+
+.board-referente-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.board-referente-thumbs figure {
+  position: relative;
+  margin: 0;
+}
+
+.board-referente-thumbs img {
+  display: block;
+  width: 68px;
+  height: 50px;
+  object-fit: cover;
+  border: 1px solid rgba(42, 39, 42, 0.2);
+  border-radius: 4px;
+}
+
+.board-referente-thumbs figure button {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid rgba(42, 39, 42, 0.3);
+  border-radius: 50%;
+  color: #2c2a2e;
+  background: #f4f0e9;
+  cursor: pointer;
+}
+
+.board-referente-lectura-edit {
+  display: grid;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid rgba(42, 39, 42, 0.14);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.board-referente-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #5d5a62;
+  font-size: 9px;
+  text-transform: none;
+}
+
+.board-referente-check input {
+  width: auto;
+}
+
+.board-referente-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+}
+
+.board-referente-actions .board-referente-save {
+  border-color: #315c7c;
+  color: #fff;
+  background: #315c7c;
+}
+
+.board-referente-vacio {
+  margin: 0;
+  color: #77746e;
+  font-size: 9px;
+}
