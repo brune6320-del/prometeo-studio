@@ -6,6 +6,7 @@ import {
   Magnet,
   Download,
   ImagePlus,
+  Library,
   Link2,
   Plus,
   Search,
@@ -47,6 +48,8 @@ import {
   type FrameView,
 } from '../board/frames';
 import { emptyBoardHistory, recordBoardChange, redoBoardChange, undoBoardChange, type BoardHistory } from '../board/history';
+import { agregarImagenDesdeUrl, importarBiblioteca } from '../board/referentes/biblioteca';
+import { leerReferente } from '../board/referentes/model';
 import { loadBoardWorkspace } from '../board/storage';
 import { BoardCardContent } from '../board/tools/CardView';
 import { BoardToolMenu } from '../board/tools/menu';
@@ -177,6 +180,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const previousBoardId = useRef('');
   const importInput = useRef<HTMLInputElement>(null);
   const mediaInput = useRef<HTMLInputElement>(null);
+  /** Referente bajo el puntero: una URL de imagen pegada cae en él. */
+  const hoveredReferenteId = useRef<string | null>(null);
 
   const projectBoards = activeProjectId
     ? boards.filter((board) => projectIdByBoardId.get(board.id) === activeProjectId)
@@ -962,6 +967,36 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
   };
 
+  /** Crea o actualiza «Biblioteca» con la semilla de referentes, sin duplicar tarjetas. */
+  const importReferentes = async () => {
+    if (!(await flushBoardWrites())) {
+      setNotice('No se importaron los referentes porque el tablero actual aún no se pudo guardar. Reintenta o exporta una copia.');
+      return;
+    }
+    const result = importarBiblioteca(boards, undefined, {
+      projectId: activeProjectId || undefined,
+      projectIdByBoardId,
+    });
+    if (result.created && activeProjectId) {
+      try {
+        await assignBoardToProject(result.board.id, activeProjectId);
+      } catch (error) {
+        setProjectError(error instanceof Error ? error.message : 'No se pudo asignar la Biblioteca al proyecto.');
+        return;
+      }
+      setProjectIdByBoardId((current) => new Map(current).set(result.board.id, activeProjectId));
+    }
+    setBoards((current) => current.some((board) => board.id === result.board.id)
+      ? current.map((board) => board.id === result.board.id ? result.board : board)
+      : [...current, result.board]);
+    setActiveBoardId(result.board.id);
+    setSelectedCardIds([]);
+    enqueueBoardSave(result.board, { immediate: true });
+    setNotice(result.created
+      ? `Tablero «Biblioteca» creado con ${result.referentes} referentes en ${result.marcos} marcos.`
+      : `Tablero «Biblioteca» actualizado: ${result.referentes} referentes en ${result.marcos} marcos, sin duplicados.`);
+  };
+
   const exportJson = () => {
     if (!activeBoard) return;
     downloadText(boardFilename(activeBoard.title, 'json'), JSON.stringify(makeBoardExport(activeBoard), null, 2), 'application/json');
@@ -1013,14 +1048,44 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   /** Las herramientas entregan la tarjeta completa; se conserva el agrupado de deshacer por campo de texto. */
-  const replaceCard = (next: BoardCard) => {
+  const replaceCard = useCallback((next: BoardCard) => {
     const current = activeBoard?.cards.find((card) => card.id === next.id);
     if (!current) return;
     const changed = (Object.keys(next) as Array<keyof BoardCard>).filter((key) => next[key] !== current[key]);
     const field = changed.length === 1 ? changed[0] : null;
     const coalesceKey = field === 'title' || field === 'body' ? `card:${next.id}:${field}:${textSession.current}` : undefined;
     updateBoard((board) => ({ ...board, cards: board.cards.map((card) => card.id === next.id ? next : card) }), { coalesceKey });
-  };
+  }, [activeBoard, updateBoard]);
+
+  /**
+   * Pegar una URL de imagen sobre un Referente (o con uno seleccionado) añade un
+   * medio que apunta a esa fuente con la fecha del día. No descarga la imagen.
+   */
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const text = event.clipboardData?.getData('text/plain').trim() ?? '';
+      if (!text || !isSafeExternalUrl(text)) return;
+      const selectedId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
+      const targetId = hoveredReferenteId.current ?? selectedId;
+      if (!targetId) return;
+      const card = activeBoard?.cards.find((item) => item.id === targetId && item.type === 'referente');
+      if (!card) return;
+      const before = leerReferente(card);
+      const next = agregarImagenDesdeUrl(before, text);
+      if (!next) return;
+      event.preventDefault();
+      if (next.imagenes.length === before.imagenes.length) {
+        setNotice('Esa imagen ya estaba en el Referente, con su fuente y fecha.');
+        return;
+      }
+      replaceCard({ ...card, title: next.nombre.trim() || card.title, datos: { ...card.datos, ...next } });
+      setNotice(`Imagen añadida a «${next.nombre || card.title || 'Referente'}» con su fuente y fecha.`);
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [activeBoard, replaceCard, selectedCardIds]);
 
   const removeCard = (id: string) => {
     const card = activeBoard?.cards.find((item) => item.id === id);
@@ -1162,6 +1227,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           {search && <button onClick={() => setSearch('')} aria-label="Limpiar búsqueda"><X size={13} /></button>}
         </div>
         <div className="board-spacer" />
+        <button className="board-tool" onClick={() => void importReferentes()} title="Crear o actualizar el tablero Biblioteca con los referentes de los vídeos"><Library size={14} /> Importar referentes</button>
         <button className="board-tool" onClick={() => importInput.current?.click()}><Upload size={14} /> Importar</button>
         <button className="board-tool" onClick={exportJson}><Download size={14} /> Exportar JSON</button>
         <button className="board-tool" onClick={exportMarkdown}>Obsidian Markdown</button>
@@ -1307,6 +1373,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                     handleConnectCard(card.id);
                   } else handleCardSelection(card.id, event);
                 }}
+                onPointerEnter={card.type === 'referente' ? () => { hoveredReferenteId.current = card.id; } : undefined}
+                onPointerLeave={card.type === 'referente' ? () => {
+                  if (hoveredReferenteId.current === card.id) hoveredReferenteId.current = null;
+                } : undefined}
                 onBlurCapture={closeTextGroup}
               >
                 <div className="board-card-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover la tarjeta">

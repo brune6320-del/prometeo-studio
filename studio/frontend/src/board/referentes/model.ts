@@ -12,6 +12,16 @@ export interface Lectura {
   aceptada: boolean;
 }
 
+/**
+ * Medio de la biblioteca. Puede ser una copia (`data:`) o una referencia a una
+ * URL externa pegada por Bruno; en ese caso `fuente` y `fecha` dicen de dónde
+ * salió y cuándo se añadió, sin descargarla.
+ */
+export interface MedioReferente extends BoardMedia {
+  fuente?: string;
+  fecha?: string;
+}
+
 /** Referente de la biblioteca. Vive en `card.datos` y la tarjeta guarda su id. */
 export interface Referente {
   nombre: string;
@@ -23,7 +33,7 @@ export interface Referente {
   porQue: string;
   etiquetas: string[];
   /** Medios de la biblioteca; `imagenes[0]` es la imagen principal. */
-  imagenes: BoardMedia[];
+  imagenes: MedioReferente[];
   vistoEn: string[];
   lecturas: Lectura[];
 }
@@ -64,18 +74,29 @@ function listaTexto(value: unknown, limit: number, maxItems: number): string[] {
   return result;
 }
 
-function normalizarImagen(value: unknown, index: number): BoardMedia | null {
+function normalizarImagen(value: unknown, index: number): MedioReferente | null {
   if (!isRecord(value)) return null;
-  const dataUrl = typeof value.dataUrl === 'string' ? value.dataUrl : '';
+  const source = typeof value.dataUrl === 'string' ? value.dataUrl : '';
   const mimeType = texto(value.mimeType, '', 100).trim().toLowerCase();
   if (!mimeType.startsWith('image/')) return null;
-  if (!dataUrl.startsWith(`data:${mimeType};base64,`) || dataUrl.length > MAX_MEDIA_DATA_URL_CHARS) return null;
-  return {
+
+  const esCopia = source.startsWith(`data:${mimeType};base64,`);
+  const esReferencia = isSafeExternalUrl(source);
+  if (!esCopia && !esReferencia) return null;
+  if (esCopia && source.length > MAX_MEDIA_DATA_URL_CHARS) return null;
+  if (esReferencia && source.length > MAX_URL) return null;
+
+  const imagen: MedioReferente = {
     name: texto(value.name, `imagen-${index + 1}`, 180) || `imagen-${index + 1}`,
     mimeType,
-    dataUrl,
+    dataUrl: esReferencia ? source.trim() : source,
     kind: 'image',
   };
+  const fuente = texto(value.fuente, '', MAX_URL).trim();
+  const fecha = texto(value.fecha, '', 40).trim();
+  if (fuente && isSafeExternalUrl(fuente)) imagen.fuente = fuente;
+  if (fecha) imagen.fecha = fecha;
+  return imagen;
 }
 
 function normalizarLectura(value: unknown): Lectura | null {

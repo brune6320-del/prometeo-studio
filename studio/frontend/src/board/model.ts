@@ -159,7 +159,10 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
       body: boundedText(entry.body, '', 12000),
       x: boundedNumber(entry.x, 120, -100000, 100000),
       y: boundedNumber(entry.y, 120, -100000, 100000),
-      width: boundedNumber(entry.width, 260, 210, 440),
+      // Un marco puede ser más ancho que una tarjeta: su vista «Libre» contiene varias columnas.
+      width: type === 'marco'
+        ? boundedNumber(entry.width, 520, 210, 2400)
+        : boundedNumber(entry.width, 260, 210, 440),
       color: entry.color === 'sand' || entry.color === 'sage' || entry.color === 'rose' ? entry.color : 'paper',
     };
     if (type === 'link') card.url = isSafeExternalUrl(url) ? url : '';

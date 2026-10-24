@@ -2128,6 +2128,25 @@
 .board-referente-thumbs figure {
   position: relative;
   margin: 0;
+  width: 68px;
+}
+
+.board-referente-thumbs figcaption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 2px;
+  color: #77746e;
+  font-size: 7px;
+  line-height: 1.2;
+}
+
+.board-referente-thumbs figcaption a {
+  color: #315c7c;
+  font-weight: 650;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 1px;
 }
 
 .board-referente-thumbs img {

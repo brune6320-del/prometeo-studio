@@ -106,9 +106,15 @@ export const referenteTool: BoardTool<BoardCard> = {
             <span className="board-referente-label">Imágenes</span>
             <div className="board-referente-thumbs">
               {borrador.imagenes.map((imagen, index) => (
-                <figure key={`${imagen.name}-${index}`}>
+                <figure key={`${imagen.name}-${index}`} title={imagen.fuente ? `${imagen.fuente}${imagen.fecha ? ` · ${imagen.fecha}` : ''}` : imagen.name}>
                   <img src={imagen.dataUrl} alt={imagen.name} />
                   <button type="button" onClick={() => cambiar({ imagenes: borrador.imagenes.filter((_, i) => i !== index) })} aria-label={`Quitar ${imagen.name}`}><X size={11} /></button>
+                  {imagen.fuente && (
+                    <figcaption>
+                      {imagen.fecha && <span>{imagen.fecha}</span>}
+                      <a href={imagen.fuente} target="_blank" rel="noreferrer">fuente</a>
+                    </figcaption>
+                  )}
                 </figure>
               ))}
             </div>
@@ -188,7 +194,7 @@ export const referenteTool: BoardTool<BoardCard> = {
             {lectura.texto && <p>{lectura.texto}</p>}
           </blockquote>
         )}
-        <span className="board-referente-hint">Doble clic para editar</span>
+        <span className="board-referente-hint">Doble clic para editar · pega una URL de imagen</span>
       </div>
     );
   },
