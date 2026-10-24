@@ -1,6 +1,13 @@
 import type { Referente } from '../referentes/model';
 import type { BoardTool } from '../tools/registry';
 import { clavePar, gustosVacios, pesoDe, type Gustos } from './gustos';
+import {
+  aplicarRegla,
+  type PiezaColocada,
+  type PiezaCollage,
+  type TamanoLienzo,
+} from './reglas';
+import { generador } from './semilla';
 
 /** Lo mínimo de un referente para combinarlo: id estable de la tarjeta y su ficha. */
 export type ReferenteFuente = Pick<Referente, 'nombre' | 'etiquetas'> & { id: string };
@@ -31,28 +38,19 @@ export interface Combinacion {
   azarPuro: boolean;
 }
 
+/** Piezas y lienzo con los que aplicar la regla elegida. */
+export interface Colocacion {
+  piezas: readonly PiezaCollage[];
+  tamano: TamanoLienzo;
+}
+
+/** Combinación que ya trae la disposición de la regla elegida. */
+export interface CombinacionColocada extends Combinacion {
+  disposicion: PiezaColocada[];
+}
+
 /** Proporción de tiradas que ignoran los gustos. */
 export const PROBABILIDAD_AZAR_PURO = 0.2;
-
-function hashSemilla(semilla: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < semilla.length; i += 1) {
-    hash ^= semilla.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-/** mulberry32: misma semilla, misma secuencia. */
-function generador(semilla: string): () => number {
-  let estado = hashSemilla(semilla);
-  return () => {
-    estado = (estado + 0x6d2b79f5) | 0;
-    let t = Math.imul(estado ^ (estado >>> 15), 1 | estado);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 function elegirUniforme<T>(items: readonly T[], azar: () => number): T {
   return items[Math.min(items.length - 1, Math.floor(azar() * items.length))];
@@ -86,11 +84,18 @@ function unicosPorId<T extends { id: string }>(items: readonly T[]): T[] {
   return result;
 }
 
+function esColocacion(value: Gustos | Colocacion | undefined): value is Colocacion {
+  return typeof value === 'object' && value !== null && 'piezas' in value && 'tamano' in value;
+}
+
 /**
  * Combina 2-3 referentes distintos con una herramienta, una regla y una
  * restricción. Si `azarPuro` sale en el 20 %, todas las elecciones son
  * uniformes; si no, referentes (con sus pares), herramienta y regla se pesan
  * con la memoria de gusto. La restricción se elige siempre al azar.
+ *
+ * Si se pasa `colocacion`, el resultado incluye `disposicion`: la regla
+ * elegida ya aplicada con `reglas.ts`.
  *
  * Precondición: al menos 2 referentes, 1 herramienta, 1 regla y 1 restricción.
  */
@@ -100,8 +105,34 @@ export function combinar(
   herramientas: readonly HerramientaFuente[],
   reglas: readonly ReglaFuente[],
   restricciones: readonly RestriccionFuente[],
-  gustos: Gustos = gustosVacios(),
-): Combinacion {
+  gustos?: Gustos,
+): Combinacion;
+export function combinar(
+  semilla: string,
+  referentes: readonly ReferenteFuente[],
+  herramientas: readonly HerramientaFuente[],
+  reglas: readonly ReglaFuente[],
+  restricciones: readonly RestriccionFuente[],
+  colocacion: Colocacion,
+  gustos?: Gustos,
+): CombinacionColocada;
+export function combinar(
+  semilla: string,
+  referentes: readonly ReferenteFuente[],
+  herramientas: readonly HerramientaFuente[],
+  reglas: readonly ReglaFuente[],
+  restricciones: readonly RestriccionFuente[],
+  opciones?: Gustos | Colocacion,
+  gustosExtra?: Gustos,
+): Combinacion | CombinacionColocada {
+  let colocacion: Colocacion | undefined;
+  let gustos: Gustos;
+  if (esColocacion(opciones)) {
+    colocacion = opciones;
+    gustos = gustosExtra ?? gustosVacios();
+  } else {
+    gustos = opciones ?? gustosVacios();
+  }
   const refs = unicosPorId(referentes);
   const tools = unicosPorId(herramientas);
   const rules = unicosPorId(reglas);
@@ -145,12 +176,18 @@ export function combinar(
     : elegirPonderado(rules, (item) => pesoDe(memoria.reglas, item.id), azar);
   const restriccion = elegirUniforme(limits, azar);
 
-  return {
+  const combinacion: Combinacion = {
     semilla,
     referentes: elegidos.map((referente) => referente.id),
     herramienta: herramienta.id,
     regla: regla.id,
     restriccion: restriccion.texto,
     azarPuro,
+  };
+  if (!colocacion) return combinacion;
+
+  return {
+    ...combinacion,
+    disposicion: aplicarRegla(regla.id, colocacion.piezas, semilla, colocacion.tamano),
   };
 }
