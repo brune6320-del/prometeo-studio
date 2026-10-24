@@ -616,6 +616,30 @@
   background: rgba(255, 123, 123, 0.16);
 }
 
+.board-frame-publish {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 138, 82, 0.42);
+  border-radius: 5px;
+  color: var(--text-1, #ededf2);
+  background: rgba(255, 138, 82, 0.12);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.board-frame-publish:hover:not(:disabled) {
+  border-color: rgba(255, 138, 82, 0.8);
+  background: rgba(255, 138, 82, 0.24);
+}
+
+.board-frame-publish:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
 .board-frame-meta {
   margin: 8px;
   padding: 2px 7px;

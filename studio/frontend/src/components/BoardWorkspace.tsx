@@ -52,6 +52,7 @@ import { BoardCardContent } from '../board/tools/CardView';
 import { BoardToolMenu } from '../board/tools/menu';
 import { getBoardTool } from '../board/tools/registry';
 import { enqueueBoardSave, flushBoardWrites, removeBoardFromStore, rememberActiveBoard } from '../board/saveQueue';
+import { publishFrameToDirectory } from '../board/publicar';
 import {
   createPdfReference,
   projectToMarkdown,
@@ -160,6 +161,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number } } | null>(null);
   /** Marco abierto a pantalla completa en la vista Archivo; Esc vuelve a la pizarra. */
   const [archiveFullscreenId, setArchiveFullscreenId] = useState<string | null>(null);
+  /** Marco cuya publicación local se está escribiendo (bloquea el botón mientras dura). */
+  const [publishingFrameId, setPublishingFrameId] = useState<string | null>(null);
   const [boardHistories, setBoardHistories] = useState<Record<string, BoardHistory>>({});
   /** Un clic que llega después de arrastrar o de un gesto con modificador no debe cambiar la selección otra vez. */
   const suppressCardClick = useRef(false);
@@ -982,6 +985,33 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     updateBoard((board) => ({ ...board, cards: setFrameView(board.cards, id, vista) }));
   };
 
+  /**
+   * Publica la vista actual del marco como carpeta estática local.
+   * La carpeta la elige la persona; no se envía nada por la red.
+   */
+  const publishFrame = async (card: BoardCard) => {
+    const data = readFrameData(card);
+    if (data.vista === 'libre') {
+      setNotice('Elige Archivo, Muro o Mesa de luz antes de publicar.');
+      return;
+    }
+    if (!activeBoard || publishingFrameId) return;
+    setPublishingFrameId(card.id);
+    setNotice('Eligiendo carpeta y preparando la publicación local…');
+    try {
+      const result = await publishFrameToDirectory(card.title || 'Archivo', data.vista, activeBoard.cards, data.hijos);
+      setNotice(result.cancelled
+        ? 'Publicación cancelada.'
+        : result.zip
+          ? `ZIP descargado: ${result.files} archivos (${result.media} ${result.media === 1 ? 'pieza' : 'piezas'}). Descomprímelo y abre index.html sin servidor.`
+          : `Publicado en «${result.folder}»: ${result.files} archivos (${result.media} ${result.media === 1 ? 'pieza' : 'piezas'}). Abre index.html sin servidor.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'No se pudo publicar el marco.');
+    } finally {
+      setPublishingFrameId(null);
+    }
+  };
+
   /** Las herramientas entregan la tarjeta completa; se conserva el agrupado de deshacer por campo de texto. */
   const replaceCard = (next: BoardCard) => {
     const current = activeBoard?.cards.find((card) => card.id === next.id);
@@ -1233,6 +1263,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                         <option value="mesa">Mesa de luz</option>
                       </select>
                     </label>
+                    <button
+                      className="board-frame-publish"
+                      type="button"
+                      disabled={publishingFrameId === card.id}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => { event.stopPropagation(); void publishFrame(card); }}
+                      title="Publicar esta vista como web local (index.html + style.css + media/)"
+                      aria-label={`Publicar ${card.title || 'marco'}`}
+                    >{publishingFrameId === card.id ? '…' : 'Publicar'}</button>
                     <button className="board-frame-delete" onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar marco" title="Eliminar el marco y dejar sus tarjetas"><X size={14} /></button>
                   </div>
                   {frame.vista === 'archivo' ? (
