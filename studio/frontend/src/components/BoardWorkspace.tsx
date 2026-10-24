@@ -70,6 +70,8 @@ import {
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
 import { ArchivoView } from './ArchivoView';
+import { MuroView } from './MuroView';
+import { MesaView } from './MesaView';
 import './board.css';
 
 interface BoardWorkspaceProps {
@@ -186,11 +188,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const canRedo = activeHistory.redo.length > 0;
 
   const cardsById = useMemo(() => new Map((activeBoard?.cards ?? []).map((card) => [card.id, card])), [activeBoard]);
-  /** Hijos que ya se pintan dentro de un marco en vista Archivo: no se dibujan dos veces. */
-  const archivedChildIds = useMemo(() => {
+  /** Hijos que ya se pintan dentro de un marco con vista propia: no se dibujan dos veces. */
+  const framedChildIds = useMemo(() => {
     const ids = new Set<string>();
     for (const card of activeBoard?.cards ?? []) {
-      if (card.type !== 'marco' || readFrameData(card).vista !== 'archivo') continue;
+      if (card.type !== 'marco' || readFrameData(card).vista === 'libre') continue;
       for (const id of readFrameData(card).hijos) ids.add(id);
     }
     return ids;
@@ -1205,7 +1207,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                 <article
                   key={card.id}
                   data-card-id={card.id}
-                  className={`board-frame ${frame.vista === 'archivo' ? 'is-archive' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''}`}
+                  className={`board-frame ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''}`}
                   style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
                   onClick={(event) => handleCardSelection(card.id, event)}
                   onDoubleClick={(event) => {
@@ -1227,6 +1229,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                       <select value={frame.vista} onChange={(event) => updateFrameView(card.id, event.target.value as FrameView)} aria-label={`Ver como: ${card.title || 'marco'}`}>
                         <option value="libre">Libre</option>
                         <option value="archivo">Archivo</option>
+                        <option value="muro">Muro</option>
+                        <option value="mesa">Mesa de luz</option>
                       </select>
                     </label>
                     <button className="board-frame-delete" onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar marco" title="Eliminar el marco y dejar sus tarjetas"><X size={14} /></button>
@@ -1236,14 +1240,21 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                       <ArchivoView frameTitle={card.title} cards={activeBoard.cards} childIds={frame.hijos} />
                       <div className="board-frame-hint">Doble clic: pantalla completa · Esc para volver</div>
                     </>
+                  ) : frame.vista === 'muro' ? (
+                    <>
+                      <MuroView frameTitle={card.title} cards={activeBoard.cards} childIds={frame.hijos} width={Math.max(180, card.width)} />
+                      <div className="board-frame-hint">Clic en una miniatura: caja de luz</div>
+                    </>
+                  ) : frame.vista === 'mesa' ? (
+                    <MesaView frameTitle={card.title} cards={activeBoard.cards} childIds={frame.hijos} width={Math.max(180, card.width)} />
                   ) : (
                     <div className="board-frame-meta">{childCount} {childCount === 1 ? 'tarjeta' : 'tarjetas'} dentro</div>
                   )}
                 </article>
               );
             }
-            // Los hijos de un marco en vista Archivo se pintan dentro del marco, no encima.
-            if (archivedChildIds.has(card.id)) return null;
+            // Los hijos de un marco con vista propia se pintan dentro del marco, no encima.
+            if (framedChildIds.has(card.id)) return null;
             return (
               <article
                 key={card.id}

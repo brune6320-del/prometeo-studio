@@ -1399,3 +1399,474 @@
     border-top: 1px dashed var(--archivo-rule);
   }
 }
+
+/* ── Vistas «Muro» y «Mesa de luz» del marco (H-5) ── */
+
+.board-frame.is-muro,
+.board-frame.is-mesa {
+  overflow: hidden;
+}
+
+.board-frame.is-muro {
+  background: #faf8f3;
+}
+
+.board-frame.is-mesa {
+  background: #f3eee4;
+}
+
+.board-muro {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: #1b1915;
+  background: #faf8f3;
+  font-family: "Diatype Mono Variable", "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.muro-strip {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-bottom: 1px solid #e6dfd3;
+  color: #8b8377;
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.muro-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.muro-grid {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 7px;
+}
+
+.muro-column {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.muro-thumb {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: zoom-in;
+}
+
+.muro-thumb:focus-visible {
+  outline: 1px dashed #8a8176;
+  outline-offset: 2px;
+}
+
+.muro-thumb-media {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: var(--muro-aspect, 1.4);
+  overflow: hidden;
+  background: #e9e4da;
+  box-shadow: 0 1px 0 rgba(60, 50, 36, 0.12);
+}
+
+.muro-thumb-media img,
+.muro-thumb-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 180ms ease;
+}
+
+.muro-thumb:hover .muro-thumb-media img,
+.muro-thumb:hover .muro-thumb-media video {
+  transform: scale(1.025);
+}
+
+.muro-thumb-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 5px;
+  min-width: 0;
+  font-size: 8px;
+  line-height: 1.2;
+}
+
+.muro-code {
+  flex: 0 0 auto;
+  color: #7c756a;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.muro-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muro-empty,
+.mesa-empty {
+  margin: 12px;
+  color: #8b8377;
+  font-size: 10px;
+}
+
+.muro-media-file,
+.muro-media-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  overflow: hidden;
+  color: #5b544a;
+  font-size: 8px;
+  text-align: center;
+}
+
+.board-muro-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  color: #111;
+  background: #fff;
+}
+
+.muro-lightbox-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #eee;
+  font-family: "Diatype Mono Variable", "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.muro-lightbox-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.muro-lightbox-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.muro-lightbox-count {
+  color: #999;
+  font-variant-numeric: tabular-nums;
+}
+
+.muro-lightbox-close {
+  flex: 0 0 auto;
+  padding: 0 2px;
+  border: 0;
+  color: #111;
+  background: transparent;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.muro-lightbox-close:hover {
+  color: #777;
+}
+
+.muro-lightbox-stage {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 18px 76px;
+}
+
+.muro-lightbox-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.muro-lightbox-media img,
+.muro-lightbox-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.muro-lightbox-media audio {
+  width: min(560px, 80vw);
+}
+
+.muro-lightbox-media .muro-media-file,
+.muro-lightbox-media .muro-media-missing {
+  color: #333;
+  font-size: 12px;
+}
+
+.muro-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid #ddd;
+  border-radius: 50%;
+  color: #111;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.muro-lightbox-nav.previous {
+  left: 18px;
+}
+
+.muro-lightbox-nav.next {
+  right: 18px;
+}
+
+.muro-lightbox-nav:hover {
+  color: #fff;
+  background: #111;
+  border-color: #111;
+}
+
+.muro-lightbox-nav:focus-visible {
+  outline: 1px dashed #111;
+  outline-offset: 2px;
+}
+
+.muro-lightbox-hint {
+  flex: 0 0 auto;
+  padding: 10px 14px 14px;
+  color: #999;
+  font-family: "Diatype Mono Variable", "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  text-align: center;
+}
+
+.muro-lightbox-hint span {
+  color: #555;
+}
+
+.board-mesa {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: #22201c;
+  background: #f3eee4;
+  font-family: "Diatype Mono Variable", "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.mesa-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 4px 7px;
+  border-bottom: 1px solid rgba(120, 100, 70, 0.16);
+  background: rgba(255, 252, 246, 0.7);
+}
+
+.mesa-label {
+  min-width: 0;
+  overflow: hidden;
+  color: #857b6b;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.mesa-action {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border: 1px solid #cfc5b4;
+  border-radius: 999px;
+  color: #403a31;
+  background: #fffdf8;
+  font: inherit;
+  font-size: 8px;
+  cursor: pointer;
+}
+
+.mesa-action:hover {
+  border-color: #a99c86;
+  background: #fff;
+}
+
+.mesa-action[aria-pressed="true"] {
+  border-color: #2a2620;
+  color: #fff;
+  background: #2a2620;
+}
+
+.mesa-action:focus-visible {
+  outline: 1px dashed #2a2620;
+  outline-offset: 2px;
+}
+
+.mesa-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+
+.mesa-surface {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-content: flex-start;
+  justify-content: center;
+}
+
+.mesa-piece {
+  position: relative;
+  margin: 0;
+  padding: 5px;
+  background: #fffdf9;
+  box-shadow: 0 7px 16px rgba(70, 58, 40, 0.22), 0 1px 2px rgba(70, 58, 40, 0.16);
+  transform: translate(var(--mesa-offset-x, 0), var(--mesa-offset-y, 0)) rotate(var(--mesa-rotation, 0deg));
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+
+.mesa-piece:hover {
+  z-index: 2;
+  box-shadow: 0 12px 24px rgba(70, 58, 40, 0.26), 0 2px 4px rgba(70, 58, 40, 0.18);
+  transform: translate(var(--mesa-offset-x, 0), var(--mesa-offset-y, 0)) rotate(0deg);
+}
+
+.mesa-media {
+  width: 100%;
+  aspect-ratio: var(--mesa-aspect, 1.4);
+  overflow: hidden;
+  background: #d9d2c5;
+}
+
+.mesa-media img,
+.mesa-media video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mesa-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 1px 0;
+  overflow: hidden;
+  font-size: 8px;
+  line-height: 1.15;
+}
+
+.mesa-caption span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mesa-wall {
+  position: relative;
+  width: 100%;
+}
+
+.mesa-wall-piece {
+  position: absolute;
+  margin: 0;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 5px 12px rgba(70, 58, 40, 0.2), 0 1px 2px rgba(70, 58, 40, 0.14);
+}
+
+.mesa-wall-piece .mesa-media {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.mesa-wall-code {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  color: #444;
+  background: rgba(255, 255, 255, 0.86);
+  font-family: "Diatype Mono Variable", "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7px;
+}
+
+.mesa-media-file,
+.mesa-media-missing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+  overflow: hidden;
+  color: #5b544a;
+  font-size: 8px;
+  text-align: center;
+}
+
+.mesa-media-file audio {
+  width: 100%;
+}

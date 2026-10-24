@@ -6,9 +6,9 @@ import { DEFAULT_CARD_LAYOUT_HEIGHT, type CardSize } from './geometry';
  * y borrar el marco los deja donde están (skill prometeo-herramientas).
  * Las vistas solo cambian cómo se pintan esos hijos: nunca su posición ni sus datos.
  */
-export type FrameView = 'libre' | 'archivo';
+export type FrameView = 'libre' | 'archivo' | 'muro' | 'mesa';
 
-const FRAME_VIEWS: readonly FrameView[] = ['libre', 'archivo'];
+const FRAME_VIEWS: readonly FrameView[] = ['libre', 'archivo', 'muro', 'mesa'];
 
 export function normalizeFrameView(value: unknown): FrameView {
   return FRAME_VIEWS.includes(value as FrameView) ? (value as FrameView) : 'libre';
