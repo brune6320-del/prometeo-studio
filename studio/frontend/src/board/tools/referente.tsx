@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { BookOpen, ImagePlus, Plus, Trash2, X } from 'lucide-react';
 import { createCard, isSafeExternalUrl, MAX_MEDIA_BYTES, type BoardCard, type BoardMedia } from '../model';
 import {
@@ -11,6 +11,7 @@ import {
   type Lectura,
   type Referente,
 } from '../referentes/model';
+import { filtrarLecturas, opcionesDeFiltro, ordenarLecturas } from '../referentes/historial';
 import type { BoardTool } from './registry';
 
 function comoDatos(referente: Referente): Record<string, unknown> {
@@ -37,9 +38,21 @@ export const referenteTool: BoardTool<BoardCard> = {
     const [borrador, setBorrador] = useState<Referente>(() => leerReferente(datos));
     const [etiquetas, setEtiquetas] = useState(() => leerReferente(datos).etiquetas.join(', '));
     const [vistoEn, setVistoEn] = useState(() => leerReferente(datos).vistoEn.join(', '));
+    const [panel, setPanel] = useState<'ficha' | 'historial'>('ficha');
+    const [filtroProyecto, setFiltroProyecto] = useState('');
+    const [filtroOjos, setFiltroOjos] = useState('');
     const referente = editando ? borrador : leerReferente(datos);
     const lectura = ultimaLectura(referente);
     const principal = referente.imagenes[0];
+    const historial = useMemo(() => {
+      const opciones = opcionesDeFiltro(referente);
+      const lecturas = ordenarLecturas(referente.lecturas);
+      return {
+        opciones,
+        lecturas,
+        filtradas: filtrarLecturas(lecturas, { proyecto: filtroProyecto, ojos: filtroOjos }),
+      };
+    }, [referente, filtroProyecto, filtroOjos]);
 
     const empezarEdicion = () => {
       const actual = leerReferente(datos);
@@ -167,34 +180,83 @@ export const referenteTool: BoardTool<BoardCard> = {
         }}
         title="Doble clic para editar"
       >
-        {principal ? (
-          <img className="board-referente-imagen" src={principal.dataUrl} alt={referente.nombre || principal.name} draggable={false} />
-        ) : (
-          <div className="board-referente-noimg">Sin imagen</div>
-        )}
         <h3 className="board-referente-nombre">{referente.nombre || 'Referente sin nombre'}</h3>
-        <div className="board-referente-meta">
-          <span>{referente.archivoOrigen || 'archivo sin nombre'} · {referente.anio || 's.f.'}</span>
-          {referente.url && isSafeExternalUrl(referente.url) && (
-            <a href={referente.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Fuente</a>
-          )}
+        <div className="board-referente-tabs" role="tablist" aria-label="Vista del referente" onDoubleClick={(event) => event.stopPropagation()}>
+          <button type="button" role="tab" aria-selected={panel === 'ficha'} className={panel === 'ficha' ? 'active' : ''} onClick={(event) => { event.stopPropagation(); setPanel('ficha'); }}>Ficha</button>
+          <button type="button" role="tab" aria-selected={panel === 'historial'} className={panel === 'historial' ? 'active' : ''} onClick={(event) => { event.stopPropagation(); setPanel('historial'); }}>Historial{referente.lecturas.length ? ` (${referente.lecturas.length})` : ''}</button>
         </div>
-        {referente.etiquetas.length > 0 && (
-          <div className="board-referente-etiquetas">
-            {referente.etiquetas.map((etiqueta) => <span key={etiqueta}>{etiqueta}</span>)}
+        {panel === 'historial' ? (
+          <div className="board-referente-historial" onDoubleClick={(event) => event.stopPropagation()}>
+            <div className="board-referente-filtros">
+              <label>Proyecto
+                <select value={filtroProyecto} onChange={(event) => setFiltroProyecto(event.target.value)} onClick={(event) => event.stopPropagation()}>
+                  <option value="">Todos</option>
+                  {historial.opciones.proyectos.map((proyecto) => <option key={proyecto} value={proyecto}>{proyecto}</option>)}
+                </select>
+              </label>
+              <label>Ojos
+                <select value={filtroOjos} onChange={(event) => setFiltroOjos(event.target.value)} onClick={(event) => event.stopPropagation()}>
+                  <option value="">Todos</option>
+                  {historial.opciones.ojos.map((ojos) => <option key={ojos} value={ojos}>{ojos}</option>)}
+                </select>
+              </label>
+            </div>
+            {(filtroProyecto || filtroOjos) && historial.filtradas.length > 0 && (
+              <p className="board-referente-historial-count">
+                {historial.filtradas.length} de {historial.lecturas.length} lecturas
+              </p>
+            )}
+            {historial.filtradas.length === 0 ? (
+              <p className="board-referente-vacio">
+                {historial.lecturas.length ? 'Ninguna lectura coincide con este filtro.' : 'Sin lecturas todavía.'}
+              </p>
+            ) : (
+              <ol className="board-referente-timeline">
+                {historial.filtradas.map((item, index) => (
+                  <li key={`${item.fecha}-${index}`} className={item.aceptada ? '' : 'propuesta'}>
+                    <div className="board-referente-timeline-meta">
+                      <time>{item.fecha || 'Sin fecha'}</time>
+                      {item.ojos && <span>{item.ojos}</span>}
+                      {item.proyecto && <span>{item.proyecto}</span>}
+                    </div>
+                    {item.texto && <p>{item.texto}</p>}
+                    {!item.aceptada && <span className="board-referente-propuesta">Propuesta sin aceptar</span>}
+                  </li>
+                ))}
+              </ol>
+            )}
           </div>
+        ) : (
+          <>
+            {principal ? (
+              <img className="board-referente-imagen" src={principal.dataUrl} alt={referente.nombre || principal.name} draggable={false} />
+            ) : (
+              <div className="board-referente-noimg">Sin imagen</div>
+            )}
+            <div className="board-referente-meta">
+              <span>{referente.archivoOrigen || 'archivo sin nombre'} · {referente.anio || 's.f.'}</span>
+              {referente.url && isSafeExternalUrl(referente.url) && (
+                <a href={referente.url} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Fuente</a>
+              )}
+            </div>
+            {referente.etiquetas.length > 0 && (
+              <div className="board-referente-etiquetas">
+                {referente.etiquetas.map((etiqueta) => <span key={etiqueta}>{etiqueta}</span>)}
+              </div>
+            )}
+            <div className="board-referente-porque">
+              <span className="board-referente-label">Por qué lo guardé</span>
+              <p>{referente.porQue.trim() || 'Sin nota todavía.'}</p>
+            </div>
+            {lectura && (
+              <blockquote className="board-referente-lectura">
+                <span>{[lectura.fecha, lectura.ojos, lectura.proyecto].filter(Boolean).join(' · ') || 'Lectura sin fecha'}</span>
+                {lectura.texto && <p>{lectura.texto}</p>}
+              </blockquote>
+            )}
+            <span className="board-referente-hint">Doble clic para editar · pega una URL de imagen</span>
+          </>
         )}
-        <div className="board-referente-porque">
-          <span className="board-referente-label">Por qué lo guardé</span>
-          <p>{referente.porQue.trim() || 'Sin nota todavía.'}</p>
-        </div>
-        {lectura && (
-          <blockquote className="board-referente-lectura">
-            <span>{[lectura.fecha, lectura.ojos, lectura.proyecto].filter(Boolean).join(' · ') || 'Lectura sin fecha'}</span>
-            {lectura.texto && <p>{lectura.texto}</p>}
-          </blockquote>
-        )}
-        <span className="board-referente-hint">Doble clic para editar · pega una URL de imagen</span>
       </div>
     );
   },

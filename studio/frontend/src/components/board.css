@@ -1932,6 +1932,139 @@
   line-height: 1.25;
 }
 
+.board-referente-tabs {
+  display: flex;
+  gap: 3px;
+}
+
+.board-referente-tabs button {
+  flex: 1 1 auto;
+  padding: 2px 7px;
+  border: 1px solid rgba(42, 39, 42, 0.16);
+  border-radius: 5px;
+  color: #5d5a62;
+  background: transparent;
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+.board-referente-tabs button.active {
+  border-color: #315c7c;
+  color: #fff;
+  background: #315c7c;
+}
+
+.board-referente-historial {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.board-referente-filtros {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.board-referente-filtros label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #77746e;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.board-referente-filtros select {
+  width: 100%;
+  padding: 3px 4px;
+  border: 1px solid rgba(42, 39, 42, 0.18);
+  border-radius: 5px;
+  color: #3b393d;
+  background: rgba(255, 253, 249, 0.85);
+  font-size: 10px;
+}
+
+.board-referente-historial-count {
+  margin: 0;
+  color: #807d86;
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.board-referente-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0 0 0 13px;
+  border-left: 1px solid rgba(42, 39, 42, 0.18);
+  list-style: none;
+}
+
+.board-referente-timeline li {
+  position: relative;
+}
+
+.board-referente-timeline li::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: -16px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #315c7c;
+}
+
+.board-referente-timeline li.propuesta::before {
+  background: #b8b4bd;
+}
+
+.board-referente-timeline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: baseline;
+  color: #807d86;
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.board-referente-timeline-meta time {
+  font-weight: 700;
+}
+
+.board-referente-timeline-meta span {
+  padding: 0 4px;
+  border: 1px solid rgba(42, 39, 42, 0.14);
+  border-radius: 999px;
+}
+
+.board-referente-timeline p {
+  margin: 2px 0 0;
+  color: #3b393d;
+  font-size: 10px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.board-referente-propuesta {
+  display: inline-block;
+  margin-top: 2px;
+  color: #807d86;
+  font-size: 8px;
+  font-style: italic;
+}
+
 .board-referente-meta {
   display: flex;
   align-items: baseline;

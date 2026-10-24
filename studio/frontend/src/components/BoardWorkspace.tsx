@@ -50,6 +50,7 @@ import {
 } from '../board/frames';
 import { emptyBoardHistory, recordBoardChange, redoBoardChange, undoBoardChange, type BoardHistory } from '../board/history';
 import { agregarImagenDesdeUrl, importarBiblioteca } from '../board/referentes/biblioteca';
+import { construirZipObsidian, notasObsidian } from '../board/referentes/historial';
 import { aceptarLectura } from '../board/referentes/mirar';
 import { leerReferente, type Lectura } from '../board/referentes/model';
 import { loadBoardWorkspace } from '../board/storage';
@@ -1051,6 +1052,23 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setNotice('Markdown listo para Obsidian. Los adjuntos multimedia permanecen en la exportación JSON.');
   };
 
+  /** Un .md por referente con frontmatter y enlaces [[ ]] a los del mismo marco. */
+  const exportReferentesObsidian = () => {
+    const notas = notasObsidian(projectBoards);
+    if (!notas.length) {
+      setNotice('No hay referentes que exportar. Importa la biblioteca primero.');
+      return;
+    }
+    const bytes = construirZipObsidian(projectBoards);
+    const url = URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: 'application/zip' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = activeProject ? `${boardFilename(activeProject.name, 'md').replace(/\.md$/, '')}-referentes.zip` : 'referentes-obsidian.zip';
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setNotice(`Obsidian: ${notas.length} ${notas.length === 1 ? 'nota' : 'notas'} de referente en un ZIP.`);
+  };
+
   const updateCard = (id: string, patch: Partial<BoardCard>) => {
     const field = Object.keys(patch)[0];
     const coalesceKey = field === 'title' || field === 'body' ? `card:${id}:${field}:${textSession.current}` : undefined;
@@ -1271,6 +1289,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         <div className="board-spacer" />
         <button className="board-tool" onClick={() => setMirarOpen(true)} title="Elegir tres referentes y unos ojos, y pedir tres lecturas"><Eye size={14} /> Volver a mirar</button>
         <button className="board-tool" onClick={() => void importReferentes()} title="Crear o actualizar el tablero Biblioteca con los referentes de los vídeos"><Library size={14} /> Importar referentes</button>
+        <button className="board-tool" onClick={exportReferentesObsidian} title="Descargar un ZIP con una nota Markdown por referente, con enlaces entre los del mismo marco"><BookOpen size={14} /> Referentes a Obsidian</button>
         <button className="board-tool" onClick={() => importInput.current?.click()}><Upload size={14} /> Importar</button>
         <button className="board-tool" onClick={exportJson}><Download size={14} /> Exportar JSON</button>
         <button className="board-tool" onClick={exportMarkdown}>Obsidian Markdown</button>
