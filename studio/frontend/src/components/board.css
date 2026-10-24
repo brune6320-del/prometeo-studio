@@ -1063,3 +1063,339 @@
   .board-back span { display: none; }
   .board-zoom-controls { right: 10px; bottom: 10px; }
 }
+
+/* ── Vista «Archivo» del marco (Lienzo Archivo · docs/STUDIO/04 §0–§2 y §5) ── */
+
+.board-frame.is-archive {
+  overflow: hidden;
+  background: #fff;
+}
+
+.board-frame-hint {
+  position: absolute;
+  right: 7px;
+  bottom: 5px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #8a8a8a;
+  background: rgba(255, 255, 255, 0.88);
+  font-size: 9px;
+  pointer-events: none;
+}
+
+.board-archivo {
+  --archivo-ink: #111;
+  --archivo-muted: #8a8a8a;
+  --archivo-rule: #d2d2d2;
+  --archivo-pad: 9px;
+  --archivo-head: 34px;
+  --archivo-rule-gap: 8px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  overflow: hidden;
+  color: var(--archivo-ink);
+  background: #fff;
+  font-family: "Diatype Mono Variable", "Diatype Semi-Mono", "JetBrains Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.archivo-columns {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: 25% 50% 25%;
+  min-height: 0;
+}
+
+.archivo-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: var(--archivo-pad);
+}
+
+.archivo-col + .archivo-col {
+  border-left: 1px dashed var(--archivo-rule);
+}
+
+.archivo-label {
+  flex: 0 0 auto;
+  min-height: var(--archivo-head);
+  overflow: hidden;
+  color: var(--archivo-muted);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.archivo-rule {
+  flex: 0 0 1px;
+  height: 1px;
+  margin: 0 0 var(--archivo-rule-gap);
+  background-image: repeating-linear-gradient(to right, var(--archivo-rule) 0 1px, transparent 1px 4px);
+}
+
+.archivo-note-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.archivo-note-body p,
+.archivo-block-text p {
+  margin: 0 0 0.85em;
+}
+
+.archivo-note-body p:last-child,
+.archivo-block-text p:last-child {
+  margin-bottom: 0;
+}
+
+.archivo-clock {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  color: var(--archivo-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.archivo-feed {
+  padding-right: calc(var(--archivo-pad) + 2px);
+}
+
+.archivo-feed-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.archivo-block {
+  padding-bottom: 1.8em;
+}
+
+.archivo-carousel {
+  position: relative;
+  width: 82%;
+  aspect-ratio: 16 / 9;
+  max-height: 46vh;
+  margin: 0 auto 2em;
+  overflow: hidden;
+  background: #fff;
+}
+
+.archivo-slide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.archivo-slide.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.archivo-slide img,
+.archivo-slide video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.archivo-media-file,
+.archivo-media-missing {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--archivo-ink);
+  text-align: center;
+}
+
+.archivo-media-file a {
+  color: inherit;
+}
+
+.archivo-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 50%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.archivo-zone.previous {
+  left: 0;
+  cursor: w-resize;
+}
+
+.archivo-zone.next {
+  right: 0;
+  cursor: e-resize;
+}
+
+.archivo-zone:focus-visible {
+  outline: 1px dashed var(--archivo-muted);
+  outline-offset: -3px;
+}
+
+.archivo-block-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.9em;
+}
+
+.archivo-block-id > div {
+  overflow-wrap: anywhere;
+}
+
+.archivo-status {
+  text-transform: uppercase;
+}
+
+.archivo-block-text {
+  font-style: italic;
+}
+
+.archivo-block-link {
+  overflow-wrap: anywhere;
+}
+
+.archivo-block-rule {
+  height: 1px;
+  margin-top: 1.7em;
+  background-image: repeating-linear-gradient(to right, var(--archivo-rule) 0 1px, transparent 1px 4px);
+}
+
+.archivo-feed-footer {
+  padding: 8px 0 12px;
+  color: var(--archivo-muted);
+}
+
+.archivo-index-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.archivo-index-heading {
+  margin-bottom: 7px;
+  color: var(--archivo-ink);
+}
+
+.archivo-index-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  width: 100%;
+  padding: 5px 0;
+  border: 0;
+  border-bottom: 1px dotted var(--archivo-rule);
+  color: var(--archivo-ink);
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.archivo-index-entry:hover .archivo-index-title,
+.archivo-index-entry:focus-visible .archivo-index-title {
+  text-decoration: underline;
+}
+
+.archivo-index-entry:focus-visible {
+  outline: 1px dashed var(--archivo-muted);
+  outline-offset: 1px;
+}
+
+.archivo-index-code,
+.archivo-index-status {
+  color: var(--archivo-muted);
+}
+
+.archivo-empty {
+  margin: 0;
+  color: var(--archivo-muted);
+}
+
+.board-archive-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  color: #111;
+}
+
+.board-archive-fullscreen .board-archivo {
+  height: 100%;
+  font-size: 12.96px;
+  --archivo-pad: 12.96px;
+  --archivo-head: 93px;
+  --archivo-rule-gap: 22px;
+}
+
+.board-archive-fullscreen .archivo-feed-scroll {
+  padding-top: 4.5em;
+}
+
+.board-archive-fullscreen .archivo-carousel {
+  margin-bottom: 5em;
+}
+
+.archivo-fullscreen-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 2;
+  padding: 3px 6px;
+  border: 0;
+  color: #8a8a8a;
+  background: rgba(255, 255, 255, 0.92);
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.archivo-fullscreen-close:hover {
+  color: #111;
+  text-decoration: underline;
+}
+
+.board-archive-fullscreen .archivo-carousel {
+  max-height: 58vh;
+}
+
+@media (max-width: 900px) {
+  .board-archive-fullscreen .archivo-columns {
+    grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .board-archive-fullscreen .archivo-col + .archivo-col {
+    border-left: 0;
+    border-top: 1px dashed var(--archivo-rule);
+  }
+}

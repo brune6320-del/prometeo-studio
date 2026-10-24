@@ -42,6 +42,7 @@ import {
   readFrameData,
   rectFromPoints,
   removeFrameKeepingChildren,
+  setFrameView,
   type FrameRect,
   type FrameView,
 } from '../board/frames';
@@ -68,6 +69,7 @@ import {
   setActiveProject,
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
+import { ArchivoView } from './ArchivoView';
 import './board.css';
 
 interface BoardWorkspaceProps {
@@ -154,6 +156,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [frameToolId, setFrameToolId] = useState<string | null>(null);
   const [frameDraft, setFrameDraft] = useState<FrameRect | null>(null);
   const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number } } | null>(null);
+  /** Marco abierto a pantalla completa en la vista Archivo; Esc vuelve a la pizarra. */
+  const [archiveFullscreenId, setArchiveFullscreenId] = useState<string | null>(null);
   const [boardHistories, setBoardHistories] = useState<Record<string, BoardHistory>>({});
   /** Un clic que llega después de arrastrar o de un gesto con modificador no debe cambiar la selección otra vez. */
   const suppressCardClick = useRef(false);
@@ -180,6 +184,20 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const activeHistory = activeBoard ? boardHistories[activeBoard.id] ?? emptyBoardHistory() : emptyBoardHistory();
   const canUndo = activeHistory.undo.length > 0;
   const canRedo = activeHistory.redo.length > 0;
+
+  const cardsById = useMemo(() => new Map((activeBoard?.cards ?? []).map((card) => [card.id, card])), [activeBoard]);
+  /** Hijos que ya se pintan dentro de un marco en vista Archivo: no se dibujan dos veces. */
+  const archivedChildIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const card of activeBoard?.cards ?? []) {
+      if (card.type !== 'marco' || readFrameData(card).vista !== 'archivo') continue;
+      for (const id of readFrameData(card).hijos) ids.add(id);
+    }
+    return ids;
+  }, [activeBoard]);
+  const archiveFullscreenFrame = archiveFullscreenId
+    ? activeBoard?.cards.find((card) => card.id === archiveFullscreenId && card.type === 'marco') ?? null
+    : null;
 
   const leaveBoard = async () => {
     // Salir con cambios que no están confirmados en el almacenamiento sería perderlos: se queda y se explica.
@@ -636,6 +654,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       const target = event.target;
       const typing = target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
       if (event.key === 'Escape') {
+        if (archiveFullscreenId) {
+          event.preventDefault();
+          setArchiveFullscreenId(null);
+          return;
+        }
         if (frameToolId) {
           event.preventDefault();
           frameDraw.current = null;
@@ -650,13 +673,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         }
         return;
       }
+      if (archiveFullscreenId) return;
       if (typing || event.key.toLocaleLowerCase() !== 'n') return;
       event.preventDefault();
       setAddMenuOpen((open) => !open);
     };
     window.addEventListener('keydown', handleAddShortcut);
     return () => window.removeEventListener('keydown', handleAddShortcut);
-  }, [addMenuOpen, frameToolId]);
+  }, [addMenuOpen, archiveFullscreenId, frameToolId]);
 
   const handleCardSelection = (cardId: string, event: React.MouseEvent<HTMLElement>) => {
     if (suppressCardClick.current) {
@@ -951,16 +975,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     updateBoard((board) => ({ ...board, cards: board.cards.map((card) => card.id === id ? { ...card, ...patch } : card) }), { coalesceKey });
   };
 
-  /** «Ver como» del marco. En H-3 solo existe Libre; H-4 y H-5 añaden sus vistas. */
+  /** «Ver como» del marco: cambiar de vista no mueve ni borra ninguna tarjeta. */
   const updateFrameView = (id: string, vista: FrameView) => {
-    updateBoard((board) => ({
-      ...board,
-      cards: board.cards.map((card) => {
-        if (card.id !== id || card.type !== 'marco') return card;
-        const data = readFrameData(card);
-        return { ...card, datos: { ...card.datos, ...data, vista } };
-      }),
-    }));
+    updateBoard((board) => ({ ...board, cards: setFrameView(board.cards, id, vista) }));
   };
 
   /** Las herramientas entregan la tarjeta completa; se conserva el agrupado de deshacer por campo de texto. */
@@ -1183,14 +1200,23 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             const isConnectionSource = connectFromId === card.id;
             if (card.type === 'marco') {
               const frame = readFrameData(card);
-              const childCount = frame.hijos.filter((id) => activeBoard.cards.some((item) => item.id === id)).length;
+              const childCount = frame.hijos.filter((id) => cardsById.has(id)).length;
               return (
                 <article
                   key={card.id}
                   data-card-id={card.id}
-                  className={`board-frame ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''}`}
+                  className={`board-frame ${frame.vista === 'archivo' ? 'is-archive' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''}`}
                   style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
                   onClick={(event) => handleCardSelection(card.id, event)}
+                  onDoubleClick={(event) => {
+                    if (frame.vista !== 'archivo') return;
+                    const target = event.target as HTMLElement;
+                    if (target.closest('input,select,a')) return;
+                    const control = target.closest('button');
+                    if (control && !control.classList.contains('archivo-zone')) return;
+                    event.stopPropagation();
+                    setArchiveFullscreenId(card.id);
+                  }}
                   onBlurCapture={closeTextGroup}
                 >
                   <div className="board-frame-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover el marco y sus tarjetas">
@@ -1200,14 +1226,24 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                       Ver como
                       <select value={frame.vista} onChange={(event) => updateFrameView(card.id, event.target.value as FrameView)} aria-label={`Ver como: ${card.title || 'marco'}`}>
                         <option value="libre">Libre</option>
+                        <option value="archivo">Archivo</option>
                       </select>
                     </label>
                     <button className="board-frame-delete" onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar marco" title="Eliminar el marco y dejar sus tarjetas"><X size={14} /></button>
                   </div>
-                  <div className="board-frame-meta">{childCount} {childCount === 1 ? 'tarjeta' : 'tarjetas'} dentro</div>
+                  {frame.vista === 'archivo' ? (
+                    <>
+                      <ArchivoView frameTitle={card.title} cards={activeBoard.cards} childIds={frame.hijos} />
+                      <div className="board-frame-hint">Doble clic: pantalla completa · Esc para volver</div>
+                    </>
+                  ) : (
+                    <div className="board-frame-meta">{childCount} {childCount === 1 ? 'tarjeta' : 'tarjetas'} dentro</div>
+                  )}
                 </article>
               );
             }
+            // Los hijos de un marco en vista Archivo se pintan dentro del marco, no encima.
+            if (archivedChildIds.has(card.id)) return null;
             return (
               <article
                 key={card.id}
@@ -1260,6 +1296,18 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         </div>
         <div className="board-count">{activeBoard.cards.length} {activeBoard.cards.length === 1 ? 'tarjeta' : 'tarjetas'} · arrastra el fondo para moverte · ⌘/Ctrl + rueda para acercar</div>
       </main>
+
+      {archiveFullscreenFrame && (
+        <div className="board-archive-fullscreen" role="dialog" aria-modal="true" aria-label={`Archivo a pantalla completa: ${archiveFullscreenFrame.title || 'marco'}`}>
+          <button type="button" className="archivo-fullscreen-close" onClick={() => setArchiveFullscreenId(null)}>Esc · volver a la pizarra</button>
+          <ArchivoView
+            frameTitle={archiveFullscreenFrame.title}
+            cards={activeBoard.cards}
+            childIds={readFrameData(archiveFullscreenFrame).hijos}
+            fullscreen
+          />
+        </div>
+      )}
 
       {selectedCards.length > 1 ? (
         <aside className="board-selection" aria-live="polite">{selectedCards.length} tarjetas seleccionadas</aside>

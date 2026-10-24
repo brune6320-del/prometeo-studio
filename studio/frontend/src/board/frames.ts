@@ -4,8 +4,15 @@ import { DEFAULT_CARD_LAYOUT_HEIGHT, type CardSize } from './geometry';
 /**
  * Un marco contiene tarjetas por id, no las copia. Mover el marco mueve a sus hijos
  * y borrar el marco los deja donde están (skill prometeo-herramientas).
+ * Las vistas solo cambian cómo se pintan esos hijos: nunca su posición ni sus datos.
  */
-export type FrameView = 'libre';
+export type FrameView = 'libre' | 'archivo';
+
+const FRAME_VIEWS: readonly FrameView[] = ['libre', 'archivo'];
+
+export function normalizeFrameView(value: unknown): FrameView {
+  return FRAME_VIEWS.includes(value as FrameView) ? (value as FrameView) : 'libre';
+}
 
 export interface FrameData {
   alto: number;
@@ -42,7 +49,7 @@ export function readFrameData(card: BoardCard): FrameData {
   const hijos = Array.isArray(raw.hijos)
     ? [...new Set(raw.hijos.filter((id): id is string => typeof id === 'string' && id.length > 0))].slice(0, MAX_FRAME_CHILDREN)
     : [];
-  return { alto, hijos, vista: 'libre' };
+  return { alto, hijos, vista: normalizeFrameView(raw.vista) };
 }
 
 /** Valida y acota los datos de un marco al cargar; los hijos deben existir en el tablero. */
@@ -56,7 +63,20 @@ export function normalizeFrameData(value: unknown, selfId: string, cardIds: Read
       (id): id is string => typeof id === 'string' && id !== selfId && cardIds.has(id),
     ))].slice(0, MAX_FRAME_CHILDREN)
     : [];
-  return { alto, hijos, vista: 'libre' };
+  return { alto, hijos, vista: normalizeFrameView(raw.vista) };
+}
+
+/** Cambia solo la vista del marco; posiciones, hijos y datos de las demás tarjetas no se tocan. */
+export function setFrameView(cards: BoardCard[], frameId: string, vista: FrameView): BoardCard[] {
+  let changed = false;
+  const next = cards.map((card) => {
+    if (card.id !== frameId || !isFrameCard(card)) return card;
+    const data = readFrameData(card);
+    if (data.vista === vista) return card;
+    changed = true;
+    return { ...card, datos: { ...card.datos, ...data, vista } };
+  });
+  return changed ? next : cards;
 }
 
 export function frameRect(card: BoardCard): FrameRect {
