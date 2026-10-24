@@ -1,4 +1,6 @@
-export type BoardCardType = 'note' | 'link' | 'media';
+import { normalizeFrameData, readFrameData } from './frames';
+
+export type BoardCardType = 'note' | 'link' | 'media' | (string & {});
 export type BoardMediaKind = 'image' | 'video' | 'audio' | 'file';
 
 export interface BoardMedia {
@@ -19,6 +21,8 @@ export interface BoardCard {
   color: 'paper' | 'sand' | 'sage' | 'rose';
   url?: string;
   media?: BoardMedia;
+  /** Campos propios de una herramienta que esta versión no conoce; se guardan sin interpretar. */
+  datos?: Record<string, unknown>;
 }
 
 export interface BoardRelation {
@@ -141,8 +145,11 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
     let id = boundedText(entry.id, '', 120).trim();
     if (!id || usedIds.has(id)) id = newBoardId('card');
     usedIds.add(id);
-    const requestedType = entry.type;
-    const type: BoardCardType = requestedType === 'link' || requestedType === 'media' ? requestedType : 'note';
+    const requestedType = boundedText(entry.type, 'note', 60).trim();
+    // Un tipo que esta versión no conoce se conserva tal cual: la tarjeta se pinta como
+    // «herramienta no instalada» y sus datos no se pierden al volver a guardar.
+    const type: BoardCardType = requestedType || 'note';
+    const knownType = type === 'note' || type === 'link' || type === 'media';
     const media = normalizeMedia(entry.media);
     const url = boundedText(entry.url, '', 2048).trim();
     const card: BoardCard = {
@@ -157,10 +164,25 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
     };
     if (type === 'link') card.url = isSafeExternalUrl(url) ? url : '';
     if (media && type === 'media') card.media = media;
+    if (!knownType) {
+      // Sin herramienta instalada no se interpreta el contenido: se guarda literal.
+      if (url) card.url = url;
+      if (media) card.media = media;
+      const reserved = new Set(['id', 'type', 'title', 'body', 'x', 'y', 'width', 'color', 'url', 'media', 'datos']);
+      const extras = Object.fromEntries(Object.entries(entry).filter(([key]) => !reserved.has(key)));
+      const propios = isRecord(entry.datos) ? { ...entry.datos, ...extras } : extras;
+      if (Object.keys(propios).length > 0) card.datos = propios;
+    }
     cards.push(card);
   }
 
   const cardIds = new Set(cards.map((card) => card.id));
+  // Un marco guarda solo ids: al cargar se descartan los que ya no existen y se acota su alto.
+  const normalizedCards = cards.map((card) => {
+    if (card.type !== 'marco') return card;
+    const raw = isRecord(card.datos) ? card.datos : {};
+    return { ...card, datos: { ...raw, ...normalizeFrameData(raw, card.id, cardIds) } };
+  });
   const relationIds = new Set<string>();
   const relations: BoardRelation[] = [];
   for (const entry of value.relations) {
@@ -180,7 +202,7 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
     title: boundedText(value.title, 'Mi tablero', 120),
     createdAt: boundedText(value.createdAt, new Date().toISOString(), 80),
     updatedAt: boundedText(value.updatedAt, new Date().toISOString(), 80),
-    cards,
+    cards: normalizedCards,
     relations,
   };
 }
@@ -201,7 +223,19 @@ export function cloneBoardForImport(board: BoardDocument): BoardDocument {
     title: `${copy.title} (importado)`.slice(0, 120),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    cards: copy.cards.map((card) => ({ ...card, id: idMap.get(card.id)! })),
+    cards: copy.cards.map((card) => {
+      const mapped = { ...card, id: idMap.get(card.id)! };
+      if (card.type === 'marco') {
+        const data = readFrameData(card);
+        const raw = isRecord(card.datos) ? card.datos : {};
+        mapped.datos = {
+          ...raw,
+          ...data,
+          hijos: data.hijos.map((id) => idMap.get(id)).filter((id): id is string => Boolean(id)),
+        };
+      }
+      return mapped;
+    }),
     relations: copy.relations.map((relation) => ({
       id: newBoardId('relation'),
       from: idMap.get(relation.from)!,

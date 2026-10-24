@@ -5,7 +5,6 @@ import {
   FolderPlus,
   Magnet,
   Download,
-  FileUp,
   ImagePlus,
   Link2,
   Plus,
@@ -24,8 +23,6 @@ import {
   boardToMarkdown,
   cloneBoardForImport,
   createBoard,
-  createCard,
-  createMediaCard,
   isSafeExternalUrl,
   makeBoardExport,
   markdownToBoard,
@@ -38,8 +35,21 @@ import {
 } from '../board/model';
 import { fitBoardCamera, zoomAtPoint, screenToWorld } from '../board/camera';
 import { alignCards, distributeCards, snapPosition, type Alignment, type CardSize, type DistributionAxis } from '../board/geometry';
+import {
+  cardsInsideFrame,
+  detachCardFromFrames,
+  FRAME_MIN_SIZE,
+  readFrameData,
+  rectFromPoints,
+  removeFrameKeepingChildren,
+  type FrameRect,
+  type FrameView,
+} from '../board/frames';
 import { emptyBoardHistory, recordBoardChange, redoBoardChange, undoBoardChange, type BoardHistory } from '../board/history';
 import { loadBoardWorkspace } from '../board/storage';
+import { BoardCardContent } from '../board/tools/CardView';
+import { BoardToolMenu } from '../board/tools/menu';
+import { getBoardTool } from '../board/tools/registry';
 import { enqueueBoardSave, flushBoardWrites, removeBoardFromStore, rememberActiveBoard } from '../board/saveQueue';
 import {
   createPdfReference,
@@ -95,10 +105,6 @@ function cardCenter(card: BoardCard): { x: number; y: number } {
   return { x: card.x + card.width / 2, y: card.y + 100 };
 }
 
-function fileMediaKind(media: BoardMedia): 'image' | 'video' | 'audio' | 'file' {
-  return media.kind;
-}
-
 export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   onBack,
   locked = false,
@@ -131,6 +137,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [connectFromId, setConnectFromId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [linkDialog, setLinkDialog] = useState(false);
   const [linkTitle, setLinkTitle] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
@@ -143,9 +150,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const viewportRef = useRef<HTMLDivElement>(null);
   const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
   const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; startBoard: BoardDocument; gesture: string; moved: boolean } | null>(null);
+  /** Herramienta de marco elegida en el menú: el siguiente arrastre dibuja el rectángulo. */
+  const [frameToolId, setFrameToolId] = useState<string | null>(null);
+  const [frameDraft, setFrameDraft] = useState<FrameRect | null>(null);
+  const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number } } | null>(null);
   const [boardHistories, setBoardHistories] = useState<Record<string, BoardHistory>>({});
   /** Un clic que llega después de arrastrar o de un gesto con modificador no debe cambiar la selección otra vez. */
   const suppressCardClick = useRef(false);
+  /** El clic posterior a dibujar un marco no debe vaciar la selección recién creada. */
+  const suppressViewportClick = useRef(false);
   /** Cada salida de un campo de texto cierra el grupo de deshacer de esa escritura. */
   const textSession = useRef(0);
   const closeTextGroup = () => {
@@ -321,13 +334,61 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setBoards((current) => current.map((board) => board.id === activeBoard.id ? nextBoard : board));
   }, [activeBoard]);
 
-  const addCard = useCallback((type: 'note' | 'link') => {
-    if (!activeBoard) return;
+  /** Crea una tarjeta con la herramienta del registro, en el centro de la vista. */
+  const addToolCard = useCallback((toolId: string, configure?: (card: BoardCard) => void): BoardCard | null => {
+    const tool = getBoardTool(toolId);
+    if (!activeBoard) return null;
+    if (frameToolId) setNotice(null);
+    setFrameToolId(null);
+    setFrameDraft(null);
+    frameDraw.current = null;
+    if (!tool) {
+      setNotice(`La herramienta «${toolId}» no está instalada.`);
+      return null;
+    }
     const center = screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, { pan, zoom });
-    const card = createCard(type, center.x - 130, center.y - 90);
+    const card = tool.crear(center.x - 130, center.y - 90) as BoardCard;
+    configure?.(card);
     updateBoard((board) => ({ ...board, cards: [...board.cards, card] }));
     setSelectedCardIds([card.id]);
-  }, [activeBoard, pan, updateBoard, viewportSize, zoom]);
+    return card;
+  }, [activeBoard, frameToolId, pan, updateBoard, viewportSize, zoom]);
+
+  const chooseTool = useCallback((toolId: string) => {
+    setAddMenuOpen(false);
+    const tool = getBoardTool(toolId);
+    if (tool?.tipo === 'marco') {
+      setFrameToolId(toolId);
+      setNotice('Arrastra en la pizarra para dibujar el marco. Escape para cancelar.');
+      return;
+    }
+    setFrameToolId(null);
+    addToolCard(toolId);
+  }, [addToolCard]);
+
+  /** El marco se dibuja arrastrando; las tarjetas cuyo centro cae dentro pasan a ser hijas por id. */
+  const createFrameFromRect = useCallback((rect: FrameRect, toolId: string) => {
+    const tool = getBoardTool(toolId);
+    if (!tool || !activeBoard) return;
+    const frame = tool.crear(rect.x, rect.y) as BoardCard;
+    const children = cardsInsideFrame(activeBoard.cards, rect, measureCardSizes());
+    const data = readFrameData(frame);
+    frame.width = Math.max(FRAME_MIN_SIZE, rect.width);
+    frame.datos = {
+      ...frame.datos,
+      ...data,
+      alto: Math.max(FRAME_MIN_SIZE, rect.height),
+      hijos: children,
+      vista: 'libre',
+    };
+    updateBoard((board) => ({ ...board, cards: [...board.cards, frame] }));
+    setSelectedCardIds([frame.id]);
+    setFrameToolId(null);
+    setFrameDraft(null);
+    setNotice(children.length === 0
+      ? 'Marco creado. No quedó ninguna tarjeta dentro.'
+      : `Marco creado con ${children.length} ${children.length === 1 ? 'tarjeta' : 'tarjetas'} dentro.`);
+  }, [activeBoard, measureCardSizes, updateBoard]);
 
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
@@ -361,7 +422,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const fitBoard = () => centerCamera(activeBoard);
 
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-controls, .board-dialog, button, input, a, .board-empty')) return;
+    if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-frame, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
     panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
     setIsPanning(true);
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -380,8 +441,66 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
   };
 
+  const viewportWorldPoint = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, { pan, zoom });
+  };
+
+  const startFrameDraw = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || !frameToolId) return;
+    if ((event.target as HTMLElement).closest('button, input, select, textarea, a, .board-zoom-controls, .board-empty, .board-controls')) return;
+    const start = viewportWorldPoint(event);
+    frameDraw.current = { pointerId: event.pointerId, start };
+    setFrameDraft(rectFromPoints(start, start));
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveFrameDraw = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = frameDraw.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    setFrameDraft(rectFromPoints(drag.start, viewportWorldPoint(event)));
+  };
+
+  const endFrameDraw = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = frameDraw.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const rect = rectFromPoints(drag.start, viewportWorldPoint(event));
+    frameDraw.current = null;
+    suppressViewportClick.current = true;
+    window.setTimeout(() => { suppressViewportClick.current = false; }, 0);
+    if (!frameToolId) {
+      setFrameDraft(null);
+      return;
+    }
+    if (rect.width < FRAME_MIN_SIZE || rect.height < FRAME_MIN_SIZE) {
+      setFrameDraft(null);
+      setNotice(`El marco necesita al menos ${FRAME_MIN_SIZE} × ${FRAME_MIN_SIZE}. Vuelve a arrastrar o pulsa Escape.`);
+      return;
+    }
+    createFrameFromRect(rect, frameToolId);
+  };
+
+  const beginViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (frameToolId) {
+      startFrameDraw(event);
+      return;
+    }
+    beginPan(event);
+  };
+
+  const moveViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (frameDraw.current) moveFrameDraw(event);
+    else movePan(event);
+  };
+
+  const endViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (frameDraw.current) endFrameDraw(event);
+    else endPan(event);
+  };
+
   const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || connectMode || (event.target as HTMLElement).closest('input,button,a,textarea') || !activeBoard) return;
+    if (event.button !== 0 || frameToolId || connectMode || (event.target as HTMLElement).closest('input,button,a,textarea,select') || !activeBoard) return;
     suppressCardClick.current = false;
     const hasModifier = event.shiftKey || event.metaKey || event.ctrlKey;
     let nextSelection = selectedCardIds;
@@ -399,7 +518,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (nextSelection !== selectedCardIds) setSelectedCardIds(nextSelection);
     if (hasModifier && !nextSelection.includes(card.id)) return;
 
-    const ids = hasModifier ? [card.id] : nextSelection.includes(card.id) ? nextSelection : [card.id];
+    const ids = hasModifier
+      ? [card.id]
+      : card.type === 'marco'
+        ? [...new Set([...nextSelection.includes(card.id) ? nextSelection : [card.id], ...readFrameData(card).hijos])]
+        : nextSelection.includes(card.id) ? nextSelection : [card.id];
     const positions = new Map(
       activeBoard.cards.filter((item) => ids.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]),
     );
@@ -506,6 +629,34 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     window.addEventListener('keydown', handleHistoryShortcut);
     return () => window.removeEventListener('keydown', handleHistoryShortcut);
   }, [redo, undo]);
+
+  useEffect(() => {
+    const handleAddShortcut = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target;
+      const typing = target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+      if (event.key === 'Escape') {
+        if (frameToolId) {
+          event.preventDefault();
+          frameDraw.current = null;
+          setFrameDraft(null);
+          setFrameToolId(null);
+          setNotice(null);
+          return;
+        }
+        if (addMenuOpen) {
+          event.preventDefault();
+          setAddMenuOpen(false);
+        }
+        return;
+      }
+      if (typing || event.key.toLocaleLowerCase() !== 'n') return;
+      event.preventDefault();
+      setAddMenuOpen((open) => !open);
+    };
+    window.addEventListener('keydown', handleAddShortcut);
+    return () => window.removeEventListener('keydown', handleAddShortcut);
+  }, [addMenuOpen, frameToolId]);
 
   const handleCardSelection = (cardId: string, event: React.MouseEvent<HTMLElement>) => {
     if (suppressCardClick.current) {
@@ -728,12 +879,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       return;
     }
     if (!activeBoard) return;
-    const center = screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, { pan, zoom });
-    const card = createCard('link', center.x - 130, center.y - 90);
-    card.title = linkTitle.trim() || linkUrl.trim();
-    card.url = linkUrl.trim();
-    updateBoard((board) => ({ ...board, cards: [...board.cards, card] }));
-    setSelectedCardIds([card.id]);
+    const created = addToolCard('link', (card) => {
+      card.title = linkTitle.trim() || linkUrl.trim();
+      card.url = linkUrl.trim();
+    });
+    if (!created) return;
     setLinkDialog(false);
     setLinkTitle('');
     setLinkUrl('');
@@ -751,10 +901,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       const dataUrl = await readFileAsDataUrl(file);
       const kind = mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'file';
       const media: BoardMedia = { name: file.name, mimeType, dataUrl, kind };
-      const center = screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, { pan, zoom });
-      const card = createMediaCard(center.x - 145, center.y - 100, media);
-      updateBoard((board) => ({ ...board, cards: [...board.cards, card] }));
-      setSelectedCardIds([card.id]);
+      const created = addToolCard('media', (card) => {
+        card.title = media.name.replace(/\.[^.]+$/, '') || 'Recurso';
+        card.media = media;
+      });
+      if (!created) return;
       setNotice('Recurso añadido y guardado dentro del tablero local.');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'No se pudo añadir el archivo.');
@@ -800,13 +951,44 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     updateBoard((board) => ({ ...board, cards: board.cards.map((card) => card.id === id ? { ...card, ...patch } : card) }), { coalesceKey });
   };
 
-  const removeCard = (id: string) => {
-    if (!window.confirm('¿Eliminar esta tarjeta y sus relaciones?')) return;
+  /** «Ver como» del marco. En H-3 solo existe Libre; H-4 y H-5 añaden sus vistas. */
+  const updateFrameView = (id: string, vista: FrameView) => {
     updateBoard((board) => ({
       ...board,
-      cards: board.cards.filter((card) => card.id !== id),
-      relations: board.relations.filter((relation) => relation.from !== id && relation.to !== id),
+      cards: board.cards.map((card) => {
+        if (card.id !== id || card.type !== 'marco') return card;
+        const data = readFrameData(card);
+        return { ...card, datos: { ...card.datos, ...data, vista } };
+      }),
     }));
+  };
+
+  /** Las herramientas entregan la tarjeta completa; se conserva el agrupado de deshacer por campo de texto. */
+  const replaceCard = (next: BoardCard) => {
+    const current = activeBoard?.cards.find((card) => card.id === next.id);
+    if (!current) return;
+    const changed = (Object.keys(next) as Array<keyof BoardCard>).filter((key) => next[key] !== current[key]);
+    const field = changed.length === 1 ? changed[0] : null;
+    const coalesceKey = field === 'title' || field === 'body' ? `card:${next.id}:${field}:${textSession.current}` : undefined;
+    updateBoard((board) => ({ ...board, cards: board.cards.map((card) => card.id === next.id ? next : card) }), { coalesceKey });
+  };
+
+  const removeCard = (id: string) => {
+    const card = activeBoard?.cards.find((item) => item.id === id);
+    const isFrame = card?.type === 'marco';
+    if (!window.confirm(isFrame
+      ? '¿Eliminar este marco? Las tarjetas de dentro seguirán en la pizarra.'
+      : '¿Eliminar esta tarjeta y sus relaciones?')) return;
+    updateBoard((board) => {
+      const cards = isFrame
+        ? removeFrameKeepingChildren(board.cards, id)
+        : detachCardFromFrames(board.cards.filter((item) => item.id !== id), id);
+      return {
+        ...board,
+        cards,
+        relations: board.relations.filter((relation) => relation.from !== id && relation.to !== id),
+      };
+    });
     setSelectedCardIds((current) => current.filter((selectedId) => selectedId !== id));
   };
 
@@ -815,11 +997,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const count = selectedCardIds.length;
     if (!window.confirm(`¿Eliminar ${count} ${count === 1 ? 'tarjeta seleccionada' : 'tarjetas seleccionadas'} y sus relaciones?`)) return;
     const selected = new Set(selectedCardIds);
-    updateBoard((board) => ({
-      ...board,
-      cards: board.cards.filter((card) => !selected.has(card.id)),
-      relations: board.relations.filter((relation) => !selected.has(relation.from) && !selected.has(relation.to)),
-    }));
+    updateBoard((board) => {
+      let cards = board.cards.filter((card) => !selected.has(card.id));
+      for (const id of selected) cards = detachCardFromFrames(cards, id);
+      return {
+        ...board,
+        cards,
+        relations: board.relations.filter((relation) => !selected.has(relation.from) && !selected.has(relation.to)),
+      };
+    });
     setSelectedCardIds([]);
   };
 
@@ -883,7 +1069,18 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         <button className={`board-tool ${referencesOpen ? 'active' : ''}`} onClick={() => setReferencesOpen((open) => !open)} disabled={!activeProjectReferences.length} aria-pressed={referencesOpen} title="Mostrar referencias PDF de este proyecto">Referencias PDF ({activeProjectReferences.length})</button>
         <button className="board-tool" onClick={exportProjectMarkdown} disabled={!activeProject} title="Exportar notas del proyecto para Obsidian">Exportar proyecto a Obsidian</button>
         <span className="board-tool-divider" />
-        <button className="board-tool primary" onClick={() => addCard('note')}><StickyNote size={15} /> Nueva nota</button>
+        <div className="board-add">
+          <button
+            className="board-tool primary"
+            onClick={() => setAddMenuOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={addMenuOpen}
+            title="Añadir tarjeta (N)"
+          >
+            <Plus size={15} /> Añadir
+          </button>
+        </div>
+        <button className="board-tool" onClick={() => addToolCard('note')}><StickyNote size={15} /> Nueva nota</button>
         <button className="board-tool" onClick={() => { setLinkDialog(true); setLinkError(null); }}><Link2 size={15} /> Añadir enlace</button>
         <button className="board-tool" onClick={() => mediaInput.current?.click()}><ImagePlus size={15} /> Añadir multimedia</button>
         <span className="board-tool-divider" />
@@ -953,13 +1150,21 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       <main
         ref={viewportRef}
-        className={`board-viewport ${isPanning ? 'panning' : ''} ${connectMode ? 'connecting' : ''}`}
+        className={`board-viewport ${isPanning ? 'panning' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
         style={{ backgroundPosition: `${pan.x}px ${pan.y}px`, backgroundSize: `${24 * zoom}px ${24 * zoom}px` }}
-        onPointerDown={beginPan}
-        onPointerMove={movePan}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
-        onClick={(event) => { if (event.target === viewportRef.current) setSelectedCardIds([]); }}
+        onPointerDown={beginViewportGesture}
+        onPointerMove={moveViewportGesture}
+        onPointerUp={endViewportGesture}
+        onPointerCancel={endViewportGesture}
+        onClickCapture={(event) => {
+          if (!suppressViewportClick.current) return;
+          suppressViewportClick.current = false;
+          event.stopPropagation();
+          event.preventDefault();
+        }}
+        onClick={(event) => {
+          if (event.target === viewportRef.current) setSelectedCardIds([]);
+        }}
       >
         <svg className="board-relations" width={viewportSize.width} height={viewportSize.height} viewBox={`0 0 ${Math.max(1, viewportSize.width)} ${Math.max(1, viewportSize.height)}`} aria-label="Relaciones entre tarjetas">
             <defs><marker id="board-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" /></marker></defs>
@@ -976,6 +1181,33 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           {activeBoard.cards.map((card) => {
             const matches = matchingCards.has(card.id);
             const isConnectionSource = connectFromId === card.id;
+            if (card.type === 'marco') {
+              const frame = readFrameData(card);
+              const childCount = frame.hijos.filter((id) => activeBoard.cards.some((item) => item.id === id)).length;
+              return (
+                <article
+                  key={card.id}
+                  data-card-id={card.id}
+                  className={`board-frame ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''}`}
+                  style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
+                  onClick={(event) => handleCardSelection(card.id, event)}
+                  onBlurCapture={closeTextGroup}
+                >
+                  <div className="board-frame-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover el marco y sus tarjetas">
+                    <span className="board-drag-grip" aria-hidden="true">⠿</span>
+                    <input className="board-frame-title" value={card.title} maxLength={200} onChange={(event) => updateCard(card.id, { title: event.target.value })} aria-label="Título del marco" />
+                    <label className="board-frame-view">
+                      Ver como
+                      <select value={frame.vista} onChange={(event) => updateFrameView(card.id, event.target.value as FrameView)} aria-label={`Ver como: ${card.title || 'marco'}`}>
+                        <option value="libre">Libre</option>
+                      </select>
+                    </label>
+                    <button className="board-frame-delete" onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar marco" title="Eliminar el marco y dejar sus tarjetas"><X size={14} /></button>
+                  </div>
+                  <div className="board-frame-meta">{childCount} {childCount === 1 ? 'tarjeta' : 'tarjetas'} dentro</div>
+                </article>
+              );
+            }
             return (
               <article
                 key={card.id}
@@ -989,39 +1221,33 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                     handleConnectCard(card.id);
                   } else handleCardSelection(card.id, event);
                 }}
+                onBlurCapture={closeTextGroup}
               >
                 <div className="board-card-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover la tarjeta">
                   <span className="board-drag-grip" aria-hidden="true">⠿</span>
-                  <input className="board-card-title" value={card.title} maxLength={200} onChange={(event) => updateCard(card.id, { title: event.target.value })} aria-label="Título de tarjeta" onBlur={closeTextGroup} />
+                  <input className="board-card-title" value={card.title} maxLength={200} onChange={(event) => updateCard(card.id, { title: event.target.value })} aria-label="Título de tarjeta" />
                   <button className={`board-connect-button ${connectMode ? 'visible' : ''}`} onClick={(event) => { event.stopPropagation(); handleConnectCard(card.id); }} title="Elegir para relacionar" aria-label="Relacionar esta tarjeta"><Link2 size={13} /></button>
                   <button className="board-card-delete" onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar tarjeta"><X size={14} /></button>
                 </div>
                 <div className="board-card-color-row" aria-label="Color de tarjeta">
                   {COLORS.map((color) => <button key={color} className={`board-color-swatch ${color} ${card.color === color ? 'current' : ''}`} onClick={() => updateCard(card.id, { color })} aria-label={`Color ${color}`} aria-pressed={card.color === color} />)}
                 </div>
-                {card.type === 'link' && (
-                  <div className="board-card-link">
-                    <Link2 size={13} aria-hidden="true" />
-                    {card.url && isSafeExternalUrl(card.url) ? <a href={card.url} target="_blank" rel="noreferrer">{card.url}</a> : <span>Añade una dirección web segura</span>}
-                  </div>
-                )}
-                {card.media && (
-                  <div className="board-card-media">
-                    {fileMediaKind(card.media) === 'image' && <img src={card.media.dataUrl} alt={card.title} draggable={false} />}
-                    {fileMediaKind(card.media) === 'video' && <video src={card.media.dataUrl} controls preload="metadata" />}
-                    {fileMediaKind(card.media) === 'audio' && <audio src={card.media.dataUrl} controls preload="metadata" />}
-                    {fileMediaKind(card.media) === 'file' && <a className="board-attachment" href={card.media.dataUrl} download={card.media.name}><FileUp size={17} />{card.media.name}</a>}
-                  </div>
-                )}
-                <textarea className="board-card-body" value={card.body} maxLength={12000} onChange={(event) => updateCard(card.id, { body: event.target.value })} placeholder={card.type === 'media' ? 'Añade un comentario…' : 'Escribe una idea…'} aria-label="Contenido de tarjeta" onBlur={closeTextGroup} />
+                <BoardCardContent card={card} editar={replaceCard} />
               </article>
             );
           })}
+          {frameDraft && (
+            <div
+              className="board-frame-draft"
+              style={{ left: frameDraft.x, top: frameDraft.y, width: frameDraft.width, height: frameDraft.height }}
+              aria-hidden="true"
+            />
+          )}
           {activeBoard.cards.length === 0 && (
             <div className="board-empty" style={{ left: (viewportSize.width / 2 - pan.x) / zoom - 170, top: (viewportSize.height / 2 - pan.y) / zoom - 60 }}>
               <strong>Tu espacio de ideas está listo</strong>
               <span>Agrega una nota, enlace o archivo para empezar.</span>
-              <button onClick={() => addCard('note')}><Plus size={14} /> Crear primera nota</button>
+              <button onClick={() => addToolCard('note')}><Plus size={14} /> Crear primera nota</button>
             </div>
           )}
         </div>
@@ -1040,6 +1266,21 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       ) : selectedCard ? (
         <aside className="board-selection" aria-live="polite">Seleccionada: <strong>{selectedCard.title || 'Sin título'}</strong></aside>
       ) : null}
+
+      {addMenuOpen && (
+        <div
+          className="board-add-backdrop"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setAddMenuOpen(false); }}
+        >
+          <div className="board-add-panel" role="presentation">
+            <div className="board-add-heading">
+              <span>Añadir tarjeta</span>
+              <button type="button" onClick={() => setAddMenuOpen(false)} aria-label="Cerrar menú"><X size={15} /></button>
+            </div>
+            <BoardToolMenu onChoose={chooseTool} />
+          </div>
+        </div>
+      )}
 
       {linkDialog && (
         <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setLinkDialog(false); }}>
