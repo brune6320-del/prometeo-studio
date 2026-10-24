@@ -5,6 +5,7 @@ import {
   FolderPlus,
   Magnet,
   Download,
+  Eye,
   ImagePlus,
   Library,
   Link2,
@@ -49,7 +50,8 @@ import {
 } from '../board/frames';
 import { emptyBoardHistory, recordBoardChange, redoBoardChange, undoBoardChange, type BoardHistory } from '../board/history';
 import { agregarImagenDesdeUrl, importarBiblioteca } from '../board/referentes/biblioteca';
-import { leerReferente } from '../board/referentes/model';
+import { aceptarLectura } from '../board/referentes/mirar';
+import { leerReferente, type Lectura } from '../board/referentes/model';
 import { loadBoardWorkspace } from '../board/storage';
 import { BoardCardContent } from '../board/tools/CardView';
 import { BoardToolMenu } from '../board/tools/menu';
@@ -73,6 +75,7 @@ import {
   setActiveProject,
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
+import { MirarDialog } from './MirarDialog';
 import { ArchivoView } from './ArchivoView';
 import { MuroView } from './MuroView';
 import { MesaView } from './MesaView';
@@ -135,6 +138,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [pdfReferenceQuote, setPdfReferenceQuote] = useState('');
   const [pdfReferenceNote, setPdfReferenceNote] = useState('');
   const [referencesOpen, setReferencesOpen] = useState(false);
+  /** Ritual «Volver a mirar»: propuestas que aún no tocan el referente. */
+  const [mirarOpen, setMirarOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const writes = useBoardWrites();
   const saveState = writes.error ? 'error' : writes.pending > 0 ? 'saving' : 'saved';
@@ -361,6 +366,37 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     enqueueBoardSave(nextBoard);
     setBoards((current) => current.map((board) => board.id === activeBoard.id ? nextBoard : board));
   }, [activeBoard]);
+
+  /** Una lectura aceptada puede caer en la Biblioteca aunque el tablero abierto sea otro. */
+  const updateBoardById = useCallback((
+    boardId: string,
+    mutate: (board: BoardDocument) => BoardDocument,
+    options: { recordHistory?: boolean; coalesceKey?: string } = {},
+  ) => {
+    const target = boards.find((board) => board.id === boardId);
+    if (!target) return;
+    const nextBoard = { ...mutate(target), updatedAt: new Date().toISOString() };
+    if (options.recordHistory !== false) {
+      setBoardHistories((current) => ({
+        ...current,
+        [boardId]: recordBoardChange(current[boardId] ?? emptyBoardHistory(), target, nextBoard, options.coalesceKey),
+      }));
+    }
+    enqueueBoardSave(nextBoard);
+    setBoards((current) => current.map((board) => board.id === boardId ? nextBoard : board));
+  }, [boards]);
+
+  const aceptarLecturaEnReferente = useCallback((boardId: string, cardId: string, lectura: Lectura) => {
+    const nombre = boards
+      .find((board) => board.id === boardId)
+      ?.cards.find((card) => card.id === cardId)
+      ?.title;
+    updateBoardById(boardId, (board) => ({
+      ...board,
+      cards: board.cards.map((card) => card.id === cardId ? aceptarLectura(card, lectura) : card),
+    }));
+    setNotice(`Lectura aceptada y guardada en «${nombre || 'el referente'}».`);
+  }, [boards, updateBoardById]);
 
   /** Crea una tarjeta con la herramienta del registro, en el centro de la vista. */
   const addToolCard = useCallback((toolId: string, configure?: (card: BoardCard) => void): BoardCard | null => {
@@ -1005,7 +1041,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const exportMarkdown = () => {
     if (!activeBoard) return;
-    downloadText(boardFilename(activeBoard.title, 'md'), boardToMarkdown(activeBoard), 'text/markdown;charset=utf-8');
+    const markdown = boardToMarkdown(activeBoard, {
+      cardMarkdown: (card) => {
+        const tool = getBoardTool(card.type);
+        return tool?.exportarMarkdown ? tool.exportarMarkdown(card) : null;
+      },
+    });
+    downloadText(boardFilename(activeBoard.title, 'md'), markdown, 'text/markdown;charset=utf-8');
     setNotice('Markdown listo para Obsidian. Los adjuntos multimedia permanecen en la exportación JSON.');
   };
 
@@ -1227,6 +1269,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           {search && <button onClick={() => setSearch('')} aria-label="Limpiar búsqueda"><X size={13} /></button>}
         </div>
         <div className="board-spacer" />
+        <button className="board-tool" onClick={() => setMirarOpen(true)} title="Elegir tres referentes y unos ojos, y pedir tres lecturas"><Eye size={14} /> Volver a mirar</button>
         <button className="board-tool" onClick={() => void importReferentes()} title="Crear o actualizar el tablero Biblioteca con los referentes de los vídeos"><Library size={14} /> Importar referentes</button>
         <button className="board-tool" onClick={() => importInput.current?.click()}><Upload size={14} /> Importar</button>
         <button className="board-tool" onClick={exportJson}><Download size={14} /> Exportar JSON</button>
@@ -1434,6 +1477,17 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       ) : selectedCard ? (
         <aside className="board-selection" aria-live="polite">Seleccionada: <strong>{selectedCard.title || 'Sin título'}</strong></aside>
       ) : null}
+
+      {mirarOpen && (
+        <MirarDialog
+          boards={boards}
+          activeBoardId={activeBoard.id}
+          tableroNombre={activeBoard.title}
+          proyecto={activeProject?.name || 'Proyecto general'}
+          onClose={() => setMirarOpen(false)}
+          onAceptar={aceptarLecturaEnReferente}
+        />
+      )}
 
       {addMenuOpen && (
         <div

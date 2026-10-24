@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "nota": "Doce ojos para el ritual «Volver a mirar». Cada uno mira distinto el mismo referente: no sustituyen la lectura de Bruno, solo le ofrecen preguntas.",
+  "ojos": [
+    {
+      "id": "tipografo-bauhaus",
+      "nombre": "Tipógrafo Bauhaus",
+      "comoMira": "Mide el espacio entre letras, el peso y la retícula antes de leer la frase.",
+      "preguntas": [
+        "¿Qué sostiene la composición cuando quitas el texto?",
+        "¿Dónde está el eje que ordena todo sin que se note?",
+        "¿Qué letra o signo podría ser la pieza entera?"
+      ],
+      "fuente": "Herbert Bayer, alfabeto «universal», Bauhaus, 1925; Bauhaus-Archiv, Berlín."
+    },
+    {
+      "id": "hannah-hoch",
+      "nombre": "Hannah Höch",
+      "comoMira": "Corta la imagen en fragmentos y busca el chiste incómodo que aparece al juntarlos mal.",
+      "preguntas": [
+        "¿Qué dos cosas que no van juntas producirían una tercera?",
+        "¿Qué rostro o resto cotidiano se puede cambiar de sitio sin que el conjunto pierda sentido?",
+        "¿Qué parte de la pieza sigue pidiendo ser recortada?"
+      ],
+      "fuente": "Hannah Höch, Cut with the Kitchen Knife Dada through the Last Weimar Beer-Belly Cultural Epoch of Germany, 1919–1920, Neue Nationalgalerie, Berlín."
+    },
+    {
+      "id": "situacionista-deriva",
+      "nombre": "Situacionista en deriva",
+      "comoMira": "Deja de ir al destino y lee lo que el recorrido dice sin querer.",
+      "preguntas": [
+        "¿Qué pasa si este material se usa en un lugar para el que no fue hecho?",
+        "¿Qué ambiente crea antes de que se entienda el mensaje?",
+        "¿Qué ruta alternativa abre este referente en la ciudad o en la página?"
+      ],
+      "fuente": "Guy Debord, «Théorie de la dérive», Internationale Situationniste nº 2, 1958."
+    },
+    {
+      "id": "arquitecta-brutalista",
+      "nombre": "Arquitecta brutalista",
+      "comoMira": "Pregunta por el peso, el material a la vista y lo que el edificio obliga a hacer al cuerpo.",
+      "preguntas": [
+        "¿Qué carga este referente y qué podría sostener sin maquillaje?",
+        "¿Dónde se ve la junta, el molde o la huella de haberlo hecho?",
+        "¿Qué gesto del cuerpo pide su escala?"
+      ],
+      "fuente": "Alison y Peter Smithson, Robin Hood Gardens, Londres, 1966–1972."
+    },
+    {
+      "id": "dj",
+      "nombre": "DJ",
+      "comoMira": "Escucha qué se repite, qué se corta y en qué segundo cambia el cuerpo de la sala.",
+      "preguntas": [
+        "¿Cuál es el sample que este referente está pidiendo prestado?",
+        "¿Qué parte se puede repetir hasta que cambie de sentido?",
+        "¿Dónde entraría el corte que hace que la gente se mueva?"
+      ],
+      "fuente": "David Toop, Ocean of Sound, Serpent's Tail, 1995."
+    },
+    {
+      "id": "archivista",
+      "nombre": "Archivista",
+      "comoMira": "Busca la ficha que falta, la fecha dudosa y la mano que escribió el reverso.",
+      "preguntas": [
+        "¿Qué dato de este referente todavía no está comprobado?",
+        "¿Qué vecino de estante lo explica mejor que su autor?",
+        "¿Qué se pierde si lo guardamos solo por su imagen?"
+      ],
+      "fuente": "Sven Spieker, The Big Archive: Art from Bureaucracy, MIT Press, 2008."
+    },
+    {
+      "id": "nino-7-anos",
+      "nombre": "Niño de 7 años",
+      "comoMira": "Dice lo primero que ve y no entiende por qué los adultos le dan tantas vueltas.",
+      "preguntas": [
+        "¿Qué es esto si no sé para qué sirve?",
+        "¿Qué parte me dan ganas de tocar o de romper?",
+        "¿Qué historia me invento con esto antes de leer la etiqueta?"
+      ],
+      "fuente": "Jean Piaget, La formación del símbolo en el niño, 1945."
+    },
+    {
+      "id": "disenadora-japonesa-60",
+      "nombre": "Diseñadora japonesa de los 60",
+      "comoMira": "Reduce hasta que solo queda una instrucción y un silencio alrededor.",
+      "preguntas": [
+        "¿Qué se puede quitar sin perder el gesto?",
+        "¿Cómo se comporta este referente en un formato pequeño y pobre?",
+        "¿Qué instrucción cabría en una tarjeta y bastaría para repetirlo?"
+      ],
+      "fuente": "Yoko Ono, Grapefruit, 1964."
+    },
+    {
+      "id": "irene-guerra",
+      "nombre": "Irene Guerra",
+      "comoMira": "Mira dos veces la misma mancha: primero lo que parece, luego lo que de verdad es.",
+      "preguntas": [
+        "¿Qué estoy viendo porque quiero verlo, y qué está realmente ahí?",
+        "¿Qué pasa si giro la pieza o la miro de lejos?",
+        "¿Qué detalle mínimo cambia toda la lectura?"
+      ],
+      "fuente": "Notas de taller de Bruno sobre Irene Guerra, 2026 (archivo interno de este proyecto)."
+    },
+    {
+      "id": "cartografo",
+      "nombre": "Cartógrafo",
+      "comoMira": "Dibuja el borde, la escala y el camino antes de nombrar el territorio.",
+      "preguntas": [
+        "¿Qué límite tiene este referente y qué queda fuera del mapa?",
+        "¿Qué escala lo vuelve útil para el proyecto de hoy?",
+        "¿Qué atajo o rodeo permite llegar a otra parte desde aquí?"
+      ],
+      "fuente": "Kevin Lynch, The Image of the City, MIT Press, 1960."
+    },
+    {
+      "id": "restauradora",
+      "nombre": "Restauradora",
+      "comoMira": "Distingue la grieta del daño, la intervención de la épica y lo que conviene no tocar.",
+      "preguntas": [
+        "¿Qué parte de este referente está viva y qué parte ya es ruina?",
+        "¿Qué se puede reparar sin borrar la huella del tiempo?",
+        "¿Qué intervención sería reversible y cuál sería una pérdida?"
+      ],
+      "fuente": "Cesare Brandi, Teoria del restauro, 1963."
+    },
+    {
+      "id": "bruno-10-anos",
+      "nombre": "Bruno dentro de 10 años",
+      "comoMira": "Pregunta qué de esto seguirá en pie cuando el proyecto ya no sea el centro.",
+      "preguntas": [
+        "¿Qué de este referente aguantará diez años de uso?",
+        "¿Qué estaría aprendiendo hoy si ya supiera cómo termina?",
+        "¿Qué debería guardar ahora para no tener que buscarlo después?"
+      ],
+      "fuente": "Bruno, cuaderno de taller, 2026 (carta a su yo de 2036)."
+    }
+  ]
+}

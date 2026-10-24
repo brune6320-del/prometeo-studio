@@ -251,9 +251,19 @@ function cleanMarkdownHeading(value: string): string {
   return value.replace(/[\r\n]+/g, ' ').replace(/^#+\s*/, '').trim() || 'Sin título';
 }
 
-export function boardToMarkdown(board: BoardDocument): string {
+export interface BoardMarkdownOptions {
+  /**
+   * Una herramienta con exportador propio (p. ej. Referente) aporta su bloque.
+   * Devolver `null` deja que se use el bloque genérico.
+   */
+  cardMarkdown?: (card: BoardCard) => string | null;
+}
+
+export function boardToMarkdown(board: BoardDocument, options: BoardMarkdownOptions = {}): string {
   const cardsById = new Map(board.cards.map((card) => [card.id, card]));
   const sections = board.cards.map((card) => {
+    const propio = options.cardMarkdown?.(card);
+    if (propio) return propio.trimEnd();
     const relations = board.relations
       .filter((relation) => relation.from === card.id || relation.to === card.id)
       .map((relation) => cardsById.get(relation.from === card.id ? relation.to : relation.from))

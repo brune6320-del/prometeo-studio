@@ -12,12 +12,16 @@ CORS va por fuera para que TODA respuesta (401, 500 incluidos) lleve sus cabecer
 sin ellas WebKit reduce cualquier error a "Load failed".
 """
 
+import asyncio
 import hmac
+import json
 import logging
 import os
 import sys
 import time
-from typing import Any, Dict, Optional
+import urllib.error
+import urllib.request
+from typing import Any, Dict, List, Optional
 
 import pymupdf
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
@@ -251,6 +255,23 @@ class VerifyExportRequest(BaseModel):
 
 class AgentChatRequest(BaseModel):
     message: str
+
+
+class MirarOjosReferente(BaseModel):
+    id: str = ""
+    nombre: str = ""
+    por_que: str = ""
+    archivo_origen: str = ""
+    etiquetas: List[str] = Field(default_factory=list)
+    url: str = ""
+
+
+class MirarOjosRequest(BaseModel):
+    proyecto: str = ""
+    ojos: str = ""
+    ojos_descripcion: str = ""
+    preguntas: List[str] = Field(default_factory=list)
+    referentes: List[MirarOjosReferente] = Field(default_factory=list)
 
 
 SAMPLE_DESCRIPTIONS = {
@@ -610,6 +631,128 @@ def get_session_manifest(session_id: str):
 @app.get("/api/sessions/{session_id}/audit_export")
 def get_session_audit_export(session_id: str):
     return _get_active_session(session_id).get_audit_export()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VOLVER A MIRAR · LECTURAS CON DEEPSEEK
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+DEEPSEEK_MODEL = "deepseek-chat"
+MAX_PALABRAS_LECTURA = 120
+
+
+def _recortar(valor: Any, limite: int) -> str:
+    return (valor if isinstance(valor, str) else "").strip()[:limite]
+
+
+def _limitar_palabras(texto: str, limite: int = MAX_PALABRAS_LECTURA) -> str:
+    palabras = texto.split()
+    if len(palabras) <= limite:
+        return " ".join(palabras)
+    return " ".join(palabras[:limite]) + "…"
+
+
+def _prompt_lectura(req: MirarOjosRequest, ref: MirarOjosReferente) -> str:
+    preguntas = "\n".join(f"- {_recortar(p, 300)}" for p in req.preguntas[:3] if _recortar(p, 300))
+    etiquetas = ", ".join(_recortar(e, 60) for e in ref.etiquetas[:12] if _recortar(e, 60))
+    proyecto = _recortar(req.proyecto, 200) or "el proyecto abierto"
+    return (
+        f"Eres {_recortar(req.ojos, 200) or 'un lector con ojos propios'}. "
+        f"Cómo miras: {_recortar(req.ojos_descripcion, 800)}\n"
+        f"Tus tres preguntas:\n{preguntas or '- ¿Qué le sirve hoy a este proyecto?'}\n\n"
+        f"Proyecto abierto: {proyecto}\n"
+        f"Referente: {_recortar(ref.nombre, 300)}\n"
+        f"Archivo de origen: {_recortar(ref.archivo_origen, 300) or 'sin dato'}\n"
+        f"Por qué se guardó: {_recortar(ref.por_que, 4000) or 'sin nota'}\n"
+        f"Etiquetas: {etiquetas or 'ninguna'}\n\n"
+        "Responde en español, en un solo párrafo de 120 palabras como máximo, a esta pregunta: "
+        f"¿qué le sirve hoy a {proyecto} de este referente? "
+        "Sé concreto y material; sin elogios, sin resumen y sin repetir la ficha. "
+        "Si el referente no alcanza, di exactamente qué falta comprobar."
+    )
+
+
+def _pedir_lectura(api_key: str, req: MirarOjosRequest, ref: MirarOjosReferente) -> str:
+    """Llamada bloqueante a DeepSeek. La clave no se registra ni se devuelve."""
+    cuerpo = json.dumps({
+        "model": DEEPSEEK_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Eres un lector de referentes de diseño. Escribes observaciones concretas, "
+                           "en español y en un máximo de 120 palabras. No inventas datos de la ficha.",
+            },
+            {"role": "user", "content": _prompt_lectura(req, ref)},
+        ],
+        "max_tokens": 320,
+        "temperature": 0.7,
+        "stream": False,
+    }).encode("utf-8")
+    peticion = urllib.request.Request(
+        DEEPSEEK_URL,
+        data=cuerpo,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(peticion, timeout=45) as respuesta:
+            datos = json.loads(respuesta.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        log.warning("deepseek rechazó la lectura: HTTP %s", exc.code)
+        return ""
+    except Exception as exc:  # red, TLS, tiempo, JSON roto
+        log.warning("deepseek no disponible: %s", type(exc).__name__)
+        return ""
+    try:
+        texto = datos["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        log.warning("deepseek devolvió una respuesta sin contenido")
+        return ""
+    return _limitar_palabras(_recortar(texto, 20000))
+
+
+@app.post("/api/referentes/mirar")
+async def mirar_referentes(req: MirarOjosRequest):
+    """Tres lecturas-propuesta. Sin clave o sin red devuelve el ritual en blanco."""
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    referentes = req.referentes[:3]
+    if not referentes:
+        return {"ok": True, "disponible": False, "motivo": "No hay referentes que mirar.", "modelo": "", "lecturas": []}
+    if not api_key:
+        return {
+            "ok": True,
+            "disponible": False,
+            "motivo": "Falta DEEPSEEK_API_KEY en el entorno del backend. Escribe las lecturas a mano.",
+            "modelo": "",
+            "lecturas": [{"texto": "", "modelo": ""} for _ in referentes],
+        }
+
+    resultados = await asyncio.gather(
+        *[run_in_threadpool(_pedir_lectura, api_key, req, ref) for ref in referentes],
+        return_exceptions=True,
+    )
+    lecturas = []
+    for resultado in resultados:
+        if isinstance(resultado, Exception):
+            log.warning("lectura fallida: %s", type(resultado).__name__)
+            texto = ""
+        else:
+            texto = _limitar_palabras(resultado or "")
+        lecturas.append({"texto": texto, "modelo": DEEPSEEK_MODEL if texto else ""})
+
+    if not any(item["texto"] for item in lecturas):
+        return {
+            "ok": True,
+            "disponible": False,
+            "motivo": "DeepSeek no respondió (sin red o sin cuota). Escribe las lecturas a mano.",
+            "modelo": "",
+            "lecturas": lecturas,
+        }
+    return {"ok": True, "disponible": True, "motivo": "", "modelo": DEEPSEEK_MODEL, "lecturas": lecturas}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -13,6 +13,8 @@ import type {
   DocumentSummary,
   HealthInfo,
   HostStatus,
+  MirarReferentesRequest,
+  MirarReferentesResponse,
   NodeDetail,
   NodeSummary,
   OCRLayerData,
@@ -151,6 +153,19 @@ const enc = encodeURIComponent;
 export const studioApi = {
   health(signal?: AbortSignal) {
     return request<HealthInfo>('/api/health', { signal, timeoutMs: 3000, stage: 'BOOT' });
+  },
+
+  /**
+   * «Volver a mirar»: pide hasta tres lecturas al motor local, que es quien
+   * habla con DeepSeek. La clave vive en el entorno del backend, nunca aquí.
+   */
+  mirarReferentes(input: MirarReferentesRequest) {
+    return request<MirarReferentesResponse>('/api/referentes/mirar', {
+      method: 'POST',
+      json: input,
+      timeoutMs: 120_000,
+      stage: 'API',
+    });
   },
 
   async getHostStatus(): Promise<HostStatus | null> {

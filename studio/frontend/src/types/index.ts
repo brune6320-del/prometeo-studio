@@ -337,3 +337,33 @@ export interface RasterPatchPreviewData {
   reasons?: string[];
   ring_delta_estimate?: number;
 }
+
+export interface MirarReferenteInput {
+  id: string;
+  nombre: string;
+  por_que: string;
+  archivo_origen: string;
+  etiquetas: string[];
+  url: string;
+}
+
+export interface MirarReferentesRequest {
+  proyecto: string;
+  ojos: string;
+  ojos_descripcion: string;
+  preguntas: string[];
+  referentes: MirarReferenteInput[];
+}
+
+export interface MirarReferenteLectura {
+  texto?: string;
+  modelo?: string;
+}
+
+export interface MirarReferentesResponse {
+  ok: boolean;
+  disponible?: boolean;
+  motivo?: string | null;
+  modelo?: string;
+  lecturas?: MirarReferenteLectura[];
+}
