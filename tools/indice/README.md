@@ -21,3 +21,11 @@ python3 -m venv .venv
 ```
 
 La primera ejecución necesita conexión para descargar los pesos. Para fotogramas de video instala además `opencv-python-headless>=4.8,<5`.
+
+## Indexar
+
+```sh
+nice -n 15 .venv/bin/python indexar.py /ruta/a/referentes --salida salidas/mi-indice --lote 2 --dispositivo cpu
+```
+
+Se recorren imágenes de forma recursiva; si hay videos, se muestrea un fotograma cada 5 segundos, hasta 24 por archivo. `--cada-segundos` y `--max-fotogramas` cambian esos límites. El directorio de salida contiene `vectores.npz` (vectores normalizados, IDs y SHA-256 de archivos fuente) e `indice.json` (rutas relativas, SHA-256, huella visual, tiempos de fotogramas, modelo y revisión). La carpeta de origen se lee sin modificarla.
