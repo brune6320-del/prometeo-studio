@@ -1,3 +1,5 @@
+@import './styles/tokens.css';
+
 /* ==========================================================================
    PROMETEO Studio · sistema de diseño "Forja"
    Grafito cálido + un único acento ascua. Los colores semánticos se reservan
@@ -6,80 +8,6 @@
    bordes de control ≥ 3:1. Ver PROMETEO_DESIGN_SYSTEM.md.
    ========================================================================== */
 
-:root {
-  color-scheme: dark;
-
-  /* Superficies */
-  --bg-0: #0f0f11;      /* lienzo de la app */
-  --bg-1: #151518;      /* paneles */
-  --bg-2: #1c1c20;      /* elementos elevados, campos */
-  --bg-3: #24242a;      /* hover */
-  --bg-canvas: #121215; /* fondo del visor */
-  --line: #2c2c33;      /* separadores decorativos */
-  --line-strong: #6e6e7b; /* bordes de control (≥ 3:1) */
-
-  /* Texto */
-  --text-1: #ededf2;
-  --text-2: #b9b9c4;
-  --text-3: #a0a0ac;
-
-  /* Acento de marca: ascua */
-  --ember: #ff8a52;
-  --ember-text: #ff9a6a;
-  --ember-soft: rgba(255, 138, 82, 0.14);
-  --ember-ring: rgba(255, 138, 82, 0.55);
-  --on-ember: #1b0e07;
-
-  /* Estados del documento */
-  --st-staged: #86b4ff;
-  --st-staged-soft: rgba(134, 180, 255, 0.13);
-  --st-verified: #4fd69c;
-  --st-verified-soft: rgba(79, 214, 156, 0.13);
-  --st-reject: #f2b84b;
-  --st-reject-soft: rgba(242, 184, 75, 0.13);
-  --st-failed: #ff7b7b;
-  --st-failed-soft: rgba(255, 123, 123, 0.13);
-  --st-ocr: #bea4ff;
-  --st-ocr-soft: rgba(190, 164, 255, 0.13);
-
-  /* Tipografía */
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-  --fs-xs: 12px;   /* mínimo absoluto */
-  --fs-sm: 13px;   /* texto de interfaz */
-  --fs-md: 14px;
-  --fs-lg: 16px;
-  --fs-xl: 20px;
-  --fs-2xl: 26px;
-  --lh-tight: 1.25;
-  --lh-normal: 1.5;
-
-  /* Espaciado (retícula de 4 px) */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 20px;
-  --sp-6: 24px;
-  --sp-8: 32px;
-
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
-  --shadow-pop: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
-  --shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 28px rgba(0, 0, 0, 0.45);
-
-  /* Movimiento */
-  --dur-fast: 120ms;
-  --dur-med: 200ms;
-  --dur-slow: 320ms;
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-
-  /* Estructura */
-  --header-h: 52px;
-  --statusbar-h: 28px;
-}
 
 /* ---------- Base ---------- */
 *,
@@ -132,8 +60,8 @@ textarea {
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #34343c;
-  border-radius: 10px;
+  background: var(--surface-3);
+  border-radius: var(--radius-lg);
   border: 2px solid var(--bg-1);
 }
 ::-webkit-scrollbar-track {
@@ -341,7 +269,7 @@ textarea {
   font-weight: 650;
 }
 .btn-primary:hover:not(:disabled) {
-  background: #ff9a6a;
+  background: var(--accent-text);
 }
 .btn-outline {
   background: transparent;
@@ -389,7 +317,7 @@ textarea {
   background: transparent;
   height: 26px;
   padding: 0 var(--sp-3);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font-size: var(--fs-xs);
   color: var(--text-2);
   cursor: pointer;
@@ -460,7 +388,7 @@ textarea {
   gap: 6px;
   height: 24px;
   padding: 0 var(--sp-2);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: var(--fs-xs);
   font-weight: 600;
   white-space: nowrap;
@@ -481,7 +409,7 @@ textarea {
   align-items: center;
   height: 20px;
   padding: 0 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   font-size: var(--fs-xs);
   background: var(--bg-2);
   color: var(--text-2);
@@ -572,7 +500,7 @@ textarea {
 .progress {
   position: relative;
   height: 3px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: var(--bg-3);
   overflow: hidden;
 }
@@ -582,7 +510,7 @@ textarea {
   inset: 0;
   width: 40%;
   background: var(--ember);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   animation: indeterminate 1.3s var(--ease-out) infinite;
 }
 
@@ -631,7 +559,7 @@ textarea {
 .chip {
   height: 26px;
   padding: 0 var(--sp-3);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--line);
   background: transparent;
   color: var(--text-2);
@@ -725,9 +653,9 @@ textarea {
 }
 .page-paper {
   position: relative;
-  background: #fff;
+  background: var(--paper-white);
   box-shadow: var(--shadow-paper);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   animation: fade-in var(--dur-med) var(--ease-out);
 }
 .page-paper img { display: block; user-select: none; }
@@ -739,7 +667,7 @@ textarea {
 }
 .overlay {
   position: absolute;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   cursor: pointer;
   border: 1px solid transparent;
   transition: background var(--dur-fast), border-color var(--dur-fast), box-shadow var(--dur-fast);
@@ -753,21 +681,21 @@ textarea {
   background: rgba(255, 138, 82, 0.12);
   animation: select-pulse var(--dur-slow) var(--ease-out);
 }
-.overlay.is-staged { border: 2px dashed #4a7fe0; background: rgba(74, 127, 224, 0.1); }
+.overlay.is-staged { border: 2px dashed var(--st-staged); background: rgba(74, 127, 224, 0.1); }
 .overlay-ocr { border: 1px dashed rgba(140, 100, 230, 0.75); background: rgba(140, 100, 230, 0.06); }
-.overlay-ocr.is-selected { border: 2px solid #8a5cf0; background: rgba(140, 100, 230, 0.16); }
+.overlay-ocr.is-selected { border: 2px solid var(--st-ocr); background: rgba(140, 100, 230, 0.16); }
 .overlay-tag {
   position: absolute;
   top: -20px;
   left: -1px;
   height: 18px;
   padding: 0 6px;
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-caption);
   font-weight: 650;
   white-space: nowrap;
-  color: #fff;
-  background: #3f6fd1;
+  color: var(--paper-white);
+  background: var(--st-staged);
   pointer-events: none;
 }
 .viewport-banner {
@@ -809,7 +737,7 @@ textarea {
 .text-old { color: var(--text-2); text-decoration: line-through; text-decoration-color: rgba(255, 123, 123, 0.6); overflow-wrap: anywhere; }
 .text-new { color: var(--text-1); font-weight: 600; overflow-wrap: anywhere; }
 .patch-preview { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }
-.patch-preview img { width: 100%; max-height: 90px; object-fit: contain; background: #fff; border-radius: 4px; }
+.patch-preview img { width: 100%; max-height: 90px; object-fit: contain; background: var(--paper-white); border-radius: var(--radius-xs); }
 
 /* ---------- Dock inferior ---------- */
 .dock {
@@ -846,7 +774,7 @@ textarea {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--bg-3);
   font-size: var(--fs-xs);
   display: inline-grid;
@@ -995,9 +923,9 @@ textarea {
 .result-item:hover { border-color: var(--line-strong); }
 kbd {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   border: 1px solid var(--line-strong);
   color: var(--text-2);
 }

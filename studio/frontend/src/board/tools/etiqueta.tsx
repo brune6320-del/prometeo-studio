@@ -13,19 +13,13 @@ export const etiquetaTool: BoardTool<BoardCard> = {
   validar: esTarjetaDe('etiqueta'),
   Vista: ({ datos, editar }) => (
     <textarea
-      className="board-card-body"
+      className="board-card-body board-card-etiqueta"
       value={datos.body}
       maxLength={120}
       onChange={(event) => editar({ ...datos, body: event.target.value })}
       placeholder="ETIQUETA"
       aria-label="Texto de la etiqueta"
-      style={{
-        color: '#9a9aa2',
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-      }}
+
     />
   ),
 };

@@ -1,0 +1,267 @@
+/* ==========================================================================
+   PROMETEO Studio · Forja 2 · única fuente de tokens.
+   Ningún color literal puede vivir fuera de este archivo.
+   Especificación: docs/STUDIO/DESIGN.md · Física: .agents/skills/prometeo-fisica
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Superficies y tinta */
+  --surface-0: #0f0f11;
+  --surface-1: #151518;
+  --surface-2: #1c1c20;
+  --surface-3: #24242a;
+  --surface-deep: #111111;
+  --surface-paper: #f7f3ea;
+  --surface-paper-alt: #f1e3c4;
+  --paper-white: #ffffff;
+  --line-subtle: #2c2c33;
+  --line-control: #6e6e7b;
+  --fg-1: #ededf2;
+  --fg-2: #b9b9c4;
+  --fg-3: #a0a0ac;
+  --paper-ink: #24221f;
+  --paper-ink-soft: #39373b;
+  --paper-muted: #6b675f;
+  --paper-muted-2: #807d86;
+  --paper-quiet: #5d5a62;
+
+  /* Acento único: ascua */
+  --accent: #ff8a52;
+  --accent-text: #ff9a6a;
+  --accent-soft: rgba(255, 138, 82, 0.14);
+  --accent-ring: rgba(255, 138, 82, 0.55);
+  --accent-paper: #b8491c;
+  --on-accent: #1b0e07;
+  --link: #ffb38f;
+
+  /* Semánticos de documento */
+  --st-staged: #86b4ff;
+  --st-staged-soft: rgba(134, 180, 255, 0.13);
+  --st-verified: #4fd69c;
+  --st-verified-soft: rgba(79, 214, 156, 0.13);
+  --st-reject: #f2b84b;
+  --st-reject-soft: rgba(242, 184, 75, 0.13);
+  --st-failed: #ff7b7b;
+  --st-failed-soft: rgba(255, 123, 123, 0.13);
+  --st-ocr: #bea4ff;
+  --st-ocr-soft: rgba(190, 164, 255, 0.13);
+
+  /* Papel de tarjetas */
+  --card-paper: #f7f3ea;
+  --card-sand: #f1e3c4;
+  --card-sage: #dfe9dc;
+  --card-rose: #f1dedb;
+  --card-rule: color-mix(in oklab, var(--paper-ink) 18%, transparent);
+  --card-rule-sand: #b98c44;
+  --card-rule-sage: #658567;
+  --card-rule-rose: #ad7378;
+
+  /* Tipografía */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Helvetica Neue", sans-serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  --font-sans: var(--font-ui);
+  --font-size-caption: 12px;
+  --font-size-label: 13px;
+  --font-size-body: 15px;
+  --font-size-heading: 17px;
+  --font-size-title: 22px;
+  --font-size-display: 32px;
+  --type-display: 650 32px/36px var(--font-ui);
+  --type-title: 650 22px/28px var(--font-ui);
+  --type-heading: 650 17px/24px var(--font-ui);
+  --type-body: 400 15px/24px var(--font-ui);
+  --type-label: 600 13px/18px var(--font-ui);
+  --type-caption: 500 12px/16px var(--font-ui);
+  --type-mono: 450 12px/18px var(--font-mono);
+  --tracking-label: 0.06em;
+  --lh-tight: 1.25;
+  --lh-normal: 1.5;
+
+  /* Espaciado 4 pt */
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radios */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-pill: 999px;
+
+  /* Sombras y elevación */
+  --shadow-0: none;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.32), 0 2px 6px rgba(0, 0, 0, 0.24);
+  --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.28);
+  --shadow-paper: 0 1px 2px rgba(0, 0, 0, 0.18), 0 12px 32px rgba(0, 0, 0, 0.28);
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+  --shadow-pop: var(--shadow-2);
+
+  /* Estados */
+  --state-rest: transparent;
+  --state-hover: rgba(255, 255, 255, 0.05);
+  --state-pressed: rgba(255, 255, 255, 0.08);
+  --state-selected-ring: 0 0 0 2px var(--accent);
+  --state-focus-ring: 0 0 0 2px var(--surface-0), 0 0 0 4px var(--accent);
+  --state-drop: 1.5px dashed var(--accent);
+  --state-disabled: 0.42;
+
+  /* Avisos */
+  --alert-warn-bg: #f6e3b8;
+  --alert-warn-fg: #7b5413;
+  --alert-engine-bg: #38261c;
+  --alert-engine-fg: #f5d9ba;
+  --alert-danger-fg: #982d39;
+  --alert-reject-fg: #7a4b16;
+  --alert-soft: #e8d4a8;
+
+  /* Iconos */
+  --icon-sm: 16px;
+  --icon-md: 18px;
+  --icon-lg: 20px;
+  --icon-gap: 8px;
+
+  /* Movimiento (heredado de prometeo-fisica) */
+  --duration-instant: 0ms;
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 280ms;
+  --dur-fast: var(--duration-fast);
+  --dur-med: var(--duration-base);
+  --dur-slow: var(--duration-slow);
+  --ease-standard: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-emphasis: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring-firm: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --motion-tau-seco: 35ms;
+  --motion-tau-suave: 160ms;
+  --motion-tau-anim: 85ms;
+  --motion-tau-rubber: 120ms;
+  --motion-iman: 0.0018;
+  --motion-ataque: 40ms;
+  --motion-release: 220ms;
+  --motion-give: 0.55;
+
+  /* Estructura y tablero */
+  --header-h: 56px;
+  --statusbar-h: 28px;
+  --control-h: 32px;
+  --control-h-sm: 28px;
+  --control-h-lg: 40px;
+  --touch-target: 44px;
+  --board-grid: 24px;
+  --board-snap: 6px;
+  --board-zoom-min: 0.25;
+  --board-zoom-max: 2;
+  --board-fit-padding: 48px;
+  --board-lod-zoom: 0.35;
+  --board-card-w: 320px;
+  --board-card-media-ratio: 4 / 3;
+  --board-card-pad: 12px;
+  --board-card-title: var(--type-heading);
+  --board-empty-h: 96px;
+  --board-toolbar-h: 44px;
+  --board-chrome-opacity: 0;
+  --board-frame-line: var(--line-subtle);
+  --board-frame-fill: transparent;
+
+  /* Alias de migración: el código viejo sigue leyendo estos nombres. */
+  --bg-0: var(--surface-0);
+  --bg-1: var(--surface-1);
+  --bg-2: var(--surface-2);
+  --bg-3: var(--surface-3);
+  --bg-canvas: var(--surface-0);
+  --line: var(--line-subtle);
+  --line-strong: var(--line-control);
+  --text-1: var(--fg-1);
+  --text-2: var(--fg-2);
+  --text-3: var(--fg-3);
+  --ember: var(--accent);
+  --ember-text: var(--accent-text);
+  --ember-soft: var(--accent-soft);
+  --ember-ring: var(--accent-ring);
+  --on-ember: var(--on-accent);
+  --fs-xs: var(--font-size-caption);
+  --fs-sm: var(--font-size-label);
+  --fs-md: var(--font-size-body);
+  --fs-lg: var(--font-size-heading);
+  --fs-xl: var(--font-size-title);
+  --fs-2xl: var(--font-size-display);
+  --sp-1: var(--space-1);
+  --sp-2: var(--space-2);
+  --sp-3: var(--space-3);
+  --sp-4: var(--space-4);
+  --sp-5: var(--space-5);
+  --sp-6: var(--space-6);
+  --sp-8: var(--space-8);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --surface-0: #f3efe7;
+  --surface-1: #fbf9f4;
+  --surface-2: #fffdf8;
+  --surface-3: #f0ebe2;
+  --surface-deep: #e9e4da;
+  --line-subtle: #e4dfd5;
+  --line-control: #8a857b;
+  --fg-1: #1c1b19;
+  --fg-2: #55524c;
+  --fg-3: #746f66;
+  --paper-ink: #24221f;
+  --paper-ink-soft: #39373b;
+  --paper-muted: #6b675f;
+  --paper-muted-2: #746f66;
+  --paper-quiet: #55524c;
+
+  --accent: #b8491c;
+  --accent-text: #a63f17;
+  --accent-soft: rgba(184, 73, 28, 0.1);
+  --accent-ring: rgba(184, 73, 28, 0.45);
+  --accent-paper: #a63f17;
+  --on-accent: #fffdf8;
+  --link: #a63f17;
+
+  --st-staged: #2f5f9e;
+  --st-verified: #1e6f4e;
+  --st-reject: #8a5a0a;
+  --st-failed: #a12a2a;
+  --st-ocr: #5b3fa6;
+
+  --shadow-1: 0 1px 2px rgba(28, 27, 25, 0.08);
+  --shadow-2: 0 8px 24px rgba(28, 27, 25, 0.12), 0 2px 6px rgba(28, 27, 25, 0.08);
+  --shadow-3: 0 24px 64px rgba(28, 27, 25, 0.18), 0 6px 16px rgba(28, 27, 25, 0.1);
+  --shadow-paper: 0 1px 2px rgba(28, 27, 25, 0.1), 0 12px 32px rgba(28, 27, 25, 0.14);
+  --shadow-panel: 0 1px 0 rgba(28, 27, 25, 0.04) inset;
+  --shadow-pop: var(--shadow-2);
+
+  --state-hover: rgba(28, 27, 25, 0.04);
+  --state-pressed: rgba(28, 27, 25, 0.07);
+  --state-focus-ring: 0 0 0 2px var(--surface-2), 0 0 0 4px var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast: 1ms;
+    --duration-base: 1ms;
+    --duration-slow: 1ms;
+    --dur-fast: 1ms;
+    --dur-med: 1ms;
+    --dur-slow: 1ms;
+  }
+}
