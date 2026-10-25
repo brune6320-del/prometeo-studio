@@ -67,6 +67,7 @@ describe('tablero Biblioteca a partir de la semilla', () => {
       const referente = leerReferente(card);
       expect(referente.nombre).toBe(item.nombre);
       expect(referente.url).toBe(item.url ?? '');
+      expect(referente.licencia).toBe(item.licencia);
       expect(referente.etiquetas.includes('por verificar')).toBe(item.verificar);
       expect(referente.imagenes).toEqual([]);
     }

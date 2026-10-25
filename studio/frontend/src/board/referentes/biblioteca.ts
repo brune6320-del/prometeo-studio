@@ -67,6 +67,8 @@ function actualizarReferente(base: Referente, item: ReferenteSemilla): Referente
     nombre: item.nombre,
     // Una URL ya verificada a mano no se borra porque la semilla la traiga a null.
     url: item.url ?? base.url,
+    // La licencia verificada rellena el hueco; si Bruno ya escribió una, se conserva.
+    licencia: base.licencia.trim() ? base.licencia : item.licencia,
     archivoOrigen: item.video,
     porQue: base.porQue.trim() ? base.porQue : item.que,
     etiquetas: etiquetasDeSemilla(item, base.etiquetas),
