@@ -1382,7 +1382,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   return (
     <div className="board-workspace" inert={locked || undefined}>
-      <header className="board-header">
+      <header className="board-header" data-testid="board-topbar">
         <button className="board-back" onClick={() => void leaveBoard()} title="Volver al espacio PDF">
           <ArrowLeft size={16} aria-hidden="true" /> <span>PDF Studio</span>
         </button>

@@ -211,7 +211,7 @@ Reglas:
 2. Sin rebotes, sin elásticos, sin animaciones infinitas decorativas.
 3. El arrastre y el pan son **inmediatos** (0 ms). La inercia, si existe, no debe retrasar el puntero.
 4. `prefers-reduced-motion: reduce` → duración `1 ms` y sin desplazamientos.
-5. La skill de física (`prometeo-fisica`) **no existe todavía** en el repo; cuando se cree, esta sección debe enlazarla y heredar sus curvas. Mientras tanto, mandan estos tokens.
+5. La física canónica vive en [`.agents/skills/prometeo-fisica/SKILL.md`](../../.agents/skills/prometeo-fisica/SKILL.md) y en `src/motion/muelle.ts` (muelles, inercia y rubber-band). Esta sección hereda sus curvas: si hay conflicto, mandan los valores medidos en Sala Oscura y los tokens de movimiento de esa skill.
 
 ## 10. Tablero tipo Milanote
 
@@ -451,6 +451,7 @@ Orden de lectura: **este DESIGN.md → skill de la tarea → código existente**
 | Tipografía y restraint | `.agents/skills/od-minimalist-skill/` | Escala, pesos, aire, paleta monocroma |
 | Crítica y pulido | `.agents/skills/od-impeccable-design-polish/` | Auditoría visual, antes/después, anti-slop |
 | Reglas del tablero | `.agents/skills/prometeo-tablero/` | Modelo, vistas, guardado, historial |
+| Física y gestos | `.agents/skills/prometeo-fisica/` | Muelles, inercia, rubber-band, duraciones, reduced motion |
 
 Reglas de convivencia:
 
@@ -464,5 +465,5 @@ Reglas de convivencia:
 - **No implementado:** este encargo no toca código de app. Los tokens existen solo en este documento.
 - **Tema claro:** especificado y medido, sin implementar ni probar en pantalla.
 - **Fuentes:** Monument Grotesk y Diatype Mono son comerciales; no se han comprado ni empaquetado. La app usa SF Pro del sistema y caerá a JetBrains Mono / IBM Plex Mono.
-- **Física:** `prometeo-fisica` no existe en `.agents/skills/` ni en `~/Desktop/deepseek-trabajo/prometeo/skills/`. El enlace queda pendiente; no se inventa.
+- **Física:** implementada en `.agents/skills/prometeo-fisica/SKILL.md` y `studio/frontend/src/motion/muelle.ts`, con valores medidos en Sala Oscura (`archivo:línea`). Los muelles de Prometeo son una derivación sobreamortiguada de esa ley, no una copia literal.
 - **Medición:** los contrastes son cálculo sRGB/WCAG (E1), no medición con colorímetro. El LOD y las duraciones son H1 hasta que se prueben con usuarios.
