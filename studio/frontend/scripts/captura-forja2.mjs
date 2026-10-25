@@ -11,6 +11,7 @@ const PUERTO = 5199;
 const APP_URL = `http://localhost:${PUERTO}`;
 const fase = process.argv[2] ?? 'f0';
 const momento = process.argv[3] ?? 'antes';
+const lod = process.argv[4] === 'lod';
 
 const esperar = async (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -98,6 +99,14 @@ try {
   await page.getByRole('button', { name: /Tablero/ }).first().click();
   await page.locator('.board-workspace').waitFor();
   await page.waitForTimeout(900);
+  if (lod) {
+    const caja = await page.locator('.board-viewport').boundingBox();
+    if (caja) await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+    await page.keyboard.down('Control');
+    for (let i = 0; i < 40; i += 1) await page.mouse.wheel(0, 120);
+    await page.keyboard.up('Control');
+    await page.waitForTimeout(700);
+  }
   await mkdir(SALIDA, { recursive: true });
   const destino = path.join(SALIDA, `${fase}-${momento}.png`);
   await page.screenshot({ path: destino, animations: 'disabled' });

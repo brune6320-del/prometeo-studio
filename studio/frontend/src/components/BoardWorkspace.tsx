@@ -33,6 +33,7 @@ import {
   type BoardMedia,
 } from '../board/model';
 import { fitBoardCamera, zoomAtPoint, screenToWorld } from '../board/camera';
+import { movimientoReducido, pasoInercia, velocidadDeMuestras, type MuestraInercia } from '../motion/muelle';
 import { alignCards, distributeCards, snapPosition, type Alignment, type CardSize, type DistributionAxis } from '../board/geometry';
 import {
   cardsInsideFrame,
@@ -51,7 +52,6 @@ import { construirZipObsidian, notasObsidian } from '../board/referentes/histori
 import { aceptarLectura } from '../board/referentes/mirar';
 import { leerReferente, type Lectura } from '../board/referentes/model';
 import { loadBoardWorkspace } from '../board/storage';
-import { BoardCardContent } from '../board/tools/CardView';
 import { BoardToolMenu } from '../board/tools/menu';
 import { getBoardTool, listBoardTools } from '../board/tools/registry';
 import { EntropiaVista } from '../board/tools/entropiaVista';
@@ -85,6 +85,7 @@ import {
   setActiveProject,
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
+import { BoardCardItem } from './BoardCardItem';
 import { MirarDialog } from './MirarDialog';
 import { ArchivoView } from './ArchivoView';
 import { MuroView } from './MuroView';
@@ -125,6 +126,19 @@ function downloadText(filename: string, content: string, mimeType: string): void
 
 function cardCenter(card: BoardCard): { x: number; y: number } {
   return { x: card.x + card.width / 2, y: card.y + 100 };
+}
+
+interface CardHandlers {
+  select: (cardId: string, event: React.MouseEvent<HTMLElement>) => void;
+  connect: (cardId: string) => void;
+  dragStart: (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => void;
+  dragMove: (event: React.PointerEvent<HTMLDivElement>) => void;
+  dragEnd: (event: React.PointerEvent<HTMLDivElement>) => void;
+  delete: (cardId: string) => void;
+  patch: (cardId: string, patch: Partial<BoardCard>) => void;
+  replace: (card: BoardCard) => void;
+  hover: (cardId: string, over: boolean) => void;
+  blur: () => void;
 }
 
 export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
@@ -176,7 +190,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [isPanning, setIsPanning] = useState(false);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const viewportRef = useRef<HTMLDivElement>(null);
-  const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number } | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const relationsRef = useRef<SVGGElement>(null);
+  const zoomValueRef = useRef<HTMLButtonElement>(null);
+  const cameraRef = useRef({ pan: { x: 0, y: 0 }, zoom: 1 });
+  const paintRaf = useRef(0);
+  const inertiaRaf = useRef(0);
+  const syncTimer = useRef<number | null>(null);
+  const wheelIdle = useRef<number | null>(null);
+  const wheelVelocity = useRef({ vx: 0, vy: 0, t: 0 });
+  const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; samples: MuestraInercia[] } | null>(null);
   const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; startBoard: BoardDocument; gesture: string; moved: boolean } | null>(null);
   /** Herramienta de marco elegida en el menú: el siguiente arrastre dibuja el rectángulo. */
   const [frameToolId, setFrameToolId] = useState<string | null>(null);
@@ -205,6 +228,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const gustosInput = useRef<HTMLInputElement>(null);
   /** Referente bajo el puntero: una URL de imagen pegada cae en él. */
   const hoveredReferenteId = useRef<string | null>(null);
+  const cardHandlers = useRef<CardHandlers | null>(null);
 
   const projectBoards = activeProjectId
     ? boards.filter((board) => projectIdByBoardId.get(board.id) === activeProjectId)
@@ -359,17 +383,101 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       const id = element.dataset.cardId;
       if (!id) return [];
       const bounds = element.getBoundingClientRect();
-      return [[id, { width: bounds.width / zoom, height: bounds.height / zoom }] as const];
+      return [[id, { width: bounds.width / cameraRef.current.zoom, height: bounds.height / cameraRef.current.zoom }] as const];
     }));
-  }, [zoom]);
+  }, []);
+
+  const aplicarCamara = useCallback(() => {
+    const { pan: posicion, zoom: escala } = cameraRef.current;
+    const stage = stageRef.current;
+    if (stage) {
+      stage.style.transform = `translate3d(${posicion.x}px, ${posicion.y}px, 0) scale(${escala})`;
+      stage.dataset.lod = escala < 0.35 ? 'min' : 'full';
+    }
+    const viewport = viewportRef.current;
+    if (viewport) {
+      viewport.style.backgroundPosition = `${posicion.x}px ${posicion.y}px`;
+      viewport.style.backgroundSize = `${GRID_SIZE * escala}px ${GRID_SIZE * escala}px`;
+    }
+    relationsRef.current?.setAttribute('transform', `translate(${posicion.x} ${posicion.y}) scale(${escala})`);
+    if (zoomValueRef.current) {
+      zoomValueRef.current.textContent = `${Math.round(escala * 100)}%`;
+      zoomValueRef.current.setAttribute('aria-label', `Zoom ${Math.round(escala * 100)} por ciento, ajustar tablero`);
+    }
+  }, []);
+
+  const pintarCamara = useCallback(() => {
+    if (paintRaf.current) return;
+    paintRaf.current = requestAnimationFrame(() => {
+      paintRaf.current = 0;
+      aplicarCamara();
+    });
+  }, [aplicarCamara]);
+
+  const sincronizarCamara = useCallback(() => {
+    if (syncTimer.current) {
+      window.clearTimeout(syncTimer.current);
+      syncTimer.current = null;
+    }
+    setPan(cameraRef.current.pan);
+    setZoom(cameraRef.current.zoom);
+  }, []);
+
+  const programarSincronizacion = useCallback(() => {
+    if (syncTimer.current) window.clearTimeout(syncTimer.current);
+    syncTimer.current = window.setTimeout(() => {
+      syncTimer.current = null;
+      sincronizarCamara();
+    }, 140);
+  }, [sincronizarCamara]);
+
+  const detenerInercia = useCallback(() => {
+    if (inertiaRaf.current) {
+      cancelAnimationFrame(inertiaRaf.current);
+      inertiaRaf.current = 0;
+    }
+  }, []);
+
+  const iniciarInercia = useCallback((vx: number, vy: number) => {
+    detenerInercia();
+    if (movimientoReducido() || Math.hypot(vx, vy) < 80) return;
+    let estado = { x: cameraRef.current.pan.x, y: cameraRef.current.pan.y, vx, vy };
+    let ultimo = performance.now();
+    const paso = (ahora: number) => {
+      const dt = Math.min(0.05, Math.max(0, (ahora - ultimo) / 1000));
+      ultimo = ahora;
+      estado = pasoInercia(estado, dt);
+      cameraRef.current = { ...cameraRef.current, pan: { x: estado.x, y: estado.y } };
+      pintarCamara();
+      if (estado.vx !== 0 || estado.vy !== 0) inertiaRaf.current = requestAnimationFrame(paso);
+      else {
+        inertiaRaf.current = 0;
+        programarSincronizacion();
+      }
+    };
+    inertiaRaf.current = requestAnimationFrame(paso);
+  }, [detenerInercia, pintarCamara, programarSincronizacion]);
+
+  useLayoutEffect(() => {
+    aplicarCamara();
+  });
+
+  useEffect(() => () => {
+    if (paintRaf.current) cancelAnimationFrame(paintRaf.current);
+    if (inertiaRaf.current) cancelAnimationFrame(inertiaRaf.current);
+    if (syncTimer.current) window.clearTimeout(syncTimer.current);
+    if (wheelIdle.current) window.clearTimeout(wheelIdle.current);
+  }, []);
 
   const centerCamera = useCallback((board: BoardDocument | null) => {
     const { width, height } = viewportSize;
     if (!width || !height) return;
     const camera = fitBoardCamera(board?.cards ?? [], { width, height }, measureCardSizes());
+    cameraRef.current = camera;
+    aplicarCamara();
     setZoom(camera.zoom);
     setPan(camera.pan);
-  }, [measureCardSizes, viewportSize]);
+  }, [aplicarCamara, measureCardSizes, viewportSize]);
 
   useEffect(() => {
     if (!viewportSize.width || !viewportSize.height) return;
@@ -449,13 +557,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       setNotice(`La herramienta «${toolId}» no está instalada.`);
       return null;
     }
-    const destino = at ?? screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, { pan, zoom });
+    const destino = at ?? screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, cameraRef.current);
     const card = tool.crear(destino.x - 130, destino.y - 90) as BoardCard;
     configure?.(card);
     updateBoard((board) => ({ ...board, cards: [...board.cards, card] }));
     setSelectedCardIds([card.id]);
     return card;
-  }, [activeBoard, frameToolId, pan, updateBoard, viewportSize, zoom]);
+  }, [activeBoard, frameToolId, updateBoard, viewportSize]);
 
   const chooseTool = useCallback((toolId: string) => {
     setAddMenuOpen(false);
@@ -480,7 +588,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     event.preventDefault();
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, { pan, zoom });
+    const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
     const tool = getBoardTool(toolId);
     if (tool?.tipo === 'marco') {
       setFrameToolId(null);
@@ -528,18 +636,31 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
+    detenerInercia();
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const actual = cameraRef.current;
     if (event.metaKey || event.ctrlKey) {
-      const rect = viewportRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const cursorX = event.clientX - rect.left;
-      const cursorY = event.clientY - rect.top;
-      const camera = zoomAtPoint({ pan, zoom }, zoom * Math.exp(-event.deltaY * 0.0012), { x: cursorX, y: cursorY });
-      setPan(camera.pan);
-      setZoom(camera.zoom);
+      const focal = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      cameraRef.current = zoomAtPoint(actual, actual.zoom * Math.exp(-event.deltaY * 0.0012), focal);
     } else {
-      setPan((current) => ({ x: current.x - event.deltaX, y: current.y - event.deltaY }));
+      cameraRef.current = { ...actual, pan: { x: actual.pan.x - event.deltaX, y: actual.pan.y - event.deltaY } };
+      const factor = 18;
+      wheelVelocity.current = {
+        vx: Math.max(-2400, Math.min(2400, -event.deltaX * factor)),
+        vy: Math.max(-2400, Math.min(2400, -event.deltaY * factor)),
+        t: performance.now(),
+      };
+      if (wheelIdle.current) window.clearTimeout(wheelIdle.current);
+      wheelIdle.current = window.setTimeout(() => {
+        wheelIdle.current = null;
+        const v = wheelVelocity.current;
+        if (performance.now() - v.t < 220) iniciarInercia(v.vx, v.vy);
+      }, 90);
     }
-  }, [pan, zoom]);
+    pintarCamara();
+    programarSincronizacion();
+  }, [detenerInercia, iniciarInercia, pintarCamara, programarSincronizacion]);
 
   useEffect(() => {
     const element = viewportRef.current;
@@ -550,16 +671,26 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const zoomBy = (factor: number) => {
     const { width, height } = viewportSize;
-    const camera = zoomAtPoint({ pan, zoom }, zoom * factor, { x: width / 2, y: height / 2 });
-    setPan(camera.pan);
-    setZoom(camera.zoom);
+    const camera = zoomAtPoint(cameraRef.current, cameraRef.current.zoom * factor, { x: width / 2, y: height / 2 });
+    cameraRef.current = camera;
+    aplicarCamara();
+    sincronizarCamara();
   };
 
   const fitBoard = () => centerCamera(activeBoard);
 
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-frame, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
-    panDrag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
+    detenerInercia();
+    const posicion = cameraRef.current.pan;
+    panDrag.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      panX: posicion.x,
+      panY: posicion.y,
+      samples: [{ t: performance.now(), x: posicion.x, y: posicion.y }],
+    };
     setIsPanning(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -567,20 +698,27 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = panDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    setPan({ x: drag.panX + event.clientX - drag.x, y: drag.panY + event.clientY - drag.y });
+    const siguiente = { x: drag.panX + event.clientX - drag.x, y: drag.panY + event.clientY - drag.y };
+    cameraRef.current = { ...cameraRef.current, pan: siguiente };
+    drag.samples.push({ t: performance.now(), x: siguiente.x, y: siguiente.y });
+    if (drag.samples.length > 10) drag.samples.shift();
+    pintarCamara();
   };
 
   const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (panDrag.current?.pointerId === event.pointerId) {
-      panDrag.current = null;
-      setIsPanning(false);
-    }
+    const drag = panDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    panDrag.current = null;
+    setIsPanning(false);
+    const velocidad = velocidadDeMuestras(drag.samples, 90);
+    programarSincronizacion();
+    iniciarInercia(velocidad.x, velocidad.y);
   };
 
   const viewportWorldPoint = (event: React.PointerEvent<HTMLDivElement>) => {
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return { x: 0, y: 0 };
-    return screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, { pan, zoom });
+    return screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
   };
 
   const startFrameDraw = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -679,8 +817,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const moveCardDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = cardDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    let deltaX = (event.clientX - drag.x) / zoom;
-    let deltaY = (event.clientY - drag.y) / zoom;
+    let deltaX = (event.clientX - drag.x) / cameraRef.current.zoom;
+    let deltaY = (event.clientY - drag.y) / cameraRef.current.zoom;
     const anchor = drag.positions.get(drag.ids[0]);
     if (snapEnabled && anchor) {
       deltaX = snapPosition(anchor.x + deltaX, GRID_SIZE) - anchor.x;
@@ -1416,6 +1554,33 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setSelectedCardIds([]);
   };
 
+  const onCardSelect = useCallback((card: BoardCard, event: React.MouseEvent<HTMLElement>) => cardHandlers.current?.select(card.id, event), []);
+  const onCardConnect = useCallback((cardId: string) => cardHandlers.current?.connect(cardId), []);
+  const onCardDragStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => cardHandlers.current?.dragStart(card, event), []);
+  const onCardDragMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => cardHandlers.current?.dragMove(event), []);
+  const onCardDragEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => cardHandlers.current?.dragEnd(event), []);
+  const onCardDelete = useCallback((cardId: string) => cardHandlers.current?.delete(cardId), []);
+  const onCardPatch = useCallback((cardId: string, patch: Partial<BoardCard>) => cardHandlers.current?.patch(cardId, patch), []);
+  const onCardReplace = useCallback((card: BoardCard) => cardHandlers.current?.replace(card), []);
+  const onCardHover = useCallback((cardId: string, over: boolean) => cardHandlers.current?.hover(cardId, over), []);
+  const onCardBlur = useCallback(() => cardHandlers.current?.blur(), []);
+
+  cardHandlers.current = {
+    select: handleCardSelection,
+    connect: handleConnectCard,
+    dragStart: startCardDrag,
+    dragMove: moveCardDrag,
+    dragEnd: endCardDrag,
+    delete: removeCard,
+    patch: updateCard,
+    replace: replaceCard,
+    hover: (cardId, over) => {
+      if (over) hoveredReferenteId.current = cardId;
+      else if (hoveredReferenteId.current === cardId) hoveredReferenteId.current = null;
+    },
+    blur: closeTextGroup,
+  };
+
   const matchingCards = useMemo(() => {
     const query = search.trim().toLocaleLowerCase();
     return new Set((activeBoard?.cards ?? []).filter((card) => !query || `${card.title} ${card.body} ${card.url ?? ''}`.toLocaleLowerCase().includes(query)).map((card) => card.id));
@@ -1482,7 +1647,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           <button className={`board-icon-button ${snapEnabled ? 'active' : ''}`} onClick={() => setSnapEnabled((enabled) => !enabled)} aria-pressed={snapEnabled} title="Ajustar a la cuadrícula" aria-label="Ajustar a la cuadrícula"><Magnet size={16} /></button>
           <span className="board-tool-divider" aria-hidden="true" />
           <button className="board-icon-button" onClick={() => zoomBy(1 / 1.15)} aria-label="Alejar" title="Alejar"><ZoomOut size={16} /></button>
-          <button className="board-zoom-value" onClick={fitBoard} title="Ajustar el tablero a la pantalla" aria-label={`Zoom ${Math.round(zoom * 100)} por ciento, ajustar tablero`}>{Math.round(zoom * 100)}%</button>
+          <button ref={zoomValueRef} className="board-zoom-value" onClick={fitBoard} title="Ajustar el tablero a la pantalla" aria-label={`Zoom ${Math.round(zoom * 100)} por ciento, ajustar tablero`}>{Math.round(zoom * 100)}%</button>
           <button className="board-icon-button" onClick={() => zoomBy(1.15)} aria-label="Acercar" title="Acercar"><ZoomIn size={16} /></button>
 
           <div className="board-menu-wrap" ref={exportMenuRef}>
@@ -1578,7 +1743,6 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       <main
         ref={viewportRef}
         className={`board-viewport ${isPanning ? 'panning' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
-        style={{ backgroundPosition: `${pan.x}px ${pan.y}px`, backgroundSize: `${24 * zoom}px ${24 * zoom}px` }}
         onPointerDown={beginViewportGesture}
         onPointerMove={moveViewportGesture}
         onPointerUp={endViewportGesture}
@@ -1597,19 +1761,20 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       >
         <svg className="board-relations" width={viewportSize.width} height={viewportSize.height} viewBox={`0 0 ${Math.max(1, viewportSize.width)} ${Math.max(1, viewportSize.height)}`} aria-label="Relaciones entre tarjetas">
             <defs><marker id="board-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" /></marker></defs>
+            <g ref={relationsRef}>
             {activeBoard.relations.map((relation) => {
               const from = activeBoard.cards.find((card) => card.id === relation.from);
               const to = activeBoard.cards.find((card) => card.id === relation.to);
               if (!from || !to) return null;
               const a = cardCenter(from);
               const b = cardCenter(to);
-              return <line key={relation.id} x1={pan.x + a.x * zoom} y1={pan.y + a.y * zoom} x2={pan.x + b.x * zoom} y2={pan.y + b.y * zoom} markerEnd="url(#board-arrow)" />;
+              return <line key={relation.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} markerEnd="url(#board-arrow)" />;
             })}
+            </g>
           </svg>
-        <div className="board-stage" style={{ transform: `translate3d(${pan.x}px, ${pan.y}px, 0) scale(${zoom})` }}>
+        <div className="board-stage" ref={stageRef}>
           {activeBoard.cards.map((card) => {
             const matches = matchingCards.has(card.id);
-            const isConnectionSource = connectFromId === card.id;
             if (card.type === 'marco') {
               const frame = readFrameData(card);
               const childCount = frame.hijos.filter((id) => cardsById.has(id)).length;
@@ -1632,7 +1797,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                     event.stopPropagation();
                     setArchiveFullscreenId(card.id);
                   }}
-                  onBlurCapture={closeTextGroup}
+                  onBlurCapture={onCardBlur}
                 >
                   <div className="board-frame-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover el marco y sus tarjetas">
                     <span className="board-drag-grip" aria-hidden="true">⠿</span>
@@ -1691,35 +1856,25 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             // Los hijos de un marco con vista propia se pintan dentro del marco, no encima.
             if (framedChildIds.has(card.id)) return null;
             return (
-              <article
+              <BoardCardItem
                 key={card.id}
-                data-card-id={card.id}
-                className={`board-card color-${card.color} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''} ${isConnectionSource ? 'connection-source' : ''}`}
-                style={{ left: card.x, top: card.y, width: card.width }}
-                onClick={(event) => {
-                  if (connectMode) {
-                    const target = event.target as HTMLElement;
-                    if (target.closest('input,textarea,button,a,video,audio')) return;
-                    handleConnectCard(card.id);
-                  } else handleCardSelection(card.id, event);
-                }}
-                onPointerEnter={card.type === 'referente' ? () => { hoveredReferenteId.current = card.id; } : undefined}
-                onPointerLeave={card.type === 'referente' ? () => {
-                  if (hoveredReferenteId.current === card.id) hoveredReferenteId.current = null;
-                } : undefined}
-                onBlurCapture={closeTextGroup}
-              >
-                <div className="board-card-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover la tarjeta">
-                  <span className="board-drag-grip" aria-hidden="true">⠿</span>
-                  <input className="board-card-title" value={card.title} maxLength={200} onChange={(event) => updateCard(card.id, { title: event.target.value })} aria-label="Título de tarjeta" />
-                  <button className={`board-connect-button ${connectMode ? 'visible' : ''}`} onClick={(event) => { event.stopPropagation(); handleConnectCard(card.id); }} title="Elegir para relacionar" aria-label="Relacionar esta tarjeta"><Link2 size={13} /></button>
-                  <button className="board-card-delete" onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar tarjeta"><X size={14} /></button>
-                </div>
-                <div className="board-card-color-row" aria-label="Color de tarjeta">
-                  {COLORS.map((color) => <button key={color} className={`board-color-swatch ${color} ${card.color === color ? 'current' : ''}`} onClick={() => updateCard(card.id, { color })} aria-label={`Color ${color}`} aria-pressed={card.color === color} />)}
-                </div>
-                <BoardCardContent card={card} editar={replaceCard} />
-              </article>
+                card={card}
+                selected={selectedCardIds.includes(card.id)}
+                dimmed={!matches}
+                connectionSource={connectFromId === card.id}
+                connectMode={connectMode}
+                colors={COLORS}
+                onSelect={onCardSelect}
+                onConnect={onCardConnect}
+                onDragStart={onCardDragStart}
+                onDragMove={onCardDragMove}
+                onDragEnd={onCardDragEnd}
+                onDelete={onCardDelete}
+                onPatch={onCardPatch}
+                onReplace={onCardReplace}
+                onHover={onCardHover}
+                onBlurCapture={onCardBlur}
+              />
             );
           })}
           {frameDraft && (

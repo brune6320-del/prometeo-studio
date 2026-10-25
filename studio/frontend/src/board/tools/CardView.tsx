@@ -9,7 +9,7 @@ import { getBoardTool } from './registry';
 export const BoardCardContent: React.FC<{
   card: BoardCard;
   editar: (card: BoardCard) => void;
-}> = ({ card, editar }) => {
+}> = React.memo(function BoardCardContent({ card, editar }) {
   const tool = getBoardTool(card.type);
   if (!tool) {
     return (
@@ -22,4 +22,4 @@ export const BoardCardContent: React.FC<{
   }
   const Vista = tool.Vista;
   return <Vista datos={card} editar={editar} />;
-};
+});

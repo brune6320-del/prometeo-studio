@@ -2936,3 +2936,48 @@
   .board-topbar-search { display: none; }
   .board-rail { flex-basis: 68px; width: 68px; }
 }
+
+/* ── LOD: por debajo del 35 % solo título, color y miniatura ───────────── */
+.board-stage[data-lod='min'] .board-card {
+  min-height: 0;
+  padding: var(--space-2);
+}
+
+.board-stage[data-lod='min'] .board-card-color-row,
+.board-stage[data-lod='min'] .board-card-body,
+.board-stage[data-lod='min'] .board-card-link,
+.board-stage[data-lod='min'] .board-referente-tabs,
+.board-stage[data-lod='min'] .board-referente-meta,
+.board-stage[data-lod='min'] .board-referente-etiquetas,
+.board-stage[data-lod='min'] .board-referente-porque,
+.board-stage[data-lod='min'] .board-referente-lectura,
+.board-stage[data-lod='min'] .board-referente-hint,
+.board-stage[data-lod='min'] .board-entropia-meta {
+  display: none;
+}
+
+.board-stage[data-lod='min'] .board-card-title {
+  font-size: var(--font-size-caption);
+}
+
+.board-stage[data-lod='min'] .board-card-media img,
+.board-stage[data-lod='min'] .board-referente-imagen {
+  max-height: 110px;
+  object-fit: cover;
+}
+
+/* El aviso no empuja el lienzo: se posa encima, como una notificación. */
+.board-toast {
+  position: fixed;
+  z-index: 70;
+  top: calc(var(--header-h) + var(--space-2));
+  left: 50%;
+  max-width: min(620px, calc(100vw - 32px));
+  padding: var(--space-2) var(--space-3);
+  transform: translateX(-50%);
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-lg);
+  color: var(--fg-1);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+}
