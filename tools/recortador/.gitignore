@@ -1,0 +1,15 @@
+.venv/
+.cache/
+.tmp/
+weights/
+salidas/
+__pycache__/
+*.pyc
+*.pt
+*.pth
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.pdf
+*.lock
