@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="recortador-token" content="__TOKEN__">
+<title>Recortador · Prometeo</title>
+<style>
+:root{color-scheme:light;font:16px system-ui,sans-serif;color:#252624;background:#efeee8}body{margin:0}header{padding:24px 4vw;border-bottom:1px solid #c6c6bc;background:#faf9f4}h1{margin:0 0 8px;font-size:26px}p{line-height:1.5}main{max-width:1500px;margin:auto;padding:24px 4vw}section{margin-bottom:24px}.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center}button,select,input{font:inherit;padding:8px;border:1px solid #aaa;border-radius:5px;background:#fff}button{cursor:pointer}button.primary{background:#214c41;color:white}button:disabled{opacity:.45;cursor:wait}input[type=number]{width:72px}label{display:inline-flex;gap:8px;align-items:center}#escena{position:relative;display:inline-block;max-width:100%;border:1px solid #aaa;background:#fff}canvas{display:block;max-width:100%;height:auto;touch-action:none}#estado{min-height:1.5em;font-weight:600}#estado.error{color:#9a261c}.muted{color:#555;font-size:14px}#resultados{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}.pieza{padding:12px;border:1px solid #ccc;background:#fafafa;border-radius:6px}.pieza img{width:100%;height:180px;object-fit:contain;background:repeating-conic-gradient(#e1e1e1 0% 25%,white 0% 50%) 50%/20px 20px}a{color:#174c40}textarea{width:100%;min-height:110px;box-sizing:border-box}#lista{padding-left:24px}
+</style>
+<script src="/interfaz.js" defer></script>
+</head>
+<body>
+<header><h1>Recortador de referentes</h1><div>Una foto o una página → piezas para la Mesa de luz</div></header>
+<main>
+<section aria-label="Origen"><div class="controls">
+<label>Archivo <input id="archivo" type="file" accept="image/png,image/jpeg,image/webp,application/pdf"></label>
+<label>Página <input id="pagina" type="number" min="1" value="1"></label>
+<label>ppp <select id="ppp"><option>150</option><option>200</option><option>300</option></select></label>
+<label>Tesela <input id="tesela" type="number" min="1" value="1"></label>
+<button id="cargar">Cargar / cambiar página</button>
+</div><p class="muted">Fotos hasta 2048 px. PDF: teselas de hasta 2048 px a 150–300 ppp, de izquierda a derecha y de arriba abajo. Los archivos se procesan en esta Mac.</p></section>
+<section aria-label="Selección"><div class="controls">
+<label>Herramienta <select id="herramienta"><option value="positivo">Punto positivo</option><option value="negativo">Punto negativo</option><option value="caja">Caja (arrastrar)</option></select></label>
+<label>Tipo <select id="tipo"><option value="objeto">Objeto</option><option value="bloque">Bloque</option><option value="texto">Texto</option><option value="tabla">Tabla</option><option value="cota">Cota</option><option value="simbolo">Símbolo</option><option value="leyenda">Leyenda</option><option value="cajetin">Cajetín</option></select></label>
+<label><input id="documento" type="checkbox">Conservar bloque rectangular</label>
+<button id="agregar">Guardar selección</button><button id="limpiar">Limpiar selecciones</button>
+</div><p class="muted">Añade varios puntos para una misma pieza o dibuja una caja. Guarda la selección para preparar otra. En PDF, el bloque conserva el fondo entre letras y celdas; el tipo lo eliges tú.</p>
+<div id="escena"><canvas id="lienzo" width="640" height="360" aria-label="Imagen: usa puntos o arrastra una caja"></canvas></div>
+<p id="info" class="muted">Carga un archivo para empezar.</p><ol id="lista"></ol>
+<div class="controls"><button id="recortar" class="primary" disabled>Recortar selecciones</button><label>Rejilla <input id="rejilla" type="number" min="2" max="16" value="4"></label><button id="proponer" disabled>Proponer sin clics</button><button id="json">Descargar indicaciones JSON</button></div>
+<details><summary>Indicaciones JSON (alternativa al ratón)</summary><textarea id="indicaciones" aria-label="Indicaciones JSON" placeholder='{"coordenadas":"imagen_px","piezas":[{"caja":[20,20,200,200]}]}'></textarea><button id="usarjson">Recortar este JSON</button></details>
+<p id="estado" role="status" aria-live="polite"></p></section>
+<section aria-label="Recortes"><h2>Piezas recortadas</h2><p id="descargas"></p><div id="resultados"></div></section>
+</main></body></html>

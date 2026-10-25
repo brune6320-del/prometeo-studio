@@ -90,3 +90,18 @@ se extiende a esa dependencia. Véase <https://pymupdf.readthedocs.io/en/latest/
 Se buscaron referencias PRAGMA en `~/Documents` y `~/Projects`: se localizaron
 la cronología SAM y un adaptador de reproducción offline, pero no se identificó
 con certeza el runner de 26 cajas. Este recortador usa directamente la API oficial.
+
+## Página local
+
+```sh
+nice -n 15 tools/recortador/.venv/bin/python -B tools/recortador/servidor.py
+```
+
+Abre <http://127.0.0.1:8765>. Carga un archivo, haz clic o arrastra una caja,
+guarda cada selección y pulsa «Recortar selecciones». «Proponer sin clics» usa
+la rejilla. La misma pantalla permite cambiar página, ppp y tesela de un PDF,
+revisar las piezas sobre damero y descargar PNG, `piezas.json` y `tablero.json`.
+Hay una alternativa con JSON para introducir coordenadas sin ratón.
+El servidor se limita a loopback, comprueba origen y token, procesa las solicitudes
+secuencialmente y no expone rutas arbitrarias del disco. `Ctrl-C` lo detiene.
+Los archivos cargados se eliminan al cerrar; los resultados permanecen en `salidas/`.
