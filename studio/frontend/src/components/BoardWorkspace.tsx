@@ -33,9 +33,10 @@ import {
   type BoardDocument,
   type BoardMedia,
 } from '../board/model';
-import { fitBoardCamera, zoomAtPoint, screenToWorld } from '../board/camera';
-import { movimientoReducido, pasoInercia, velocidadDeMuestras, type MuestraInercia } from '../motion/muelle';
+import { fitBoardCamera, MAX_BOARD_ZOOM, MIN_BOARD_ZOOM, zoomAtPoint, screenToWorld } from '../board/camera';
+import { movimientoReducido, pasoInercia, resortar, seguir, TAU, velocidadDeMuestras, type MuestraInercia } from '../motion/muelle';
 import { alignCards, distributeCards, snapPosition, type Alignment, type CardSize, type DistributionAxis } from '../board/geometry';
+import { imanDeCaja, inclinacionPorVelocidad, type GuiasIman } from '../board/iman';
 import {
   cardsInsideFrame,
   detachCardFromFrames,
@@ -117,6 +118,15 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
+function liberarPuntero(element: HTMLElement | null, pointerId: number): void {
+  if (!element) return;
+  try {
+    if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+  } catch {
+    /* el elemento ya no existe o el puntero se soltó solo */
+  }
+}
+
 function downloadText(filename: string, content: string, mimeType: string): void {
   const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
   const anchor = document.createElement('a');
@@ -134,6 +144,12 @@ interface Modificadores {
   metaKey: boolean;
   ctrlKey: boolean;
   shiftKey: boolean;
+}
+
+interface GestoWebKit extends Event {
+  scale?: number;
+  clientX?: number;
+  clientY?: number;
 }
 
 interface CardHandlers {
@@ -196,6 +212,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  const [guias, setGuias] = useState<GuiasIman>({});
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -204,11 +221,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const cameraRef = useRef({ pan: { x: 0, y: 0 }, zoom: 1 });
   const paintRaf = useRef(0);
   const inertiaRaf = useRef(0);
+  const returnZoomRaf = useRef(0);
   const syncTimer = useRef<number | null>(null);
   const wheelIdle = useRef<number | null>(null);
   const wheelVelocity = useRef({ vx: 0, vy: 0, t: 0 });
-  const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; samples: MuestraInercia[] } | null>(null);
-  const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null } | null>(null);
+  const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; samples: MuestraInercia[]; captureEl: HTMLElement | null } | null>(null);
+  const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; sizes: Map<string, CardSize>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null; lastX: number; lastY: number; lastT: number } | null>(null);
   /** Herramienta de marco elegida en el menú: el siguiente arrastre dibuja el rectángulo. */
   const [frameToolId, setFrameToolId] = useState<string | null>(null);
   const [frameDraft, setFrameDraft] = useState<FrameRect | null>(null);
@@ -217,7 +235,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [dropFrameId, setDropFrameId] = useState<string | null>(null);
   const frameResize = useRef<{ pointerId: number; cardId: string; startX: number; startY: number; width: number; height: number; startBoard: BoardDocument } | null>(null);
   const settleTimer = useRef<number | null>(null);
-  const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number } } | null>(null);
+  const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number }; captureEl: HTMLElement | null } | null>(null);
+  const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => {});
   /** Marco abierto a pantalla completa en la vista Archivo; Esc vuelve a la pizarra. */
   const [archiveFullscreenId, setArchiveFullscreenId] = useState<string | null>(null);
   /** Marco cuya publicación local se está escribiendo (bloquea el botón mientras dura). */
@@ -471,6 +490,82 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     inertiaRaf.current = requestAnimationFrame(paso);
   }, [detenerInercia, pintarCamara, programarSincronizacion]);
 
+  const detenerRetornoZoom = useCallback(() => {
+    if (returnZoomRaf.current) {
+      cancelAnimationFrame(returnZoomRaf.current);
+      returnZoomRaf.current = 0;
+    }
+  }, []);
+
+  /** Si el pellizco empujó el zoom fuera de los topes, vuelve con banda elástica. */
+  const volverAZoom = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const actual = cameraRef.current;
+    const destino = Math.max(MIN_BOARD_ZOOM, Math.min(MAX_BOARD_ZOOM, actual.zoom));
+    if (Math.abs(destino - actual.zoom) < 0.0005) return;
+    detenerRetornoZoom();
+    const focal = { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
+    const mundo = screenToWorld(focal, actual);
+    let zoomActual = actual.zoom;
+    let ultimo = performance.now();
+    const paso = (ahora: number) => {
+      const dt = Math.min(0.05, Math.max(0, (ahora - ultimo) / 1000));
+      ultimo = ahora;
+      zoomActual = seguir(zoomActual, destino, dt, TAU.rubber, 0.0005);
+      cameraRef.current = {
+        zoom: zoomActual,
+        pan: { x: focal.x - mundo.x * zoomActual, y: focal.y - mundo.y * zoomActual },
+      };
+      pintarCamara();
+      if (Math.abs(destino - zoomActual) > 0.0005) returnZoomRaf.current = requestAnimationFrame(paso);
+      else {
+        returnZoomRaf.current = 0;
+        cameraRef.current = { ...cameraRef.current, zoom: destino };
+        pintarCamara();
+        programarSincronizacion();
+      }
+    };
+    returnZoomRaf.current = requestAnimationFrame(paso);
+  }, [detenerRetornoZoom, pintarCamara, programarSincronizacion]);
+
+  const limpiarInclinacion = useCallback(() => {
+    viewportRef.current?.style.removeProperty('--drag-tilt');
+  }, []);
+
+  /** Un gesto nuevo o una pérdida de foco no deja capturas, clases ni timers colgados. */
+  const cancelarGestos = useCallback(() => {
+    detenerInercia();
+    detenerRetornoZoom();
+    if (wheelIdle.current) {
+      window.clearTimeout(wheelIdle.current);
+      wheelIdle.current = null;
+    }
+    if (settleTimer.current) {
+      window.clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    const pan = panDrag.current;
+    if (pan) liberarPuntero(pan.captureEl, pan.pointerId);
+    const card = cardDrag.current;
+    if (card) liberarPuntero(card.captureEl, card.pointerId);
+    const draw = frameDraw.current;
+    if (draw) liberarPuntero(draw.captureEl, draw.pointerId);
+    const resize = frameResize.current;
+    if (resize) liberarPuntero(viewportRef.current, resize.pointerId);
+    panDrag.current = null;
+    cardDrag.current = null;
+    frameDraw.current = null;
+    frameResize.current = null;
+    setIsPanning(false);
+    setDraggingIds([]);
+    setSettlingIds([]);
+    setDropFrameId(null);
+    setFrameDraft(null);
+    setGuias({});
+    limpiarInclinacion();
+  }, [detenerInercia, detenerRetornoZoom, limpiarInclinacion]);
+
   useLayoutEffect(() => {
     aplicarCamara();
   });
@@ -478,9 +573,31 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   useEffect(() => () => {
     if (paintRaf.current) cancelAnimationFrame(paintRaf.current);
     if (inertiaRaf.current) cancelAnimationFrame(inertiaRaf.current);
+    if (returnZoomRaf.current) cancelAnimationFrame(returnZoomRaf.current);
     if (syncTimer.current) window.clearTimeout(syncTimer.current);
     if (wheelIdle.current) window.clearTimeout(wheelIdle.current);
   }, []);
+
+  // El tablero cambia de vista o de documento: nada del gesto anterior debe sobrevivir.
+  useEffect(() => () => cancelarGestos(), [activeBoard?.id, archiveFullscreenId, cancelarGestos]);
+
+  // Red de seguridad para cuando el pointerup ocurre fuera de la ventana o el WebView pierde el foco.
+  useEffect(() => {
+    const alSoltar = () => {
+      if (panDrag.current || cardDrag.current || frameDraw.current || frameResize.current) cancelarGestos();
+    };
+    const alOcultar = () => { if (document.hidden) alSoltar(); };
+    window.addEventListener('pointerup', alSoltar);
+    window.addEventListener('pointercancel', alSoltar);
+    window.addEventListener('blur', alSoltar);
+    document.addEventListener('visibilitychange', alOcultar);
+    return () => {
+      window.removeEventListener('pointerup', alSoltar);
+      window.removeEventListener('pointercancel', alSoltar);
+      window.removeEventListener('blur', alSoltar);
+      document.removeEventListener('visibilitychange', alOcultar);
+    };
+  }, [cancelarGestos]);
 
   const centerCamera = useCallback((board: BoardDocument | null) => {
     const { width, height } = viewportSize;
@@ -691,12 +808,29 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
     detenerInercia();
+    detenerRetornoZoom();
+    if (wheelIdle.current) {
+      window.clearTimeout(wheelIdle.current);
+      wheelIdle.current = null;
+    }
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
     const actual = cameraRef.current;
     if (event.metaKey || event.ctrlKey) {
       const focal = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-      cameraRef.current = zoomAtPoint(actual, actual.zoom * Math.exp(-event.deltaY * 0.0012), focal);
+      const pedido = actual.zoom * Math.exp(-event.deltaY * 0.0012);
+      // Fuera de los topes el zoom cede (rubber-band) y vuelve solo: nunca un corte seco.
+      const conBanda = resortar(pedido, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM);
+      const siguiente = Math.max(MIN_BOARD_ZOOM * 0.72, Math.min(MAX_BOARD_ZOOM * 1.12, conBanda));
+      const mundo = screenToWorld(focal, actual);
+      cameraRef.current = {
+        zoom: siguiente,
+        pan: { x: focal.x - mundo.x * siguiente, y: focal.y - mundo.y * siguiente },
+      };
+      wheelIdle.current = window.setTimeout(() => {
+        wheelIdle.current = null;
+        volverAZoom();
+      }, 90);
     } else {
       cameraRef.current = { ...actual, pan: { x: actual.pan.x - event.deltaX, y: actual.pan.y - event.deltaY } };
       const factor = 18;
@@ -705,7 +839,6 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         vy: Math.max(-2400, Math.min(2400, -event.deltaY * factor)),
         t: performance.now(),
       };
-      if (wheelIdle.current) window.clearTimeout(wheelIdle.current);
       wheelIdle.current = window.setTimeout(() => {
         wheelIdle.current = null;
         const v = wheelVelocity.current;
@@ -714,14 +847,68 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
     pintarCamara();
     programarSincronizacion();
-  }, [detenerInercia, iniciarInercia, pintarCamara, programarSincronizacion]);
+  }, [detenerInercia, detenerRetornoZoom, iniciarInercia, pintarCamara, programarSincronizacion, volverAZoom]);
 
+  useEffect(() => {
+    wheelHandlerRef.current = handleWheel;
+  }, [handleWheel]);
+
+  // Se engancha una sola vez al viewport: cambiar de estado no deja una ventana sin rueda.
   useEffect(() => {
     const element = viewportRef.current;
     if (!element) return;
-    element.addEventListener('wheel', handleWheel, { passive: false });
-    return () => element.removeEventListener('wheel', handleWheel);
-  }, [handleWheel, loaded]);
+    const alRodar = (event: WheelEvent) => wheelHandlerRef.current(event);
+    element.addEventListener('wheel', alRodar, { passive: false });
+    return () => element.removeEventListener('wheel', alRodar);
+  }, [loaded]);
+
+  /**
+   * Safari y WKWebView no siempre entregan el pellizco como ctrl+wheel. Los eventos
+   * `gesture*` se cancelan para que el WebView no haga zoom de página y se traducen
+   * al mismo zoom de cámara. No hay API pública de 120 Hz: se deja a rAF.
+   */
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+    let base: { zoom: number; focal: { x: number; y: number }; mundo: { x: number; y: number } } | null = null;
+    const start = (event: Event) => {
+      const gesto = event as GestoWebKit;
+      if (typeof gesto.scale !== 'number') return;
+      event.preventDefault();
+      detenerInercia();
+      detenerRetornoZoom();
+      const rect = element.getBoundingClientRect();
+      const focal = { x: (gesto.clientX ?? rect.left + rect.width / 2) - rect.left, y: (gesto.clientY ?? rect.top + rect.height / 2) - rect.top };
+      base = { zoom: cameraRef.current.zoom, focal, mundo: screenToWorld(focal, cameraRef.current) };
+    };
+    const change = (event: Event) => {
+      const gesto = event as GestoWebKit;
+      if (!base || typeof gesto.scale !== 'number') return;
+      event.preventDefault();
+      const pedido = base.zoom * gesto.scale;
+      const siguiente = Math.max(MIN_BOARD_ZOOM * 0.72, Math.min(MAX_BOARD_ZOOM * 1.12, resortar(pedido, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM)));
+      cameraRef.current = {
+        zoom: siguiente,
+        pan: { x: base.focal.x - base.mundo.x * siguiente, y: base.focal.y - base.mundo.y * siguiente },
+      };
+      pintarCamara();
+    };
+    const end = (event: Event) => {
+      if (!base) return;
+      event.preventDefault();
+      base = null;
+      programarSincronizacion();
+      volverAZoom();
+    };
+    element.addEventListener('gesturestart', start, { passive: false });
+    element.addEventListener('gesturechange', change, { passive: false });
+    element.addEventListener('gestureend', end, { passive: false });
+    return () => {
+      element.removeEventListener('gesturestart', start);
+      element.removeEventListener('gesturechange', change);
+      element.removeEventListener('gestureend', end);
+    };
+  }, [detenerInercia, detenerRetornoZoom, loaded, pintarCamara, programarSincronizacion, volverAZoom]);
 
   const zoomBy = (factor: number) => {
     const { width, height } = viewportSize;
@@ -736,7 +923,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-frame, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
     detenerInercia();
+    detenerRetornoZoom();
     if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
+    if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
+    setSettlingIds([]);
+    setGuias({});
+    limpiarInclinacion();
     const posicion = cameraRef.current.pan;
     panDrag.current = {
       pointerId: event.pointerId,
@@ -745,9 +937,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       panX: posicion.x,
       panY: posicion.y,
       samples: [{ t: performance.now(), x: posicion.x, y: posicion.y }],
+      captureEl: event.currentTarget,
     };
     setIsPanning(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
   };
 
   const movePan = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -765,6 +958,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (!drag || drag.pointerId !== event.pointerId) return;
     panDrag.current = null;
     setIsPanning(false);
+    liberarPuntero(drag.captureEl, event.pointerId);
     const velocidad = velocidadDeMuestras(drag.samples, 90);
     programarSincronizacion();
     iniciarInercia(velocidad.x, velocidad.y);
@@ -779,10 +973,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const startFrameDraw = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !frameToolId) return;
     if ((event.target as HTMLElement).closest('button, input, select, textarea, a, .board-zoom-controls, .board-empty, .board-controls')) return;
+    detenerInercia();
+    detenerRetornoZoom();
+    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
     const start = viewportWorldPoint(event);
-    frameDraw.current = { pointerId: event.pointerId, start };
+    frameDraw.current = { pointerId: event.pointerId, start, captureEl: event.currentTarget };
     setFrameDraft(rectFromPoints(start, start));
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
   };
 
   const moveFrameDraw = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -796,6 +993,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (!drag || drag.pointerId !== event.pointerId) return;
     const rect = rectFromPoints(drag.start, viewportWorldPoint(event));
     frameDraw.current = null;
+    liberarPuntero(drag.captureEl, event.pointerId);
     suppressViewportClick.current = true;
     window.setTimeout(() => { suppressViewportClick.current = false; }, 0);
     if (!frameToolId) {
@@ -830,9 +1028,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => {
     detenerInercia();
+    detenerRetornoZoom();
     if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
     if (event.button !== 0 || event.detail > 1 || frameToolId || connectMode || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
     suppressCardClick.current = false;
+    if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
+    setSettlingIds([]);
+    setGuias({});
+    limpiarInclinacion();
     const hasModifier = event.shiftKey || event.metaKey || event.ctrlKey;
     let nextSelection = selectedCardIds;
     if (event.metaKey || event.ctrlKey) {
@@ -857,6 +1060,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const positions = new Map(
       activeBoard.cards.filter((item) => ids.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]),
     );
+    const sizes = measureCardSizes();
+    sizes.set(card.id, {
+      width: card.width,
+      height: card.type === 'marco' ? readFrameData(card).alto : sizes.get(card.id)?.height ?? 200,
+    });
     cardDrag.current = {
       pointerId: event.pointerId,
       boardId: activeBoard.id,
@@ -864,13 +1072,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       x: event.clientX,
       y: event.clientY,
       positions,
+      sizes,
       startBoard: activeBoard,
       gesture: newBoardId('move'),
       moved: false,
       captureEl: event.currentTarget,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      lastT: performance.now(),
     };
     setDraggingIds(ids);
-    setSettlingIds([]);
     setDropFrameId(null);
   };
 
@@ -890,7 +1101,41 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       deltaX = snapPosition(anchor.x + deltaX, GRID_SIZE) - anchor.x;
       deltaY = snapPosition(anchor.y + deltaY, GRID_SIZE) - anchor.y;
     }
+    const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
+    const arrastrados = new Set(drag.ids);
+    if (anchor && tablero) {
+      const tamano = drag.sizes.get(drag.ids[0]) ?? { width: 260, height: 200 };
+      const caja = { x: anchor.x + deltaX, y: anchor.y + deltaY, width: tamano.width, height: tamano.height };
+      const otras = tablero.cards
+        .filter((item) => !arrastrados.has(item.id))
+        .map((item) => {
+          const medida = drag.sizes.get(item.id);
+          return {
+            x: item.x,
+            y: item.y,
+            width: medida?.width ?? item.width,
+            height: medida?.height ?? (item.type === 'marco' ? readFrameData(item).alto : 200),
+          };
+        });
+      const iman = imanDeCaja(caja, otras, { umbral: 7 / Math.max(0.05, cameraRef.current.zoom), rejilla: GRID_SIZE });
+      deltaX += iman.dx;
+      deltaY += iman.dy;
+      setGuias((actual) => actual.x === iman.guias.x && actual.y === iman.guias.y ? actual : iman.guias);
+    } else {
+      setGuias((actual) => actual.x === undefined && actual.y === undefined ? actual : {});
+    }
     if (deltaX !== 0 || deltaY !== 0) drag.moved = true;
+
+    const ahora = performance.now();
+    const dt = Math.max(1, ahora - drag.lastT);
+    const vx = ((event.clientX - drag.lastX) / dt) * 1000;
+    drag.lastX = event.clientX;
+    drag.lastY = event.clientY;
+    drag.lastT = ahora;
+    if (!movimientoReducido()) {
+      viewportRef.current?.style.setProperty('--drag-tilt', `${inclinacionPorVelocidad(vx)}deg`);
+    }
+
     updateBoard((board) => ({
       ...board,
       cards: board.cards.map((item) => {
@@ -899,8 +1144,6 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       }),
     }), { recordHistory: false });
 
-    const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
-    const arrastrados = new Set(drag.ids);
     const esMarcoArrastrado = drag.ids.some((id) => tablero?.cards.find((item) => item.id === id)?.type === 'marco');
     if (!tablero || esMarcoArrastrado) {
       setDropFrameId(null);
@@ -918,12 +1161,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const asentar = (ids: string[]) => {
-    if (movimientoReducido() || !ids.length) return;
+    if (movimientoReducido() || !ids.length) {
+      limpiarInclinacion();
+      return;
+    }
     setSettlingIds(ids);
     if (settleTimer.current) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(() => {
       settleTimer.current = null;
       setSettlingIds([]);
+      limpiarInclinacion();
     }, 280);
   };
 
@@ -963,10 +1210,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       enqueueBoardSave(final);
     }
     if (drag.moved || destino) suppressCardClick.current = true;
-    try { drag.captureEl?.releasePointerCapture(drag.pointerId); } catch { /* ya liberado */ }
+    liberarPuntero(drag.captureEl, drag.pointerId);
     setDraggingIds([]);
     setDropFrameId(null);
+    setGuias({});
     if (drag.moved) asentar(drag.ids);
+    else limpiarInclinacion();
     cardDrag.current = null;
   };
 
@@ -975,6 +1224,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     event.preventDefault();
     event.stopPropagation();
     detenerInercia();
+    detenerRetornoZoom();
+    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
     frameResize.current = {
       pointerId: event.pointerId,
       cardId: card.id,
@@ -986,7 +1237,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     };
     setDraggingIds([card.id]);
     setSettlingIds([]);
-    event.currentTarget.setPointerCapture(event.pointerId);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
   };
 
   const moveFrameResize = (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -1007,6 +1258,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const drag = frameResize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     frameResize.current = null;
+    liberarPuntero(event.currentTarget, event.pointerId);
     setDraggingIds([]);
     const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
     const marco = tablero?.cards.find((item) => item.id === drag.cardId);
@@ -1794,14 +2046,19 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           </select>
           <span className="board-identity-separator" aria-hidden="true">·</span>
           <label className="sr-only" htmlFor="board-select">Tablero</label>
-          <select id="board-select" className="board-board-select" value={activeBoard.id} onChange={async (event) => {
-            const saved = await flushBoardWrites();
-            if (!saved) {
-              setNotice('No se cambió de tablero porque el actual aún no se pudo guardar. Reintenta o exporta una copia.');
-              return;
-            }
-            setActiveBoardId(event.target.value);
-            setSelectedCardIds([]);
+          <select id="board-select" className="board-board-select" value={activeBoard.id} onChange={(event) => {
+            // El select es controlado: hay que guardar el destino antes del await,
+            // porque mientras se guarda vuelve a pintar el tablero actual.
+            const destino = event.target.value;
+            void (async () => {
+              const saved = await flushBoardWrites();
+              if (!saved) {
+                setNotice('No se cambió de tablero porque el actual aún no se pudo guardar. Reintenta o exporta una copia.');
+                return;
+              }
+              setActiveBoardId(destino);
+              setSelectedCardIds([]);
+            })();
           }} aria-label="Elegir tablero">
             {projectBoards.map((board) => <option key={board.id} value={board.id}>{board.title || 'Sin título'}</option>)}
           </select>
@@ -1955,6 +2212,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             </g>
           </svg>
         <div className="board-stage" ref={stageRef}>
+          {guias.x !== undefined && (
+            <div className="board-guide board-guide-x" data-testid="board-guide-x" style={{ left: guias.x }} aria-hidden="true" />
+          )}
+          {guias.y !== undefined && (
+            <div className="board-guide board-guide-y" data-testid="board-guide-y" style={{ top: guias.y }} aria-hidden="true" />
+          )}
           {activeBoard.cards.map((card) => {
             const matches = matchingCards.has(card.id);
             if (card.type === 'marco') {

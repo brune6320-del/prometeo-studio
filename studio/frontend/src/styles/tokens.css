@@ -179,6 +179,7 @@
   --board-chrome-opacity: 0;
   --board-frame-line: var(--line-subtle);
   --board-frame-fill: transparent;
+  --board-guide: color-mix(in oklab, var(--accent) 58%, var(--card-rose));
 
   /* Alias de migración: el código viejo sigue leyendo estos nombres. */
   --bg-0: var(--surface-0);

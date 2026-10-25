@@ -513,7 +513,9 @@
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.12);
   pointer-events: auto;
   user-select: text;
-  transition: box-shadow 110ms ease, opacity 110ms ease;
+  transform: translate3d(0, calc(-1 * var(--card-lift, 0px)), 0) rotate(var(--card-tilt, 0deg));
+  transform-origin: 55% 60%;
+  transition: box-shadow 120ms var(--ease-standard), opacity 120ms var(--ease-standard), transform 120ms var(--ease-standard);
 }
 
 .board-frame {
@@ -664,8 +666,9 @@
 .board-card.color-sage { background: var(--card-sage); border-top-color: var(--card-rule-sage); }
 .board-card.color-rose { background: var(--card-rose); border-top-color: var(--card-rule-rose); }
 
-.board-card:hover {
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.14);
+.board-card:not(.dragging):not(.settling):hover {
+  --card-lift: 1.5px;
+  box-shadow: var(--shadow-2);
 }
 
 .board-card.selected {
@@ -2985,15 +2988,20 @@
 /* ── F4 · arrastre, asentado y destino de marco ─────────────────────────── */
 .board-card.dragging {
   z-index: 6;
+  --card-tilt: var(--drag-tilt, 0deg);
   opacity: 0.96;
   box-shadow: var(--shadow-3);
   cursor: grabbing;
+  transform: translate3d(0, -2px, 0) rotate(var(--card-tilt));
+  transition: none;
 }
 
 .board-frame.dragging {
   z-index: 6;
   opacity: 0.96;
   box-shadow: var(--shadow-3);
+  transform: rotate(var(--drag-tilt, 0deg));
+  transition: none;
 }
 
 .board-card.settling,
@@ -3002,8 +3010,30 @@
 }
 
 @keyframes board-asentar {
-  from { transform: translateY(-4px) scale(1.012); }
-  to { transform: translateY(0) scale(1); }
+  from { transform: translateY(-3px) rotate(var(--drag-tilt, 0deg)) scale(1.008); }
+  to { transform: translateY(0) rotate(0deg) scale(1); }
+}
+
+/* Guías del imán: solo mientras se arrastra, en el mundo del tablero. */
+.board-guide {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--board-guide);
+  box-shadow: 0 0 0 0.5px var(--accent-soft);
+  opacity: 0.9;
+}
+
+.board-guide-x {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.board-guide-y {
+  left: 0;
+  right: 0;
+  height: 1px;
 }
 
 .board-frame.drop-target {
@@ -3046,6 +3076,17 @@
 @media (prefers-reduced-motion: reduce) {
   .board-card.settling,
   .board-frame.settling { animation: none; }
+
+  .board-card {
+    --card-lift: 0px;
+    transform: none;
+    transition: none;
+  }
+
+  .board-card.dragging,
+  .board-frame.dragging {
+    transform: none;
+  }
 }
 
 /* ── F5 · edición en el sitio ───────────────────────────────────────────── */
