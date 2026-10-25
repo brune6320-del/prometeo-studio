@@ -367,3 +367,18 @@ export interface MirarReferentesResponse {
   modelo?: string;
   lecturas?: MirarReferenteLectura[];
 }
+
+export interface ManifiestoRequest {
+  proyecto: string;
+  collages: string[];
+  lecturas: string[];
+  pesos: string[];
+}
+
+export interface ManifiestoResponse {
+  ok: boolean;
+  disponible?: boolean;
+  motivo?: string | null;
+  modelo?: string;
+  lineas?: string[];
+}

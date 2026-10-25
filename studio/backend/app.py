@@ -17,6 +17,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -272,6 +273,13 @@ class MirarOjosRequest(BaseModel):
     ojos_descripcion: str = ""
     preguntas: List[str] = Field(default_factory=list)
     referentes: List[MirarOjosReferente] = Field(default_factory=list)
+
+
+class ManifiestoRequest(BaseModel):
+    proyecto: str = ""
+    collages: List[str] = Field(default_factory=list)
+    lecturas: List[str] = Field(default_factory=list)
+    pesos: List[str] = Field(default_factory=list)
 
 
 SAMPLE_DESCRIPTIONS = {
@@ -753,6 +761,124 @@ async def mirar_referentes(req: MirarOjosRequest):
             "lecturas": lecturas,
         }
     return {"ok": True, "disponible": True, "motivo": "", "modelo": DEEPSEEK_MODEL, "lecturas": lecturas}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MANIFIESTO SEMANAL · DEEPSEEK
+# ─────────────────────────────────────────────────────────────────────────────
+
+MAX_LINEAS_MANIFIESTO = 12
+
+
+def _limpiar_linea_manifiesto(valor: str) -> str:
+    linea = valor.strip()
+    linea = re.sub(r"^#{1,6}\s*", "", linea)
+    linea = re.sub(r"\*\*(.+?)\*\*", r"\1", linea)
+    linea = re.sub(r"__(.+?)__", r"\1", linea)
+    linea = re.sub(r"^(?:\d+[.)]|[-*•])\s*", "", linea)
+    linea = re.sub(r"sk-[A-Za-z0-9_-]{8,}", "[clave oculta]", linea)
+    linea = re.sub(r"Bearer\s+\S+", "Bearer [oculto]", linea, flags=re.IGNORECASE)
+    return linea.strip()
+
+
+def _lineas_manifiesto(texto: str) -> List[str]:
+    limpio = (texto or "").replace("\r\n", "\n").strip()
+    if limpio.startswith("```"):
+        limpio = re.sub(r"^```[a-zA-Z0-9_-]*\n?", "", limpio)
+        limpio = re.sub(r"\n?```$", "", limpio)
+    crudas = [_limpiar_linea_manifiesto(linea) for linea in limpio.split("\n")]
+    lineas = [linea for linea in crudas if linea]
+    if len(lineas) <= 1 and lineas:
+        lineas = [_limpiar_linea_manifiesto(parte) for parte in re.split(r"(?<=[.!?…])\s+", lineas[0])]
+        lineas = [linea for linea in lineas if linea]
+    lineas = lineas[:MAX_LINEAS_MANIFIESTO]
+    return [f"{indice}. {linea}" for indice, linea in enumerate(lineas, start=1)]
+
+
+def _prompt_manifiesto(req: ManifiestoRequest) -> str:
+    proyecto = _recortar(req.proyecto, 200) or "el proyecto abierto"
+    collages = "\n".join(f"- {_recortar(item, 400)}" for item in req.collages[:9] if _recortar(item, 400))
+    lecturas = "\n".join(f"- {_recortar(item, 1200)}" for item in req.lecturas[:12] if _recortar(item, 1200))
+    pesos = "\n".join(f"- {_recortar(item, 200)}" for item in req.pesos[:5] if _recortar(item, 200))
+    return (
+        f"Proyecto: {proyecto}\n\n"
+        f"Collages con ♥ de los últimos siete días:\n{collages or '- ninguno'}\n\n"
+        f"Lecturas aceptadas de la semana (palabras de Bruno):\n{lecturas or '- ninguna'}\n\n"
+        f"Pesos de gusto que más subieron:\n{pesos or '- ninguno'}\n\n"
+        "Escribe un manifiesto de vanguardia para esta semana, en español, de como máximo "
+        f"{MAX_LINEAS_MANIFIESTO} líneas numeradas. Cada línea es una sola idea corta y material. "
+        "Usa palabras de las lecturas; no inventes citas ni datos. "
+        "No uses Markdown, ni títulos, ni explicaciones antes o después. "
+        "Devuelve solo las líneas numeradas."
+    )
+
+
+def _pedir_manifiesto(api_key: str, req: ManifiestoRequest) -> List[str]:
+    """Llamada bloqueante a DeepSeek. La clave no se registra ni se devuelve."""
+    cuerpo = json.dumps({
+        "model": DEEPSEEK_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": "Eres un editor de manifiestos de vanguardia. Escribes en español, "
+                           f"en líneas numeradas y con un máximo de {MAX_LINEAS_MANIFIESTO} líneas. "
+                           "No inventas datos ni citas.",
+            },
+            {"role": "user", "content": _prompt_manifiesto(req)},
+        ],
+        "max_tokens": 700,
+        "temperature": 0.85,
+        "stream": False,
+    }).encode("utf-8")
+    peticion = urllib.request.Request(
+        DEEPSEEK_URL,
+        data=cuerpo,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(peticion, timeout=60) as respuesta:
+            datos = json.loads(respuesta.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        log.warning("deepseek rechazó el manifiesto: HTTP %s", exc.code)
+        return []
+    except Exception as exc:  # red, TLS, tiempo, JSON roto
+        log.warning("deepseek no disponible para el manifiesto: %s", type(exc).__name__)
+        return []
+    try:
+        texto = datos["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        log.warning("deepseek devolvió un manifiesto sin contenido")
+        return []
+    return _lineas_manifiesto(_recortar(texto, 20000))
+
+
+@app.post("/api/manifiesto/escribir")
+async def escribir_manifiesto(req: ManifiestoRequest):
+    """Manifiesto de ≤12 líneas. Sin clave o sin red devuelve la plantilla vacía."""
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    if not api_key:
+        return {
+            "ok": True,
+            "disponible": False,
+            "motivo": "Falta DEEPSEEK_API_KEY en el entorno del backend. Escribe el manifiesto a mano.",
+            "modelo": "",
+            "lineas": [],
+        }
+
+    lineas = await run_in_threadpool(_pedir_manifiesto, api_key, req)
+    if not lineas:
+        return {
+            "ok": True,
+            "disponible": False,
+            "motivo": "DeepSeek no respondió (sin red o sin cuota). Escribe el manifiesto a mano.",
+            "modelo": "",
+            "lineas": [],
+        }
+    return {"ok": True, "disponible": True, "motivo": "", "modelo": DEEPSEEK_MODEL, "lineas": lineas}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

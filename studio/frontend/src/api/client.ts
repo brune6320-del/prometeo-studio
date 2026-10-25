@@ -13,6 +13,8 @@ import type {
   DocumentSummary,
   HealthInfo,
   HostStatus,
+  ManifiestoRequest,
+  ManifiestoResponse,
   MirarReferentesRequest,
   MirarReferentesResponse,
   NodeDetail,
@@ -161,6 +163,19 @@ export const studioApi = {
    */
   mirarReferentes(input: MirarReferentesRequest) {
     return request<MirarReferentesResponse>('/api/referentes/mirar', {
+      method: 'POST',
+      json: input,
+      timeoutMs: 120_000,
+      stage: 'API',
+    });
+  },
+
+  /**
+   * «Manifiesto semanal»: el motor local habla con DeepSeek y devuelve líneas
+   * numeradas. Sin clave o sin red responde disponible:false, no un error.
+   */
+  escribirManifiesto(input: ManifiestoRequest) {
+    return request<ManifiestoResponse>('/api/manifiesto/escribir', {
       method: 'POST',
       json: input,
       timeoutMs: 120_000,

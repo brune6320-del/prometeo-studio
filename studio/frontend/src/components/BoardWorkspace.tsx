@@ -67,6 +67,7 @@ import {
   type FuenteEntropia,
 } from '../board/vanguardia/entropia';
 import { gustosVacios, importarGustosParciales, like, nope, type Gustos } from '../board/vanguardia/gustos';
+import { crearMarcoManifiesto, pedirManifiesto, seleccionarSemana } from '../board/vanguardia/manifiesto';
 import { enqueueBoardSave, flushBoardWrites, removeBoardFromStore, rememberActiveBoard } from '../board/saveQueue';
 import { publishFrameToDirectory } from '../board/publicar';
 import {
@@ -183,6 +184,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [archiveFullscreenId, setArchiveFullscreenId] = useState<string | null>(null);
   /** Marco cuya publicación local se está escribiendo (bloquea el botón mientras dura). */
   const [publishingFrameId, setPublishingFrameId] = useState<string | null>(null);
+  /** El manifiesto semanal espera al motor local; el botón no se dispara dos veces. */
+  const [manifesting, setManifesting] = useState(false);
   const [boardHistories, setBoardHistories] = useState<Record<string, BoardHistory>>({});
   /** Un clic que llega después de arrastrar o de un gesto con modificador no debe cambiar la selección otra vez. */
   const suppressCardClick = useRef(false);
@@ -1169,6 +1172,49 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
   };
 
+  /**
+   * Crea un marco nuevo en vista Archivo con el manifiesto como nota fija y
+   * los collages de la semana convertidos en piezas del feed.
+   */
+  const crearManifiesto = async () => {
+    if (!activeBoard || manifesting) return;
+    const sourceBoards = projectBoards.length ? projectBoards : [activeBoard];
+    const ahora = new Date();
+    const seleccion = seleccionarSemana(sourceBoards, {
+      ahora,
+      gustos: activeProject?.gustos ?? gustosVacios(),
+    });
+    if (!seleccion.collages.length && !seleccion.lecturas.length && !seleccion.pesos.length) {
+      setNotice('No hay nada que contar esta semana: faltan collages con ♥, lecturas aceptadas o pesos que hayan subido.');
+      return;
+    }
+    setManifesting(true);
+    try {
+      const resultado = await pedirManifiesto(seleccion, activeProject?.name || activeBoard.title || 'el proyecto abierto');
+      const maxX = activeBoard.cards.length
+        ? Math.max(...activeBoard.cards.map((card) => card.x + card.width))
+        : 0;
+      const minY = activeBoard.cards.length
+        ? Math.min(...activeBoard.cards.map((card) => card.y))
+        : 0;
+      const { frame, cards } = crearMarcoManifiesto(seleccion, resultado.lineas, {
+        x: maxX + 80,
+        y: minY,
+        fuentes: fuentesEntropia,
+        ahora,
+      });
+      updateBoard((board) => ({ ...board, cards: [...board.cards, ...cards] }));
+      setSelectedCardIds([frame.id]);
+      setNotice(resultado.disponible
+        ? `Manifiesto creado con ${seleccion.collages.length} ${seleccion.collages.length === 1 ? 'collage' : 'collages'} y ${resultado.lineas.length} líneas. Abre «Ver como Archivo» o pulsa «Publicar».`
+        : `Sin DeepSeek (${resultado.motivo}). El marco ya está creado con 12 líneas vacías para escribir a mano.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'No se pudo crear el manifiesto.');
+    } finally {
+      setManifesting(false);
+    }
+  };
+
   /** Las herramientas entregan la tarjeta completa; se conserva el agrupado de deshacer por campo de texto. */
   const replaceCard = useCallback((next: BoardCard) => {
     const current = activeBoard?.cards.find((card) => card.id === next.id);
@@ -1421,6 +1467,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         </div>
         <div className="board-spacer" />
         <button className="board-tool" onClick={() => setMirarOpen(true)} title="Elegir tres referentes y unos ojos, y pedir tres lecturas"><Eye size={14} /> Volver a mirar</button>
+        <button className="board-tool" onClick={() => void crearManifiesto()} disabled={manifesting} title="Crear un marco con el manifiesto de la semana: collages con ♥, lecturas aceptadas y pesos que subieron">{manifesting ? 'Escribiendo…' : 'Manifiesto'}</button>
         <button className="board-tool" onClick={() => void importReferentes()} title="Crear o actualizar el tablero Biblioteca con los referentes de los vídeos"><Library size={14} /> Importar referentes</button>
         <button className="board-tool" onClick={() => gustosInput.current?.click()} title="Sumar los ♥/✕ de un gustos-parcial.json a este proyecto">Importar gustos</button>
         <button className="board-tool" onClick={exportReferentesObsidian} title="Descargar un ZIP con una nota Markdown por referente, con enlaces entre los del mismo marco"><BookOpen size={14} /> Referentes a Obsidian</button>
