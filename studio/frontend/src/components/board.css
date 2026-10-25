@@ -2981,3 +2981,70 @@
   background: var(--surface-2);
   box-shadow: var(--shadow-2);
 }
+
+/* ── F4 · arrastre, asentado y destino de marco ─────────────────────────── */
+.board-card.dragging {
+  z-index: 6;
+  opacity: 0.96;
+  box-shadow: var(--shadow-3);
+  cursor: grabbing;
+  pointer-events: none;
+}
+
+.board-frame.dragging {
+  z-index: 6;
+  opacity: 0.96;
+  box-shadow: var(--shadow-3);
+}
+
+.board-card.settling,
+.board-frame.settling {
+  animation: board-asentar 240ms var(--ease-spring-firm);
+}
+
+@keyframes board-asentar {
+  from { transform: translateY(-4px) scale(1.012); }
+  to { transform: translateY(0) scale(1); }
+}
+
+.board-frame.drop-target {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--accent-soft);
+  box-shadow: var(--state-drop), var(--shadow-2);
+}
+
+.board-frame-resize {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 0 0 var(--radius-xl) 0;
+  background: transparent;
+  cursor: nwse-resize;
+}
+
+.board-frame-resize::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--line-control);
+  border-bottom: 2px solid var(--line-control);
+}
+
+.board-frame:hover .board-frame-resize::after,
+.board-frame.selected .board-frame-resize::after {
+  border-color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-card.settling,
+  .board-frame.settling { animation: none; }
+}

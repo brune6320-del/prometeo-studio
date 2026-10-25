@@ -8,6 +8,8 @@ export interface BoardCardItemProps {
   card: BoardCard;
   selected: boolean;
   dimmed: boolean;
+  dragging: boolean;
+  settling: boolean;
   connectionSource: boolean;
   connectMode: boolean;
   colors: Array<BoardCard['color']>;
@@ -27,6 +29,8 @@ export const BoardCardItem = React.memo(function BoardCardItem({
   card,
   selected,
   dimmed,
+  dragging,
+  settling,
   connectionSource,
   connectMode,
   colors,
@@ -45,7 +49,7 @@ export const BoardCardItem = React.memo(function BoardCardItem({
   return (
     <article
       data-card-id={card.id}
-      className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''}`}
+      className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''}`}
       style={{ left: card.x, top: card.y, width: card.width }}
       onClick={(event) => {
         if (connectMode) {

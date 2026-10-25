@@ -204,6 +204,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   /** Herramienta de marco elegida en el menú: el siguiente arrastre dibuja el rectángulo. */
   const [frameToolId, setFrameToolId] = useState<string | null>(null);
   const [frameDraft, setFrameDraft] = useState<FrameRect | null>(null);
+  const [draggingIds, setDraggingIds] = useState<string[]>([]);
+  const [settlingIds, setSettlingIds] = useState<string[]>([]);
+  const [dropFrameId, setDropFrameId] = useState<string | null>(null);
+  const frameResize = useRef<{ pointerId: number; cardId: string; startX: number; startY: number; width: number; height: number; startBoard: BoardDocument } | null>(null);
+  const settleTimer = useRef<number | null>(null);
   const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number } } | null>(null);
   /** Marco abierto a pantalla completa en la vista Archivo; Esc vuelve a la pizarra. */
   const [archiveFullscreenId, setArchiveFullscreenId] = useState<string | null>(null);
@@ -811,6 +816,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       gesture: newBoardId('move'),
       moved: false,
     };
+    setDraggingIds(ids);
+    setSettlingIds([]);
+    setDropFrameId(null);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -832,23 +840,136 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         return position ? { ...item, x: position.x + deltaX, y: position.y + deltaY } : item;
       }),
     }), { recordHistory: false });
+
+    const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
+    const arrastrados = new Set(drag.ids);
+    const esMarcoArrastrado = drag.ids.some((id) => tablero?.cards.find((item) => item.id === id)?.type === 'marco');
+    if (!tablero || esMarcoArrastrado) {
+      setDropFrameId(null);
+      return;
+    }
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
+    const destino = tablero.cards.find((item) => {
+      if (item.type !== 'marco' || arrastrados.has(item.id)) return false;
+      const alto = readFrameData(item).alto;
+      return punto.x >= item.x && punto.x <= item.x + item.width && punto.y >= item.y && punto.y <= item.y + alto;
+    });
+    setDropFrameId((actual) => actual === (destino?.id ?? null) ? actual : destino?.id ?? null);
+  };
+
+  const asentar = (ids: string[]) => {
+    if (movimientoReducido() || !ids.length) return;
+    setSettlingIds(ids);
+    if (settleTimer.current) window.clearTimeout(settleTimer.current);
+    settleTimer.current = window.setTimeout(() => {
+      settleTimer.current = null;
+      setSettlingIds([]);
+    }, 280);
   };
 
   const endCardDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = cardDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    if (activeBoard?.id === drag.boardId && drag.ids.some((id) => {
+    const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
+    const destino = dropFrameId;
+    let final = tablero;
+    if (tablero && destino && !drag.ids.some((id) => tablero.cards.find((item) => item.id === id)?.type === 'marco')) {
+      const adoptados = new Set(drag.ids);
+      final = {
+        ...tablero,
+        updatedAt: new Date().toISOString(),
+        cards: tablero.cards.map((item) => {
+          if (item.type !== 'marco') return item;
+          const datos = readFrameData(item);
+          const hijos = datos.hijos.filter((id) => !adoptados.has(id));
+          return item.id === destino
+            ? { ...item, datos: { ...item.datos, ...datos, hijos: [...new Set([...hijos, ...drag.ids])] } }
+            : { ...item, datos: { ...item.datos, ...datos, hijos } };
+        }),
+      };
+    }
+    if (final && drag.ids.some((id) => {
       const before = drag.startBoard.cards.find((item) => item.id === id);
-      const after = activeBoard.cards.find((item) => item.id === id);
+      const after = final.cards.find((item) => item.id === id);
       return before && after && (before.x !== after.x || before.y !== after.y);
     })) {
       setBoardHistories((current) => ({
         ...current,
-        [drag.boardId]: recordBoardChange(current[drag.boardId] ?? emptyBoardHistory(), drag.startBoard, activeBoard, drag.gesture),
+        [drag.boardId]: recordBoardChange(current[drag.boardId] ?? emptyBoardHistory(), drag.startBoard, final, drag.gesture),
       }));
     }
-    if (drag.moved) suppressCardClick.current = true;
+    if (final && final !== tablero) {
+      setBoards((current) => current.map((board) => board.id === final.id ? final : board));
+      enqueueBoardSave(final);
+    }
+    if (drag.moved || destino) suppressCardClick.current = true;
+    setDraggingIds([]);
+    setDropFrameId(null);
+    if (drag.moved) asentar(drag.ids);
     cardDrag.current = null;
+  };
+
+  const startFrameResize = (card: BoardCard, event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 || !activeBoard) return;
+    event.preventDefault();
+    event.stopPropagation();
+    frameResize.current = {
+      pointerId: event.pointerId,
+      cardId: card.id,
+      startX: event.clientX,
+      startY: event.clientY,
+      width: card.width,
+      height: readFrameData(card).alto,
+      startBoard: activeBoard,
+    };
+    setDraggingIds([card.id]);
+    setSettlingIds([]);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const moveFrameResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = frameResize.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const escala = cameraRef.current.zoom;
+    const ancho = Math.max(FRAME_MIN_SIZE, drag.width + (event.clientX - drag.startX) / escala);
+    const alto = Math.max(FRAME_MIN_SIZE, drag.height + (event.clientY - drag.startY) / escala);
+    updateBoard((board) => ({
+      ...board,
+      cards: board.cards.map((item) => item.id === drag.cardId
+        ? { ...item, width: ancho, datos: { ...item.datos, ...readFrameData(item), alto } }
+        : item),
+    }), { recordHistory: false });
+  };
+
+  const endFrameResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const drag = frameResize.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    frameResize.current = null;
+    setDraggingIds([]);
+    const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
+    const marco = tablero?.cards.find((item) => item.id === drag.cardId);
+    if (!tablero || !marco) return;
+    const datos = readFrameData(marco);
+    const rect: FrameRect = { x: marco.x, y: marco.y, width: marco.width, height: datos.alto };
+    const hijos = esMarcoEntropia(marco)
+      ? datos.hijos
+      : cardsInsideFrame(tablero.cards, rect, measureCardSizes()).filter((id) => id !== marco.id);
+    const final: BoardDocument = {
+      ...tablero,
+      updatedAt: new Date().toISOString(),
+      cards: tablero.cards.map((item) => item.id === marco.id
+        ? { ...item, datos: { ...item.datos, ...datos, hijos } }
+        : item),
+    };
+    setBoardHistories((current) => ({
+      ...current,
+      [drag.startBoard.id]: recordBoardChange(current[drag.startBoard.id] ?? emptyBoardHistory(), drag.startBoard, final, newBoardId('resize')),
+    }));
+    setBoards((current) => current.map((board) => board.id === final.id ? final : board));
+    enqueueBoardSave(final);
+    asentar([marco.id]);
   };
 
   const alignSelection = (alignment: Alignment) => {
@@ -1785,7 +1906,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   key={card.id}
                   data-card-id={card.id}
                   data-marco={esEntropia ? 'entropia' : 'libre'}
-                  className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''}`}
+                  className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''} ${draggingIds.includes(card.id) ? 'dragging' : ''} ${settlingIds.includes(card.id) ? 'settling' : ''} ${dropFrameId === card.id ? 'drop-target' : ''}`}
                   style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
                   onClick={(event) => handleCardSelection(card.id, event)}
                   onDoubleClick={(event) => {
@@ -1850,6 +1971,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   ) : (
                     <div className="board-frame-meta">{childCount} {childCount === 1 ? 'tarjeta' : 'tarjetas'} dentro</div>
                   )}
+                  <button
+                    type="button"
+                    className="board-frame-resize"
+                    onPointerDown={(event) => startFrameResize(card, event)}
+                    onPointerMove={moveFrameResize}
+                    onPointerUp={endFrameResize}
+                    onPointerCancel={endFrameResize}
+                    aria-label={`Redimensionar ${card.title || 'marco'}`}
+                    title="Redimensionar marco"
+                  />
                 </article>
               );
             }
@@ -1861,6 +1992,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                 card={card}
                 selected={selectedCardIds.includes(card.id)}
                 dimmed={!matches}
+                dragging={draggingIds.includes(card.id)}
+                settling={settlingIds.includes(card.id)}
                 connectionSource={connectFromId === card.id}
                 connectMode={connectMode}
                 colors={COLORS}
