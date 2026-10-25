@@ -54,16 +54,40 @@ export function esMarcaDeTarjetas(texto: string): boolean {
   return texto.trimStart().startsWith(PREFIJO_PORTAPAPELES);
 }
 
+/** Texto legible para el portapapeles del sistema, además de la marca interna. */
+export function textoLegibleDeTarjetas(cards: readonly BoardCard[]): string {
+  const lineas = cards.map((card) => {
+    const titulo = card.title?.trim() || 'Sin título';
+    const cuerpo = card.body?.trim();
+    const url = card.url && card.url.trim() ? ` <${card.url.trim()}>` : '';
+    return `- ${titulo}${url}${cuerpo ? `\n  ${cuerpo.replace(/\n/g, '\n  ')}` : ''}`;
+  });
+  return [`Prometeo Studio · ${cards.length} ${cards.length === 1 ? 'tarjeta' : 'tarjetas'}`, ...lineas].join('\n');
+}
+
 /** Pega la copia interna con ids nuevos y relaciones internas remapeadas. */
 export function pegarTarjetas(board: BoardDocument, paso = 24): TarjetasPegadas | null {
   if (!contenido?.cards.length) return null;
   contenido.pegados += 1;
   const offset = paso * contenido.pegados;
+  return pegarConOffset(board, { x: offset, y: offset });
+}
+
+/** Pega en un punto del mundo: la esquina superior izquierda del grupo cae en el cursor. */
+export function pegarTarjetasEn(board: BoardDocument, punto: { x: number; y: number }): TarjetasPegadas | null {
+  if (!contenido?.cards.length) return null;
+  const izquierda = Math.min(...contenido.cards.map((card) => card.x));
+  const arriba = Math.min(...contenido.cards.map((card) => card.y));
+  return pegarConOffset(board, { x: punto.x - izquierda, y: punto.y - arriba });
+}
+
+function pegarConOffset(board: BoardDocument, offset: { x: number; y: number }): TarjetasPegadas | null {
+  if (!contenido?.cards.length) return null;
   const dup = duplicateCards(
     contenido.cards,
     contenido.relations,
     contenido.cards.map((card) => card.id),
-    { x: offset, y: offset },
+    offset,
   );
   return {
     board: {

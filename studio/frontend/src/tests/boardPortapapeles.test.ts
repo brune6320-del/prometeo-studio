@@ -6,6 +6,8 @@ import {
   hayTarjetasCopiadas,
   PREFIJO_PORTAPAPELES,
   pegarTarjetas,
+  pegarTarjetasEn,
+  textoLegibleDeTarjetas,
   vaciarPortapapeles,
 } from '../board/portapapeles';
 
@@ -47,6 +49,26 @@ describe('T-2 · portapapeles interno de tarjetas', () => {
     const segunda = pegarTarjetas(primera.board)!;
     expect(primera.newIds[0]).not.toBe(segunda.newIds[0]);
     expect(segunda.board.cards.find((card) => card.id === segunda.newIds[0])).toMatchObject({ x: 148, y: 148 });
+  });
+
+  it('pegar en el cursor coloca la esquina del grupo en el punto indicado', () => {
+    const board = createBoard('t');
+    board.cards = [nota('a', 100, 100), nota('b', 400, 250)];
+    copiarTarjetas(board, ['a', 'b']);
+    const pegado = pegarTarjetasEn(board, { x: 900, y: 600 })!;
+    const copias = pegado.board.cards.filter((card) => pegado.newIds.includes(card.id));
+    expect(Math.min(...copias.map((card) => card.x))).toBe(900);
+    expect(Math.min(...copias.map((card) => card.y))).toBe(600);
+  });
+
+  it('el portapapeles del sistema lleva texto legible además de la marca', () => {
+    const board = createBoard('t');
+    board.cards = [{ ...nota('a'), title: 'Alfa', body: 'cuerpo', url: 'https://example.com' }];
+    const texto = textoLegibleDeTarjetas(board.cards);
+    expect(texto).toContain('Prometeo Studio · 1 tarjeta');
+    expect(texto).toContain('Alfa');
+    expect(texto).toContain('cuerpo');
+    expect(texto).toContain('https://example.com');
   });
 
   it('una marca del sistema se reconoce aunque el contenido interno se haya vaciado', () => {

@@ -46,7 +46,7 @@ import {
 import { geometriaConector, rectDeTarjeta } from '../board/conectores';
 import { vecinoGeometrico, type Direccion } from '../board/navegacion';
 import { coincideBusqueda, ordenDePintado, ventanaVirtual, INDICE_ROW_HEIGHT } from '../board/indice';
-import { readColumnData, setColumnFolded, columnChildIds } from '../board/columnas';
+import { readColumnData, setColumnFolded, columnChildIds, COLUMN_MIN_HEIGHT, quitarHijoDeColumna, reordenarHijoDeColumna } from '../board/columnas';
 import { normalizarVistaPrevia } from '../board/vistaPrevia';
 import { borrarPlantillasLegacy, crearPlantilla, leerPlantillasLegacy, listarPlantillas, materializar, type Plantilla } from '../board/plantillas';
 import { ABRIR_TABLERO_EVENT } from '../board/tools/tablero';
@@ -88,7 +88,8 @@ import {
   copiarTarjetas,
   esMarcaDeTarjetas,
   hayTarjetasCopiadas,
-  pegarTarjetas,
+  pegarTarjetasEn,
+  textoLegibleDeTarjetas,
 } from '../board/portapapeles';
 import { agregarImagenDesdeUrl, importarBiblioteca } from '../board/referentes/biblioteca';
 import { construirZipObsidian, notasObsidian } from '../board/referentes/historial';
@@ -158,6 +159,7 @@ interface BoardWorkspaceProps {
 const GRID_SIZE = 24;
 const COLORS: Array<BoardCard['color']> = ['paper', 'sand', 'sage', 'rose'];
 const RAIL_TOOLS = ['note', 'link', 'media', 'tareas', 'columna', 'referente', 'marco', 'entropia'];
+const DIRECCIONES_ASA = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 const ETIQUETA_BORRADO: Record<BorradoKind, string> = {
   board: 'Tablero',
   reference: 'Referencia PDF',
@@ -332,8 +334,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [settlingIds, setSettlingIds] = useState<string[]>([]);
   const [dropFrameId, setDropFrameId] = useState<string | null>(null);
   const dropFrameIdRef = useRef<string | null>(null);
-  const frameResize = useRef<{ pointerId: number; cardId: string; startX: number; startY: number; width: number; height: number; startBoard: BoardDocument; captureEl: HTMLElement | null; elemento: HTMLElement | null; raf: number; ultimo: { width: number; height: number } } | null>(null);
+  const frameResize = useRef<{ pointerId: number; cardId: string; tipo: 'marco' | 'columna'; dir: string; startX: number; startY: number; x: number; y: number; width: number; height: number; startBoard: BoardDocument; captureEl: HTMLElement | null; elemento: HTMLElement | null; raf: number; ultimo: { x: number; y: number; width: number; height: number } } | null>(null);
   const freeResize = useRef<{ pointerId: number; cardId: string; corner: EsquinaMedia; startX: number; startY: number; x: number; y: number; width: number; height: number; ratio: number; startBoard: BoardDocument; captureEl: HTMLElement | null; elemento: HTMLElement | null; raf: number; ultimo: { x: number; y: number; width: number; height: number } | null } | null>(null);
+  /** H6 · asa de ancho para notas y selección múltiple; el alto sigue al contenido. */
+  const widthResize = useRef<{ pointerId: number; ids: string[]; startX: number; startWidths: Map<string, number>; startBoard: BoardDocument; captureEl: HTMLElement | null; raf: number; ultimas: Map<string, number> } | null>(null);
   const settleTimer = useRef<number | null>(null);
   const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number }; captureEl: HTMLElement | null } | null>(null);
   const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => {});
@@ -367,6 +371,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const gustosInput = useRef<HTMLInputElement>(null);
   /** Referente bajo el puntero: una URL de imagen pegada cae en él. */
   const hoveredReferenteId = useRef<string | null>(null);
+  /** Último punto del mundo bajo el puntero: pegar crea aquí, no en el centro. */
+  const lastPointerWorld = useRef<{ x: number; y: number } | null>(null);
   const cardHandlers = useRef<CardHandlers | null>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const algunDialogoAbierto = shortcutsOpen || nestedDialog || templateDialog || linkDialog || projectDialog || pdfReferenceDialog || archiveOpen || Boolean(archiveFullscreenId);
@@ -680,8 +686,19 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       liberarPuntero(resize.captureEl, resize.pointerId);
       if (resize.raf) cancelAnimationFrame(resize.raf);
       if (resize.elemento) {
+        resize.elemento.style.left = `${resize.x}px`;
+        resize.elemento.style.top = `${resize.y}px`;
         resize.elemento.style.width = `${resize.width}px`;
         resize.elemento.style.height = `${resize.height}px`;
+      }
+    }
+    const anchos = widthResize.current;
+    if (anchos) {
+      liberarPuntero(anchos.captureEl, anchos.pointerId);
+      if (anchos.raf) cancelAnimationFrame(anchos.raf);
+      for (const [id, ancho] of anchos.startWidths) {
+        const elemento = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${id}"]`);
+        if (elemento) elemento.style.width = `${ancho}px`;
       }
     }
     const free = freeResize.current;
@@ -702,6 +719,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     frameDraw.current = null;
     frameResize.current = null;
     freeResize.current = null;
+    widthResize.current = null;
     marqueeDrag.current = null;
     touchPoints.current.clear();
     touchGesture.current = null;
@@ -744,7 +762,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   // Red de seguridad para cuando el pointerup ocurre fuera de la ventana o el WebView pierde el foco.
   useEffect(() => {
     const alSoltar = () => {
-      if (panDrag.current || cardDrag.current || frameDraw.current || frameResize.current || marqueeDrag.current) cancelarGestos();
+      if (panDrag.current || cardDrag.current || frameDraw.current || frameResize.current || freeResize.current || widthResize.current || marqueeDrag.current) cancelarGestos();
     };
     const alOcultar = () => { if (document.hidden) alSoltar(); };
     window.addEventListener('pointerup', alSoltar);
@@ -1019,6 +1037,28 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (!activeBoard) return;
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const hijoColumna = event.dataTransfer.getData('application/x-prometeo-column-child');
+    if (hijoColumna) {
+      event.preventDefault();
+      try {
+        const { columnId, cardId } = JSON.parse(hijoColumna) as { columnId?: string; cardId?: string };
+        if (columnId && cardId) {
+          const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
+          updateBoard((board) => {
+            const conHijoFuera = quitarHijoDeColumna(board.cards, columnId, cardId);
+            return {
+              ...board,
+              cards: conHijoFuera.map((card) => card.id === cardId ? { ...card, x: punto.x - card.width / 2, y: punto.y - 20 } : card),
+            };
+          });
+          setSelectedCardIds([cardId]);
+          setNotice('Tarjeta sacada de la columna. Su posición es la del cursor.');
+        }
+      } catch {
+        /* un arrastre externo no se interpreta */
+      }
+      return;
+    }
     const archivos = Array.from(event.dataTransfer.files ?? []);
     if (archivos.length) {
       event.preventDefault();
@@ -1282,6 +1322,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     return screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
   };
 
+  const puntoDePegado = () => {
+    if (lastPointerWorld.current) return lastPointerWorld.current;
+    return screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, cameraRef.current);
+  };
+
   const distanciaEntreToques = (): number => {
     const puntos = [...touchPoints.current.values()];
     if (puntos.length < 2) return 0;
@@ -1437,6 +1482,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const beginViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (rect) lastPointerWorld.current = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
     if (event.pointerType === 'touch') {
       iniciarToque(event);
       return;
@@ -1468,6 +1515,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const moveViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (rect && event.pointerType !== 'touch') lastPointerWorld.current = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
     if (event.pointerType === 'touch') {
       moverToque(event);
       return;
@@ -1691,7 +1740,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             const datos = readColumnData(item);
             const hijos = datos.hijos.filter((id) => !adoptados.has(id));
             return destino === item.id
-              ? { ...item, datos: { ...item.datos, ...datos, hijos: [...new Set([...hijos, ...drag.ids])] } }
+              ? { ...item, datos: { ...item.datos, ...datos, hijos: [...new Set([...hijos, ...drag.ids])], ordenExplicito: true } }
               : { ...item, datos: { ...item.datos, ...datos, hijos } };
           }
           if (item.type !== 'marco') return item;
@@ -1729,52 +1778,72 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     terminarGestoVisual();
   };
 
-  const startFrameResize = (card: BoardCard, event: React.PointerEvent<HTMLButtonElement>) => {
+  /** H6 · asas de 4 bordes y 4 esquinas para marcos y columnas. */
+  const startFrameResize = (card: BoardCard, direction: string, event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || !activeBoard || card.locked) return;
     event.preventDefault();
     event.stopPropagation();
     detenerInercia();
     marcarGestoVisual();
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
-    const alto = readFrameData(card).alto;
+    const elemento = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`) ?? null;
+    const alto = card.type === 'marco'
+      ? readFrameData(card).alto
+      : readColumnData(card).alto ?? (elemento ? elemento.getBoundingClientRect().height / cameraRef.current.zoom : 300);
     frameResize.current = {
       pointerId: event.pointerId,
       cardId: card.id,
+      tipo: card.type === 'columna' ? 'columna' : 'marco',
+      dir: direction,
       startX: event.clientX,
       startY: event.clientY,
+      x: card.x,
+      y: card.y,
       width: card.width,
       height: alto,
       startBoard: activeBoard,
       captureEl: event.currentTarget,
-      elemento: viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`) ?? null,
+      elemento,
       raf: 0,
-      ultimo: { width: card.width, height: alto },
+      ultimo: { x: card.x, y: card.y, width: card.width, height: alto },
     };
     setDraggingIds([card.id]);
     setSettlingIds([]);
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
   };
 
-  const moveFrameResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const moveFrameResize = (event: React.PointerEvent<HTMLElement>) => {
     const drag = frameResize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const escala = cameraRef.current.zoom;
-    const ancho = Math.max(FRAME_MIN_SIZE, drag.width + (event.clientX - drag.startX) / escala);
-    const alto = Math.max(FRAME_MIN_SIZE, drag.height + (event.clientY - drag.startY) / escala);
-    drag.ultimo = { width: Math.round(ancho * 10) / 10, height: Math.round(alto * 10) / 10 };
-    // Ref + rAF: se escribe en el DOM y React solo se entera al soltar.
+    const dx = (event.clientX - drag.startX) / escala;
+    const dy = (event.clientY - drag.startY) / escala;
+    const minimo = drag.tipo === 'marco' ? FRAME_MIN_SIZE : COLUMN_MIN_HEIGHT;
+    let ancho = drag.width + (drag.dir.includes('e') ? dx : 0) - (drag.dir.includes('w') ? dx : 0);
+    let alto = drag.height + (drag.dir.includes('s') ? dy : 0) - (drag.dir.includes('n') ? dy : 0);
+    ancho = Math.max(minimo, ancho);
+    alto = Math.max(minimo, alto);
+    const x = drag.dir.includes('w') ? drag.x + (drag.width - ancho) : drag.x;
+    const y = drag.dir.includes('n') ? drag.y + (drag.height - alto) : drag.y;
+    drag.ultimo = {
+      x: Math.round(x * 10) / 10,
+      y: Math.round(y * 10) / 10,
+      width: Math.round(ancho * 10) / 10,
+      height: Math.round(alto * 10) / 10,
+    };
+    // Ref + rAF: durante el gesto solo cambia el DOM; React recibe el tamaño al soltar.
     if (drag.raf) return;
     drag.raf = requestAnimationFrame(() => {
       drag.raf = 0;
-      if (frameResize.current !== drag) return;
-      if (drag.elemento) {
-        drag.elemento.style.width = `${drag.ultimo.width}px`;
-        drag.elemento.style.height = `${drag.ultimo.height}px`;
-      }
+      if (frameResize.current !== drag || !drag.elemento) return;
+      drag.elemento.style.left = `${drag.ultimo.x}px`;
+      drag.elemento.style.top = `${drag.ultimo.y}px`;
+      drag.elemento.style.width = `${drag.ultimo.width}px`;
+      drag.elemento.style.height = `${drag.ultimo.height}px`;
     });
   };
 
-  const endFrameResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const endFrameResize = (event: React.PointerEvent<HTMLElement>) => {
     const drag = frameResize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (drag.raf) {
@@ -1786,28 +1855,111 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     terminarGestoVisual();
     setDraggingIds([]);
     const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
-    const marco = tablero?.cards.find((item) => item.id === drag.cardId);
-    if (!tablero || !marco) return;
-    const { width, height } = drag.ultimo;
-    const datos = readFrameData(marco);
-    const rect: FrameRect = { x: marco.x, y: marco.y, width, height };
-    const hijos = esMarcoEntropia(marco)
-      ? datos.hijos
-      : cardsInsideFrame(tablero.cards, rect, measureCardSizes()).filter((id) => id !== marco.id);
-    const final: BoardDocument = {
-      ...tablero,
-      updatedAt: new Date().toISOString(),
-      cards: tablero.cards.map((item) => item.id === marco.id
-        ? { ...item, width, datos: { ...item.datos, ...datos, alto: height, hijos } }
-        : item),
-    };
+    const card = tablero?.cards.find((item) => item.id === drag.cardId);
+    if (!tablero || !card) return;
+    const { x, y, width, height } = drag.ultimo;
+    let final: BoardDocument;
+    if (drag.tipo === 'marco') {
+      const datos = readFrameData(card);
+      const rect: FrameRect = { x, y, width, height };
+      const hijos = esMarcoEntropia(card)
+        ? datos.hijos
+        : cardsInsideFrame(tablero.cards, rect, measureCardSizes()).filter((id) => id !== card.id);
+      final = {
+        ...tablero,
+        updatedAt: new Date().toISOString(),
+        cards: tablero.cards.map((item) => item.id === card.id
+          ? { ...item, x, y, width, datos: { ...item.datos, ...datos, alto: height, hijos } }
+          : item),
+      };
+    } else {
+      const datos = readColumnData(card);
+      final = {
+        ...tablero,
+        updatedAt: new Date().toISOString(),
+        cards: tablero.cards.map((item) => item.id === card.id
+          ? { ...item, x, y, width, datos: { ...item.datos, ...datos, alto: height } }
+          : item),
+      };
+    }
     setBoardHistories((current) => ({
       ...current,
       [drag.startBoard.id]: recordBoardChange(current[drag.startBoard.id] ?? emptyBoardHistory(), drag.startBoard, final, newBoardId('resize')),
     }));
     setBoards((current) => current.map((board) => board.id === final.id ? final : board));
     enqueueBoardSave(final);
-    asentar([marco.id]);
+    asentar([card.id]);
+  };
+
+  /** H6 · asa de ancho de una nota (o de toda la selección). El alto sigue al contenido. */
+  const startWidthResize = (card: BoardCard, event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !activeBoard || card.locked) return;
+    event.preventDefault();
+    event.stopPropagation();
+    detenerInercia();
+    marcarGestoVisual();
+    const seleccion = selectedCardIds.includes(card.id) ? selectedCardIds : [card.id];
+    const ids = seleccion.filter((id) => {
+      const item = activeBoard.cards.find((candidate) => candidate.id === id);
+      return Boolean(item && !item.locked && item.type !== 'marco' && item.type !== 'media');
+    });
+    if (!ids.includes(card.id)) ids.push(card.id);
+    const startWidths = new Map(ids.map((id) => [id, activeBoard.cards.find((item) => item.id === id)?.width ?? card.width]));
+    widthResize.current = {
+      pointerId: event.pointerId,
+      ids,
+      startX: event.clientX,
+      startWidths,
+      startBoard: activeBoard,
+      captureEl: event.currentTarget,
+      raf: 0,
+      ultimas: new Map(startWidths),
+    };
+    setSettlingIds([]);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
+  };
+
+  const moveWidthResize = (event: React.PointerEvent<HTMLElement>) => {
+    const drag = widthResize.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const delta = (event.clientX - drag.startX) / cameraRef.current.zoom;
+    for (const [id, inicial] of drag.startWidths) {
+      const limite = 640;
+      drag.ultimas.set(id, Math.round(Math.max(210, Math.min(limite, inicial + delta)) * 10) / 10);
+    }
+    if (drag.raf) return;
+    drag.raf = requestAnimationFrame(() => {
+      drag.raf = 0;
+      if (widthResize.current !== drag) return;
+      for (const [id, ancho] of drag.ultimas) {
+        const elemento = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${id}"]`);
+        if (elemento) elemento.style.width = `${ancho}px`;
+      }
+    });
+  };
+
+  const endWidthResize = (event: React.PointerEvent<HTMLElement>) => {
+    const drag = widthResize.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.raf) { cancelAnimationFrame(drag.raf); drag.raf = 0; }
+    widthResize.current = null;
+    liberarPuntero(drag.captureEl, event.pointerId);
+    terminarGestoVisual();
+    const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
+    if (!tablero) return;
+    const final: BoardDocument = {
+      ...tablero,
+      updatedAt: new Date().toISOString(),
+      cards: tablero.cards.map((item) => drag.ultimas.has(item.id)
+        ? { ...item, width: Math.max(210, Math.min(640, drag.ultimas.get(item.id)!)) }
+        : item),
+    };
+    setBoardHistories((current) => ({
+      ...current,
+      [drag.startBoard.id]: recordBoardChange(current[drag.startBoard.id] ?? emptyBoardHistory(), drag.startBoard, final, newBoardId('resize-ancho')),
+    }));
+    setBoards((current) => current.map((board) => board.id === final.id ? final : board));
+    enqueueBoardSave(final);
   };
 
   /** Redimensionar una imagen o vídeo desde cualquier esquina; Shift mantiene la proporción. */
@@ -2791,6 +2943,39 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     updateBoard((board) => ({ ...board, cards: board.cards.map((card) => card.id === id ? { ...card, ...patch } : card) }), { coalesceKey });
   };
 
+  /** Reemplaza el medio conservando caja, posición, pie, alt y recorte. */
+  const reemplazarMedia = async (cardId: string, file: File) => {
+    if (!activeBoard) return;
+    if (file.size > MAX_MEDIA_BYTES) {
+      setNotice('El archivo supera los 12 MB. Reduce su tamaño y vuelve a intentarlo.');
+      return;
+    }
+    const card = activeBoardRef.current?.cards.find((item) => item.id === cardId);
+    if (!card) return;
+    try {
+      const mimeType = file.type || 'application/octet-stream';
+      const kind = mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : 'file';
+      if (kind !== 'image' && kind !== 'video') {
+        setNotice('Reemplaza una imagen o un vídeo por otro medio del mismo tipo.');
+        return;
+      }
+      const dataUrl = await readFileAsDataUrl(file);
+      const media: BoardMedia = { name: file.name, mimeType, dataUrl, kind };
+      const anterior = card.media;
+      updateCard(cardId, {
+        media,
+        title: card.title || media.name.replace(/\.[^.]+$/, ''),
+        datos: {
+          ...card.datos,
+          ...(anterior ? { mediaAnterior: { ...anterior, reemplazado: new Date().toISOString() } } : {}),
+        },
+      });
+      mostrarAviso('Imagen reemplazada · la caja y la leyenda no se movieron', undefined, true);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'No se pudo reemplazar el medio.');
+    }
+  };
+
   /** «Ver como» del marco: cambiar de vista no mueve ni borra ninguna tarjeta. */
   const updateFrameView = (id: string, vista: FrameView) => {
     updateBoard((board) => ({ ...board, cards: setFrameView(board.cards, id, vista) }));
@@ -3001,10 +3186,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const copiarSeleccion = useCallback((cortar: boolean) => {
     const board = activeBoardRef.current;
     if (!board || !selectedCardIds.length) return;
+    const seleccionadas = board.cards.filter((card) => selectedCardIds.includes(card.id));
     const marca = copiarTarjetas(board, selectedCardIds);
     if (!marca) return;
+    // Al portapapeles del sistema van la marca interna y texto legible para otras apps.
+    const texto = `${marca}\n\n${textoLegibleDeTarjetas(seleccionadas)}`;
     try {
-      void navigator.clipboard?.writeText(marca).catch(() => { /* el portapapeles interno sigue disponible */ });
+      void navigator.clipboard?.writeText(texto).catch(() => { /* el portapapeles interno sigue disponible */ });
     } catch {
       /* Sin permiso de portapapeles la copia interna funciona igual. */
     }
@@ -3014,7 +3202,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const pegarSeleccion = useCallback(() => {
     const board = activeBoardRef.current;
     if (!board) return false;
-    const resultado = pegarTarjetas(board);
+    const resultado = pegarTarjetasEn(board, puntoDePegado());
     if (!resultado) return false;
     updateBoard(() => resultado.board);
     setSelectedCardIds(resultado.newIds);
@@ -3324,50 +3512,57 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) archivos.push(file);
         }
       }
+      const punto = puntoDePegado();
       if (archivos.length && activeBoard) {
         event.preventDefault();
-        const rect = viewportRef.current?.getBoundingClientRect();
-        const punto = rect
-          ? screenToWorld({ x: rect.width / 2, y: rect.height / 2 }, cameraRef.current)
-          : { x: 0, y: 0 };
         archivos.forEach((file, indice) => {
           void addMediaRef.current(file, { x: punto.x + indice * 36, y: punto.y + indice * 28 });
         });
         return;
       }
       const text = event.clipboardData?.getData('text/plain').trim() ?? '';
-      // Copia interna: una marca corta; si el sistema trae texto o imagen, mandan ellos.
+      // Copia interna: la marca va primero; si el sistema trae texto o imagen, mandan ellos.
       if ((esMarcaDeTarjetas(text) || (!text && hayTarjetasCopiadas())) && pegarSeleccion()) {
         event.preventDefault();
         return;
       }
-      if (!text || !isSafeExternalUrl(text) || !activeBoard) return;
-      const selectedId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
-      const targetId = hoveredReferenteId.current ?? selectedId;
-      const card = targetId ? activeBoard.cards.find((item) => item.id === targetId && item.type === 'referente') : undefined;
-      if (card) {
-        const before = leerReferente(card);
-        const next = agregarImagenDesdeUrl(before, text);
-        if (!next) return;
-        event.preventDefault();
-        if (next.imagenes.length === before.imagenes.length) {
-          setNotice('Esa imagen ya estaba en el Referente, con su fuente y fecha.');
+      if (!text || !activeBoard) return;
+      if (isSafeExternalUrl(text)) {
+        const selectedId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
+        const targetId = hoveredReferenteId.current ?? selectedId;
+        const card = targetId ? activeBoard.cards.find((item) => item.id === targetId && item.type === 'referente') : undefined;
+        if (card) {
+          const before = leerReferente(card);
+          const next = agregarImagenDesdeUrl(before, text);
+          if (!next) return;
+          event.preventDefault();
+          if (next.imagenes.length === before.imagenes.length) {
+            setNotice('Esa imagen ya estaba en el Referente, con su fuente y fecha.');
+            return;
+          }
+          replaceCard({ ...card, title: next.nombre.trim() || card.title, datos: { ...card.datos, ...next } });
+          setNotice(`Imagen añadida a «${next.nombre || card.title || 'Referente'}» con su fuente y fecha.`);
           return;
         }
-        replaceCard({ ...card, title: next.nombre.trim() || card.title, datos: { ...card.datos, ...next } });
-        setNotice(`Imagen añadida a «${next.nombre || card.title || 'Referente'}» con su fuente y fecha.`);
+        // Sin referente debajo: la URL pegada nace como enlace en el cursor.
+        event.preventDefault();
+        const creada = addToolCard('link', (nueva) => {
+          nueva.url = text;
+          nueva.title = text;
+        }, punto);
+        if (!creada) return;
+        setNotice('Enlace pegado. Buscando título, descripción e imagen…');
+        void aplicarVistaPrevia(creada.id, text);
         return;
       }
-      // Sin referente debajo: la URL pegada se convierte en tarjeta de enlace con
-      // vista previa pedida al backend local (las claves nunca viven en el frontend).
+      // Texto plano: nace una nota con el texto en el punto del cursor (A-1 · D9).
       event.preventDefault();
-      const creada = addToolCard('link', (nueva) => {
-        nueva.url = text;
-        nueva.title = text;
-      });
-      if (!creada) return;
-      setNotice('Enlace pegado. Buscando título, descripción e imagen…');
-      void aplicarVistaPrevia(creada.id, text);
+      const primeraLinea = text.split(/\r?\n/).map((linea) => linea.trim()).find(Boolean)?.slice(0, 60);
+      const creada = addToolCard('note', (nueva) => {
+        nueva.title = primeraLinea || 'Nota pegada';
+        nueva.body = text.slice(0, 12000);
+      }, punto);
+      if (creada) setNotice('Texto pegado como nota en el cursor.');
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
@@ -4004,6 +4199,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   onDelete={onCardDelete}
                   onPatch={onCardPatch}
                   onToggleFold={(id) => updateBoard((board) => ({ ...board, cards: setColumnFolded(board.cards, id, !readColumnData(card).plegada) }))}
+                  onReorderChild={(columnId, childId, targetId) => updateBoard((board) => ({ ...board, cards: reordenarHijoDeColumna(board.cards, columnId, childId, targetId) }))}
+                  onDetachChild={(columnId, childId) => updateBoard((board) => ({ ...board, cards: quitarHijoDeColumna(board.cards, columnId, childId) }))}
+                  onResizeStart={startFrameResize}
+                  onResizeMove={moveFrameResize}
+                  onResizeEnd={endFrameResize}
                 />
               );
             }
@@ -4103,16 +4303,19 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   ) : (
                     <div className="board-frame-meta">{childCount} {childCount === 1 ? 'tarjeta' : 'tarjetas'} dentro</div>
                   )}
-                  <button
-                    type="button"
-                    className="board-frame-resize"
-                    onPointerDown={(event) => startFrameResize(card, event)}
-                    onPointerMove={moveFrameResize}
-                    onPointerUp={endFrameResize}
-                    onPointerCancel={endFrameResize}
-                    aria-label={`Redimensionar ${card.title || 'marco'}`}
-                    title="Redimensionar marco"
-                  />
+                  {!card.locked && DIRECCIONES_ASA.map((direccion) => (
+                    <button
+                      key={direccion}
+                      type="button"
+                      className={`board-frame-resize ${direccion}`}
+                      onPointerDown={(event) => startFrameResize(card, direccion, event)}
+                      onPointerMove={moveFrameResize}
+                      onPointerUp={endFrameResize}
+                      onPointerCancel={endFrameResize}
+                      aria-label={`Redimensionar ${card.title || 'marco'} desde ${direccion}`}
+                      title="Redimensionar marco"
+                    />
+                  ))}
                 </article>
               );
             }
@@ -4137,6 +4340,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   onResizeMove={moveFreeResize}
                   onResizeEnd={endFreeResize}
                   onNaturalSize={ajustarAlturaNatural}
+                  onReplaceMedia={(cardId, file) => void reemplazarMedia(cardId, file)}
                 />
               );
             }
@@ -4156,10 +4360,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                  onSelect={onCardSelect}
                  onConnect={onCardConnect}
                  onConnectStart={onCardConnectStart}
-                onDragStart={onCardDragStart}
-                onDragMove={onCardDragMove}
-                onDragEnd={onCardDragEnd}
-                onDelete={onCardDelete}
+                 onDragStart={onCardDragStart}
+                 onDragMove={onCardDragMove}
+                 onDragEnd={onCardDragEnd}
+                 onWidthResizeStart={startWidthResize}
+                 onWidthResizeMove={moveWidthResize}
+                 onWidthResizeEnd={endWidthResize}
+                 onDelete={onCardDelete}
                 onPatch={onCardPatch}
                 onReplace={onCardReplace}
                 onHover={onCardHover}

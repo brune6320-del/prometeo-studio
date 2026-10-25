@@ -2,6 +2,31 @@ import React from 'react';
 import { Lock, LockOpen, Pause, Play, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
 import { metricas } from '../motion/metricas';
+import { TituloEnSitio, TextoEnSitio } from './InlineEdit';
+
+export interface RecorteMedia {
+  escala: number;
+  x: number;
+  y: number;
+}
+
+/** Lee el recorte guardado sin confiar en el almacenamiento. */
+export function leerRecorte(card: BoardCard): RecorteMedia {
+  const raw = card.datos?.recorte;
+  if (typeof raw !== 'object' || raw === null) return { escala: 1, x: 0.5, y: 0.5 };
+  const datos = raw as Partial<RecorteMedia>;
+  const limitar = (valor: unknown, min: number, max: number, fallback: number) =>
+    typeof valor === 'number' && Number.isFinite(valor) ? Math.max(min, Math.min(max, valor)) : fallback;
+  return {
+    escala: limitar(datos.escala, 1, 3, 1),
+    x: limitar(datos.x, 0, 1, 0.5),
+    y: limitar(datos.y, 0, 1, 0.5),
+  };
+}
+
+function leerAlt(card: BoardCard): string {
+  return typeof card.datos?.alt === 'string' ? card.datos.alt : '';
+}
 
 export type EsquinaMedia = 'nw' | 'ne' | 'sw' | 'se';
 
@@ -27,6 +52,7 @@ export interface BoardFreeMediaProps {
   onResizeMove: (event: React.PointerEvent<HTMLElement>) => void;
   onResizeEnd: (event: React.PointerEvent<HTMLElement>) => void;
   onNaturalSize: (cardId: string, width: number, height: number) => void;
+  onReplaceMedia?: (cardId: string, file: File) => void;
 }
 
 const ESQUINAS: EsquinaMedia[] = ['nw', 'ne', 'sw', 'se'];
@@ -52,12 +78,17 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
   onResizeMove,
   onResizeEnd,
   onNaturalSize,
+  onReplaceMedia,
 }: BoardFreeMediaProps) {
   metricas.rendersTarjeta += 1;
   const videoRef = React.useRef<HTMLVideoElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
   const inicioRef = React.useRef<{ x: number; y: number } | null>(null);
   const movidoRef = React.useRef(false);
   const [reproduciendo, setReproduciendo] = React.useState(false);
+  const [editandoRecorte, setEditandoRecorte] = React.useState(false);
+  const recorte = leerRecorte(card);
+  const alt = leerAlt(card);
 
   const alternarVideo = () => {
     const video = videoRef.current;
@@ -125,8 +156,13 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
         {card.media?.kind === 'image' && (
           <img
             src={card.media.dataUrl}
-            alt={card.title || card.media.name}
+            alt={alt || card.title || card.media.name}
             draggable={false}
+            style={{
+              objectFit: 'cover',
+              objectPosition: `${recorte.x * 100}% ${recorte.y * 100}%`,
+              transform: `scale(${recorte.escala})`,
+            }}
             onLoad={(event) => {
               if (alto === undefined) onNaturalSize(card.id, event.currentTarget.naturalWidth, event.currentTarget.naturalHeight);
             }}
@@ -155,9 +191,56 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
         )}
       </div>
 
-      <div className="board-free-media-caption" aria-hidden="true">
-        <strong>{card.title || card.media?.name || 'Sin título'}</strong>
-        {card.body && <span>{card.body}</span>}
+      <div className={`board-free-media-caption ${selected ? 'is-editable' : ''}`}>
+        {selected ? (
+          <>
+            <TituloEnSitio value={card.title} onCommit={(title) => onPatch(card.id, { title })} ariaLabel="Título de la imagen" className="board-free-media-title" />
+            <TextoEnSitio value={card.body} onCommit={(body) => onPatch(card.id, { body })} placeholder="Pie de imagen" ariaLabel="Pie de la imagen" maxLength={2000} />
+            <input
+              className="board-free-media-alt"
+              value={alt}
+              placeholder="Texto alternativo"
+              aria-label="Texto alternativo de la imagen"
+              maxLength={300}
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              onChange={(event) => onPatch(card.id, { datos: { ...card.datos, alt: event.target.value.slice(0, 300) } })}
+            />
+            <div className="board-free-media-tools" onPointerDown={(event) => event.stopPropagation()}>
+              <button type="button" onClick={() => fileInputRef.current?.click()} aria-label="Reemplazar imagen">Reemplazar</button>
+              <button
+                type="button"
+                onClick={() => setEditandoRecorte((valor) => !valor)}
+                aria-expanded={editandoRecorte}
+                aria-label={editandoRecorte ? 'Terminar recorte' : 'Recortar imagen'}
+              >{editandoRecorte ? 'Listo' : 'Recortar'}</button>
+            </div>
+            {editandoRecorte && !esVideo && (
+              <div className="board-free-media-crop" onPointerDown={(event) => event.stopPropagation()}>
+                <label>Zoom<input type="range" min="1" max="3" step="0.05" value={recorte.escala} aria-label="Zoom del recorte" onChange={(event) => onPatch(card.id, { datos: { ...card.datos, recorte: { ...recorte, escala: Number(event.target.value) } } })} /></label>
+                <label>Horizontal<input type="range" min="0" max="1" step="0.01" value={recorte.x} aria-label="Posición horizontal del recorte" onChange={(event) => onPatch(card.id, { datos: { ...card.datos, recorte: { ...recorte, x: Number(event.target.value) } } })} /></label>
+                <label>Vertical<input type="range" min="0" max="1" step="0.01" value={recorte.y} aria-label="Posición vertical del recorte" onChange={(event) => onPatch(card.id, { datos: { ...card.datos, recorte: { ...recorte, y: Number(event.target.value) } } })} /></label>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              hidden
+              aria-label="Archivo para reemplazar la imagen"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) onReplaceMedia?.(card.id, file);
+              }}
+            />
+          </>
+        ) : (
+          <>
+            <strong>{card.title || card.media?.name || 'Sin título'}</strong>
+            {card.body && <span>{card.body}</span>}
+          </>
+        )}
       </div>
 
       <button

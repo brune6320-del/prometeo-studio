@@ -29,6 +29,9 @@ export interface BoardCardItemProps {
   onDragStart: (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => void;
   onDragMove: (event: React.PointerEvent<HTMLDivElement>) => void;
   onDragEnd: (event: React.PointerEvent<HTMLDivElement>) => void;
+  onWidthResizeStart?: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
+  onWidthResizeMove?: (event: React.PointerEvent<HTMLElement>) => void;
+  onWidthResizeEnd?: (event: React.PointerEvent<HTMLElement>) => void;
   onDelete: (cardId: string) => void;
   onPatch: (cardId: string, patch: Partial<BoardCard>) => void;
   onReplace: (card: BoardCard) => void;
@@ -53,6 +56,9 @@ export const BoardCardItem = React.memo(function BoardCardItem({
   onDragStart,
   onDragMove,
   onDragEnd,
+  onWidthResizeStart,
+  onWidthResizeMove,
+  onWidthResizeEnd,
   onDelete,
   onPatch,
   onReplace,
@@ -142,6 +148,17 @@ export const BoardCardItem = React.memo(function BoardCardItem({
         {colors.map((color) => <button key={color} className={`board-color-swatch ${color} ${card.color === color ? 'current' : ''}`} onClick={() => onPatch(card.id, { color })} aria-label={`Color ${color}`} aria-pressed={card.color === color} />)}
       </div>
       <BoardCardContent card={card} editar={onReplace} />
+      {!card.locked && onWidthResizeStart && (
+        <span
+          role="presentation"
+          className="board-card-width-handle"
+          onPointerDown={(event) => { event.stopPropagation(); event.preventDefault(); onWidthResizeStart(card, event); }}
+          onPointerMove={onWidthResizeMove}
+          onPointerUp={onWidthResizeEnd}
+          onPointerCancel={onWidthResizeEnd}
+          title="Arrastra para cambiar el ancho"
+        />
+      )}
       <button
         type="button"
         className="board-connector-handle"
