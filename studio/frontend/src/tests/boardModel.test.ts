@@ -81,4 +81,18 @@ describe('modelo de tablero visual', () => {
   it('genera nombres de archivo portables', () => {
     expect(boardFilename('Plan de acción: Perú / 2026', 'md')).toBe('Plan-de-accion-Peru-2026.md');
   });
+
+  it('guarda el sistema de diseño por tablero y lo sanea al cargar', () => {
+    const board = createBoard('Con sistema');
+    expect(board.sistema).toBe('forja');
+
+    const irene = normalizeBoard({ ...board, sistema: 'irene' });
+    expect(irene?.sistema).toBe('irene');
+
+    const unknown = normalizeBoard({ ...board, sistema: 'otro' });
+    expect(unknown?.sistema).toBe('forja');
+
+    const legacy = normalizeBoard({ ...board, sistema: undefined });
+    expect(legacy?.sistema).toBe('forja');
+  });
 });

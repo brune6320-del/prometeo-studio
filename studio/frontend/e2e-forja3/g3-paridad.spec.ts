@@ -184,7 +184,8 @@ test.describe('G3 · paridad Milanote', () => {
     await expect(page.locator('.board-nested')).toContainText('Tablero Forja 2');
     await expect(page.locator('.board-nested-open')).toBeVisible();
     await page.getByRole('button', { name: 'Más' }).click();
-    await page.getByRole('menuitem', { name: 'Tablero anidado' }).click();
+    await page.getByRole('option', { name: /Tablero anidado/ }).click();
+    await page.getByRole('button', { name: 'Añadir al tablero' }).click();
     await expect(page.getByRole('dialog', { name: 'Anidar un tablero' })).toBeVisible();
     await page.locator('.board-template-card').first().click();
     await expect(page.locator('[data-card-type="tablero"]')).toHaveCount(2);

@@ -1,4 +1,5 @@
 import { normalizeFrameData, readFrameData } from './frames';
+import { normalizeDesignSystem, type DesignSystemId } from './diseno';
 import { normalizeColumnData } from './columnas';
 
 export type BoardCardType = 'note' | 'link' | 'media' | (string & {});
@@ -47,6 +48,8 @@ export interface BoardDocument {
   title: string;
   createdAt: string;
   updatedAt: string;
+  /** Sistema de diseño del tablero; ausente = Forja 2 (tableros anteriores). */
+  sistema?: DesignSystemId;
   cards: BoardCard[];
   relations: BoardRelation[];
 }
@@ -76,6 +79,7 @@ export function createBoard(title = 'Mi tablero'): BoardDocument {
     title,
     createdAt: now,
     updatedAt: now,
+    sistema: 'forja',
     cards: [],
     relations: [],
   };
@@ -246,6 +250,7 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
     title: boundedText(value.title, 'Mi tablero', 120),
     createdAt: boundedText(value.createdAt, new Date().toISOString(), 80),
     updatedAt: boundedText(value.updatedAt, new Date().toISOString(), 80),
+    sistema: normalizeDesignSystem(value.sistema),
     cards: normalizedCards,
     relations,
   };

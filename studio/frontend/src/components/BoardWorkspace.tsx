@@ -65,6 +65,7 @@ import { aceptarLectura } from '../board/referentes/mirar';
 import { leerReferente, type Lectura } from '../board/referentes/model';
 import { loadBoardWorkspace } from '../board/storage';
 import { BoardToolMenu } from '../board/tools/menu';
+import { DESIGN_SYSTEMS, normalizeDesignSystem, type DesignSystemId } from '../board/diseno';
 import { getBoardTool, listBoardTools } from '../board/tools/registry';
 import { EntropiaVista } from '../board/tools/entropiaVista';
 import {
@@ -668,6 +669,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (!loaded || !activeBoardId) return;
     rememberActiveBoard(activeBoardId);
   }, [activeBoardId, loaded]);
+
+  // El sistema de diseño del tablero se aplica en la raíz para que alcance
+  // también a los portales (pliego, caja de luz, diálogos), no solo al lienzo.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.dataset.designSystem = normalizeDesignSystem(activeBoard?.sistema);
+    return () => {
+      delete root.dataset.designSystem;
+    };
+  }, [activeBoard?.id, activeBoard?.sistema]);
 
   // Un tablero anidado pide abrirse desde su tarjeta (botón o doble clic).
   useEffect(() => {
@@ -2567,6 +2578,20 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           }} aria-label="Elegir tablero">
             {projectBoards.map((board) => <option key={board.id} value={board.id}>{board.title || 'Sin título'}</option>)}
           </select>
+          <label className="sr-only" htmlFor="design-system-select">Sistema de diseño del tablero</label>
+          <select
+            id="design-system-select"
+            className="board-system-select"
+            value={normalizeDesignSystem(activeBoard.sistema)}
+            onChange={(event) => {
+              const sistema = normalizeDesignSystem(event.target.value) as DesignSystemId;
+              updateBoard((board) => ({ ...board, sistema }));
+            }}
+            aria-label="Sistema de diseño del tablero"
+            title="Sistema de diseño de este tablero"
+          >
+            {DESIGN_SYSTEMS.map((entry) => <option key={entry.id} value={entry.id}>{entry.nombre}</option>)}
+          </select>
           <button className="board-icon-button" onClick={() => { const nombre = window.prompt('Nombre del tablero', activeBoard.title); if (nombre !== null) renameBoard(nombre.trim() || activeBoard.title); }} aria-label="Renombrar tablero" title="Renombrar tablero"><Pencil size={15} /></button>
           <button className="board-icon-button" onClick={() => { setProjectName(''); setProjectDialog(true); }} aria-label="Crear proyecto" title="Crear proyecto"><FolderPlus size={16} /></button>
           <button className="board-icon-button" onClick={() => void addNewBoard()} aria-label="Crear tablero" title="Crear tablero"><Plus size={16} /></button>
@@ -2996,7 +3021,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         >
           <div className="board-add-panel" role="presentation">
             <div className="board-add-heading">
-              <span>Añadir tarjeta</span>
+              <span>Biblioteca de herramientas</span>
               <button type="button" onClick={() => setAddMenuOpen(false)} aria-label="Cerrar menú"><X size={15} /></button>
             </div>
             <BoardToolMenu onChoose={chooseTool} />

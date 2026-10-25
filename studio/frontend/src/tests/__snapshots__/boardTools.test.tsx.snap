@@ -52,6 +52,7 @@ exports[`registro de herramientas del tablero > un tablero viejo carga igual (sn
     },
   ],
   "schemaVersion": 1,
+  "sistema": "forja",
   "title": "Tablero antiguo",
   "updatedAt": "2026-01-02T03:04:05.000Z",
 }

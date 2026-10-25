@@ -51,8 +51,8 @@ describe('registro de herramientas del tablero', () => {
 
   it('el menú se arma desde el registro y muestra las 10 herramientas', () => {
     const html = renderToStaticMarkup(<BoardToolMenu onChoose={NOOP} />);
-    expect((html.match(/role="menuitem"/g) ?? []).length).toBe(10);
-    for (const nombre of ['Nota', 'Enlace', 'Multimedia', 'Etiqueta', 'Referente', 'Marco', 'Entropía', 'Columna', 'Lista de tareas', 'Tablero anidado']) {
+    expect((html.match(/role="option"/g) ?? []).length).toBe(10);
+    for (const nombre of ['Nota', 'Enlace', 'Imagen o vídeo', 'Etiqueta', 'Referente', 'Marco', 'Entropía', 'Columna', 'Tareas', 'Tablero anidado']) {
       expect(html).toContain(nombre);
     }
   });
