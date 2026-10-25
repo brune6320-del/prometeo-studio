@@ -70,6 +70,8 @@ test('H4 · Tab entra, Alt+flechas navegan, Enter selecciona y Esc sale', async 
     const guardado = await leerTablero(page, 'board-h4');
     return (guardado?.cards.find((card) => card.id === 'f1')?.datos as { alto?: number } | undefined)?.alto;
   }).toBe(310);
+  await page.keyboard.press('Meta+ArrowRight');
+  await expect.poll(async () => (await leerTablero(page, 'board-h4'))?.cards.find((card) => card.id === 'f1')?.width).toBe(430);
 
   // Tres seleccionadas: aria-selected y región viva.
   await page.keyboard.press('Meta+a');

@@ -131,7 +131,7 @@ const Capacidades: React.FC<{ summary: DocumentSummary }> = ({ summary }) => {
         <dt>Imágenes</dt><dd>{summary.image_nodes_count}</dd>
         <dt>Vectores</dt><dd>{summary.vector_nodes_count}</dd>
         <dt>Páginas</dt><dd>{summary.pages_count}</dd>
-        <dt>Contrato</dt><dd>{nativo ? 'sustituir y verificar' : escaneado ? 'OCR con seguridad' : 'solo lectura'}</dd>
+        <dt>Contrato</dt><dd>{nativo ? 'sustituir y verificar' : escaneado && c.has_ocr_layer ? 'OCR con seguridad' : 'solo lectura'}</dd>
       </dl>
       <p className="hint">Esta pantalla no finge: si una edición no se puede verificar, la herramienta la rechaza con el motivo. No hay botón para abrir Acrobat.</p>
     </div>

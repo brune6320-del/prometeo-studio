@@ -1053,7 +1053,7 @@ class StudioDocumentSession:
                 }
             antes = [self._span_signature(span) for span in spans if span is not objetivo]
             rect = pymupdf.Rect(bbox[0] - 0.4, bbox[1] - 0.4, bbox[2] + 0.4, bbox[3] + 0.4)
-            page.add_redact_annot(rect)
+            page.add_redact_annot(rect, fill=False)
             page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE, graphics=pymupdf.PDF_REDACT_LINE_ART_NONE)
             origen = objetivo.get("origin") or (bbox[0], bbox[3] - max(1.0, (bbox[3] - bbox[1]) * 0.2))
             page.insert_text(

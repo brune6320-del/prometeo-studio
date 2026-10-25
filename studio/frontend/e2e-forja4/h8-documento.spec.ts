@@ -87,6 +87,38 @@ test('H8 · capacidades, selección de texto, tipografía verificada y rechazo e
   await expect(dialogo).toContainText('SHA-256');
 });
 
+test('H8 · un escaneado declara el motivo y no finge un editor de texto', async ({ page }) => {
+  await mockReadyBackend(page);
+  await page.route('**/api/sessions/open_sample', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      ok: true,
+      session_id: 'studio_sess_scan',
+      filename: 'escaneado.pdf',
+      summary: {
+        document_id: 'doc_scan', source_sha256: 'b'.repeat(64), filename: 'escaneado.pdf',
+        pages_count: 1, total_nodes: 1, text_nodes_count: 0, image_nodes_count: 1, vector_nodes_count: 0,
+        docgraph_version: '0.3', session_id: 'studio_sess_scan', transaction_state: 'READY', staged_count: 0,
+        capabilities: { is_born_digital: false, is_raster: true, is_raster_dominant: true, can_text_edit: false, can_verify_physically: false, has_ocr_layer: false, capability_badge: 'RASTER_ONLY' },
+      },
+    }) });
+  });
+  await page.route((url) => url.pathname.startsWith('/api/sessions/'), async (route) => {
+    const endpoint = new URL(route.request().url()).pathname;
+    if (endpoint.endsWith('/nodes')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ nodes: [] }) });
+    if (endpoint.includes('/ocr/')) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, observations: [] }) });
+    return route.fallback();
+  });
+  await page.goto('/');
+  await page.locator('[data-sample="mock_three_pages"]').click();
+  await expect(page.locator('#open-file-name')).toHaveText('escaneado.pdf');
+  await page.getByRole('button', { name: 'Documento', exact: true }).click();
+  const dialogo = page.getByRole('dialog', { name: 'Documento' });
+  await expect(dialogo).toContainText('Documento escaneado');
+  await expect(dialogo).toContainText('sin texto nativo');
+  await expect(dialogo.getByRole('button', { name: /Acrobat/ })).toHaveCount(0);
+  await page.screenshot({ path: path.join(CAPTURAS, 'H8-despues-escaneado-motivo.png') });
+});
+
 test('H8 · anotar y organizar páginas producen una copia nueva', async ({ page }) => {
   await page.goto('/');
   await abrirPdf(page);
@@ -153,6 +185,7 @@ test('H8 · el manifiesto llega como propuesta: Enter acepta y Esc descarta', as
   await page.getByRole('button', { name: /^Biblioteca/ }).click();
   await page.getByRole('menuitem', { name: /Manifiesto/ }).click();
   await expect(page.getByRole('group', { name: 'Propuesta de manifiesto pendiente' })).toBeVisible();
+  await page.waitForTimeout(150);
   await page.keyboard.press('Enter');
   await expect(propuesta).toHaveCount(0);
   await expect.poll(async () => (await leerTablero(page, 'board-h8-manifiesto'))?.cards.length).toBeGreaterThan(antes?.cards.length ?? 0);

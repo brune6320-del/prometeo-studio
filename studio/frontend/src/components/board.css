@@ -493,10 +493,15 @@
   position: absolute;
   z-index: 2;
   inset: 0;
-  contain: layout style;
+  contain: layout style paint;
   transform-origin: 0 0;
   pointer-events: none;
   will-change: transform;
+}
+
+/* Una tarjeta en coordenadas negativas no puede quedar recortada por `contain: paint`. */
+.board-stage.has-negative {
+  contain: layout style;
 }
 
 /*

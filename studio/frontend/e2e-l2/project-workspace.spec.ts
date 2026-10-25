@@ -92,6 +92,11 @@ async function seedLegacyWorkspace(page: Page) {
   }, { boardDb: BOARD_DB, projectDb: PROJECT_DB });
 }
 
+async function renombrarTablero(page: Page, nombre: string) {
+  page.once('dialog', (dialog) => dialog.accept(nombre));
+  await page.getByRole('button', { name: 'Renombrar tablero' }).click();
+}
+
 async function openBoard(page: Page) {
   await page.getByRole('button', { name: 'Tablero' }).click();
   await expect(page.locator('.board-workspace')).toBeVisible();
@@ -106,8 +111,8 @@ test('migra el espacio legado a proyectos sin reescribir el tablero ni el proyec
   await openBoard(page);
 
   await expect(page.getByLabel('Elegir proyecto')).toHaveValue('project-legacy-0001');
-  await expect(page.getByLabel('Nombre del tablero')).toHaveValue('Tablero heredado');
-  await expect(page.getByLabel('Título de tarjeta')).toHaveValue('Idea conservada');
+  await expect(page.locator('#board-select option:checked')).toHaveText('Tablero heredado');
+  await expect(page.locator('.board-card-title')).toHaveText('Idea conservada');
 
   const state = await page.evaluate(async ({ boardDb, projectDb }) => {
     const requestValue = <T,>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
@@ -154,7 +159,7 @@ test('crea proyectos separados y recupera su tablero activo después de recargar
   await page.goto('/');
   await openBoard(page);
 
-  await page.getByLabel('Nombre del tablero').fill('Tablero general');
+  await renombrarTablero(page, 'Tablero general');
   await expect(page.getByText('Guardando…', { exact: true })).toBeVisible();
   await expect(page.getByText('Guardado', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Crear proyecto' }).click();
@@ -162,22 +167,22 @@ test('crea proyectos separados y recupera su tablero activo después de recargar
   await dialog.getByLabel('Nombre del proyecto').fill('Investigación PDF');
   await dialog.getByRole('button', { name: 'Crear proyecto' }).click();
   await expect(page.getByLabel('Elegir proyecto')).toHaveValue(/project-/);
-  await expect(page.getByLabel('Nombre del tablero')).toHaveValue('Mi tablero');
-  await page.getByLabel('Nombre del tablero').fill('Tablero de investigación');
+  await expect(page.locator('#board-select option:checked')).toHaveText('Mi tablero');
+  await renombrarTablero(page, 'Tablero de investigación');
   await expect(page.getByText('Guardando…', { exact: true })).toBeVisible();
   await expect(page.getByText('Guardado', { exact: true })).toBeVisible();
 
   await page.getByLabel('Elegir proyecto').selectOption({ label: 'Proyecto general' });
-  await expect(page.getByLabel('Nombre del tablero')).toHaveValue('Tablero general');
+  await expect(page.locator('#board-select option:checked')).toHaveText('Tablero general');
   await page.getByLabel('Elegir proyecto').selectOption({ label: 'Investigación PDF' });
-  await expect(page.getByLabel('Nombre del tablero')).toHaveValue('Tablero de investigación');
+  await expect(page.locator('#board-select option:checked')).toHaveText('Tablero de investigación');
 
   await page.reload();
   await openBoard(page);
   await expect(page.getByLabel('Elegir proyecto')).toHaveValue(/project-/);
   await expect(page.getByLabel('Elegir proyecto').locator('option')).toHaveCount(2);
   await expect(page.getByLabel('Elegir proyecto').locator('option:checked')).toHaveText('Investigación PDF');
-  await expect(page.getByLabel('Nombre del tablero')).toHaveValue('Tablero de investigación');
+  await expect(page.locator('#board-select option:checked')).toHaveText('Tablero de investigación');
 });
 
 test('guarda referencias de página, vuelve al PDF exacto y exporta Markdown para Obsidian', async ({ page }) => {
@@ -189,7 +194,8 @@ test('guarda referencias de página, vuelve al PDF exacto y exporta Markdown par
   await expect(page.locator('#page-jump')).toHaveValue('2');
   await openBoard(page);
 
-  await page.getByRole('button', { name: 'Referenciar página PDF' }).click();
+  await page.getByRole('button', { name: /^Biblioteca/ }).click();
+  await page.getByRole('menuitem', { name: /Referenciar página PDF/ }).click();
   const dialog = page.getByRole('dialog', { name: 'Referenciar página PDF' });
   await dialog.getByLabel('Cita o fragmento').fill('Fragmento verificable');
   await dialog.getByLabel('Nota').fill('Conectar con el marco teórico');
@@ -199,9 +205,10 @@ test('guarda referencias de página, vuelve al PDF exacto y exporta Markdown par
   await expect(references).toContainText('Página 2');
   await expect(references).toContainText('Fragmento verificable');
 
+  await page.locator('.board-topbar-actions').getByRole('button', { name: /^Exportar/ }).click();
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: 'Exportar proyecto a Obsidian' }).click(),
+    page.getByRole('menuitem', { name: 'Obsidian del proyecto' }).click(),
   ]);
   const downloadPath = await download.path();
   expect(downloadPath).not.toBeNull();
@@ -250,9 +257,11 @@ test('rechaza una base futura, conserva sus datos y mantiene operativos los tabl
   await page.getByRole('button', { name: 'Tablero' }).click();
   await expect(page.locator('.board-workspace')).toBeVisible();
   await expect(page.getByRole('alert')).toContainText('versión más nueva');
-  await expect(page.getByLabel('Nombre del tablero')).toHaveValue('Tablero seguro');
+  await expect(page.locator('#board-select option:checked')).toHaveText('Tablero seguro');
   await page.getByRole('button', { name: 'Nueva nota' }).click();
+  await page.locator('.board-card-title').last().dblclick();
   await page.getByLabel('Título de tarjeta').fill('Trabajo local conservado');
+  await page.getByLabel('Título de tarjeta').press('Enter');
   await expect(page.getByText('Guardando…', { exact: true })).toBeVisible();
   await expect(page.getByText('Guardado', { exact: true })).toBeVisible();
 

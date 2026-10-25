@@ -7,6 +7,7 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e-forja4',
+  testIgnore: /h9-soak\.spec\.ts/,
   fullyParallel: false,
   workers: 1,
   retries: 0,

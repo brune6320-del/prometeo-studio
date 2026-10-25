@@ -156,3 +156,95 @@ test('H1 · cerrar con cambios pendientes fuerza el volcado antes de confirmar',
   }), DB_NAME);
   expect(tableroGuardado).toBe(1);
 });
+
+test('H1 · el staging PDF deshace y rehace un cambio preparado', async ({ page }) => {
+  await mockReadyBackend(page);
+  let operacion: Record<string, unknown> | null = null;
+  await page.route((url) => url.pathname.startsWith('/api/sessions/'), async (route) => {
+    const request = route.request();
+    const endpoint = new URL(request.url()).pathname;
+    if (endpoint.endsWith('/nodes')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ nodes: [{ id: 't1', type: 'TEXT', page: 0, bbox: [100, 120, 330, 150], text: 'Contrato de prueba', font: 'Helvetica', size: 12 }] }) });
+    }
+    if (endpoint.includes('/node/t1')) {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 't1', type: 'TEXT', page: 0, bbox: [100, 120, 330, 150], text: 'Contrato de prueba', font: 'Helvetica', size: 12 }) });
+    }
+    if (endpoint.endsWith('/stage_edit')) {
+      const body = request.postDataJSON() as { new_text: string };
+      operacion = { op_id: 'op_pdf_1', type: 'VECTOR_REPLACE_TEXT', node_id: 't1', target_id: 't1', original_text: 'Contrato de prueba', new_text: body.new_text, page: 0, status: 'STAGED' };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, staged: operacion }) });
+    }
+    if (endpoint.endsWith('/transaction') && request.method() === 'GET') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, transaction_state: operacion ? 'STAGED' : 'READY', staged_operations: operacion ? [operacion] : [], count: operacion ? 1 : 0 }) });
+    }
+    if (endpoint.includes('/staged/') && request.method() === 'DELETE') {
+      operacion = null;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ok: true, transaction_state: 'READY', staged_operations: [], staged_total: 0 }) });
+    }
+    return route.fallback();
+  });
+  await page.goto('/');
+  await page.locator('[data-sample="mock_three_pages"]').click();
+  await page.locator('.overlay[data-node-id="t1"]').click();
+  await page.getByLabel('Texto nuevo').fill('Contrato nuevo');
+  await page.getByRole('button', { name: 'Preparar cambio' }).click();
+  await expect(page.getByText(/1 cambio preparado/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Deshacer el último cambio preparado' }).click();
+  await expect.poll(async () => page.getByText('No hay cambios preparados').isVisible()).toBe(true);
+  await page.getByRole('button', { name: 'Rehacer el cambio preparado' }).click();
+  await expect(page.getByText(/1 cambio preparado/)).toBeVisible();
+  await expect(page.getByRole('tabpanel', { name: 'Cambios' }).getByText('Contrato nuevo')).toBeVisible();
+});
+
+test('H1 · una referencia PDF borrada se recupera desde Archivo', async ({ page }) => {
+  await mockReadyBackend(page);
+  await page.goto('/');
+  const board = tablero([nota('n1', 120, 120, 'Con referencia')], 'board-h1-ref', 'Referencias');
+  await sembrar(page, board);
+  await page.evaluate(async ({ boardId }) => {
+    const ahora = new Date().toISOString();
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open('prometeo-studio-project-workspace', 2);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains('projects')) db.createObjectStore('projects', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('board-projects')) db.createObjectStore('board-projects', { keyPath: 'boardId' });
+        if (!db.objectStoreNames.contains('pdf-references')) db.createObjectStore('pdf-references', { keyPath: 'id' });
+        if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' });
+      };
+      request.onsuccess = () => {
+        const db = request.result;
+        const tx = db.transaction(['projects', 'board-projects', 'pdf-references', 'meta'], 'readwrite');
+        tx.objectStore('projects').put({ schemaVersion: 2, id: 'project-refs0001', name: 'Referencias', createdAt: ahora, updatedAt: ahora, gustos: {}, plantillas: [] });
+        tx.objectStore('board-projects').put({ schemaVersion: 2, boardId, projectId: 'project-refs0001' });
+        tx.objectStore('pdf-references').put({ schemaVersion: 2, id: 'pdfref-aaaaaaaa', projectId: 'project-refs0001', boardId, sourceName: 'fuente.pdf', sourceSha256: 'a'.repeat(64), page: 2, quote: 'Cita que vuelve', note: '', createdAt: ahora, updatedAt: ahora });
+        tx.objectStore('meta').put({ key: 'active-project-id', value: 'project-refs0001' });
+        tx.objectStore('meta').put({ key: 'workspace-schema-version', value: 2 });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }, { boardId: 'board-h1-ref' });
+  await page.reload();
+  await openBoard(page);
+  await page.getByRole('button', { name: /^Biblioteca/ }).click();
+  await page.getByRole('menuitem', { name: /Referencias PDF/ }).click();
+  const panel = page.getByRole('complementary', { name: /Referencias PDF de/ });
+  await expect(panel).toContainText('fuente.pdf');
+  await panel.getByRole('button', { name: 'Eliminar' }).click();
+  await expect(panel.getByText('fuente.pdf')).toHaveCount(0);
+  await expect.poll(async () => (await leerMemoria(page)).some((item) => item.kind === 'reference')).toBe(true);
+
+  await page.reload();
+  await openBoard(page);
+  await page.getByRole('button', { name: 'Archivo y recientes borrados' }).click();
+  const dialogo = page.getByRole('dialog', { name: 'Archivo' });
+  await expect(dialogo).toContainText('Referencia a «fuente.pdf»');
+  await dialogo.getByRole('button', { name: 'Restaurar' }).first().click();
+  await dialogo.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await page.getByRole('button', { name: /^Biblioteca/ }).click();
+  await page.getByRole('menuitem', { name: /Referencias PDF/ }).click();
+  await expect(page.getByRole('complementary', { name: /Referencias PDF de/ })).toContainText('fuente.pdf');
+});

@@ -4428,7 +4428,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             })()}
             </g>
           </svg>
-        <div className="board-stage" ref={stageRef}>
+        <div className={`board-stage ${activeBoard.cards.some((card) => card.x < 0 || card.y < 0) ? 'has-negative' : ''}`} ref={stageRef}>
           {guias.x !== undefined && (
             <div className="board-guide board-guide-x" data-testid="board-guide-x" style={{ left: guias.x }} aria-hidden="true" />
           )}
