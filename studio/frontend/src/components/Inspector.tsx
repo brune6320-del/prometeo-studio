@@ -82,11 +82,13 @@ const NodeInspector: React.FC<InspectorProps & { node: NodeDetail }> = ({ node, 
   const [error, setError] = useState<ApiError | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [justStaged, setJustStaged] = useState(false);
+  const [preparedText, setPreparedText] = useState<string | null>(null);
 
   useEffect(() => {
     setText(node.text ?? '');
     setError(null);
     setJustStaged(false);
+    setPreparedText(null);
   }, [node.id, node.text]);
 
   if (node.type !== 'TEXT') {
@@ -107,6 +109,7 @@ const NodeInspector: React.FC<InspectorProps & { node: NodeDetail }> = ({ node, 
 
   const original = node.text ?? '';
   const changed = text.trim() !== '' && text !== original;
+  const upToDate = preparedText !== null && text.trim() === preparedText;
   const tooLong = original.length > 0 && text.length > original.length * 1.5;
 
   const submit = async (e: React.FormEvent) => {
@@ -116,6 +119,7 @@ const NodeInspector: React.FC<InspectorProps & { node: NodeDetail }> = ({ node, 
     setError(null);
     try {
       await onStageText(node.id, text);
+      setPreparedText(text.trim());
       setJustStaged(true);
     } catch (err) {
       setError(normalizeError(err, 'STAGING'));
@@ -190,9 +194,18 @@ const NodeInspector: React.FC<InspectorProps & { node: NodeDetail }> = ({ node, 
             </Notice>
           </div>
         )}
-        <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!changed || submitting || busy || isStaged}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          style={{ width: '100%' }}
+          disabled={!changed || submitting || busy || (isStaged && upToDate)}
+        >
           {submitting ? <Spinner label="Preparando" /> : <Layers size={15} aria-hidden="true" />}
-          {isStaged ? (txPhase === 'VERIFIED' ? 'Incluido en la copia verificada' : 'Ya hay un cambio preparado aquí') : submitting ? 'Preparando…' : 'Preparar cambio'}
+          {submitting ? 'Preparando…' : isStaged
+            ? (upToDate
+              ? (txPhase === 'VERIFIED' ? 'Incluido en la copia verificada' : 'Cambio preparado')
+              : 'Actualizar cambio preparado')
+            : 'Preparar cambio'}
         </button>
         <p className="hint" id="edit-help" style={{ marginTop: 'var(--sp-2)' }}>
           <ShieldCheck size={12} aria-hidden="true" /> Preparar no modifica nada. El cambio solo se aplica en una copia nueva, y solo si la verificación lo aprueba.
@@ -238,6 +251,7 @@ const OcrInspector: React.FC<InspectorProps & { obs: OCRObservation }> = ({ obs,
   const [error, setError] = useState<ApiError | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [staged, setStaged] = useState(false);
+  const [preparedText, setPreparedText] = useState<string | null>(null);
 
   useEffect(() => {
     setText(obs.text);
@@ -246,6 +260,7 @@ const OcrInspector: React.FC<InspectorProps & { obs: OCRObservation }> = ({ obs,
     setError(null);
     setCheckError(null);
     setStaged(false);
+    setPreparedText(null);
     if (!sessionId) return;
     const ctrl = new AbortController();
     setChecking(true);
@@ -267,6 +282,7 @@ const OcrInspector: React.FC<InspectorProps & { obs: OCRObservation }> = ({ obs,
   }, [obs.id, obs.page, obs.text, sessionId]);
 
   const changed = text.trim() !== '' && text !== obs.text;
+  const upToDate = preparedText !== null && text.trim() === preparedText;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!changed) return;
@@ -274,6 +290,7 @@ const OcrInspector: React.FC<InspectorProps & { obs: OCRObservation }> = ({ obs,
     setError(null);
     try {
       await onStageRaster(obs.page, obs.id, text.trim());
+      setPreparedText(text.trim());
       setStaged(true);
     } catch (err) {
       setError(normalizeError(err, 'STAGING'));
@@ -349,15 +366,20 @@ const OcrInspector: React.FC<InspectorProps & { obs: OCRObservation }> = ({ obs,
               <StageError error={error} />
             </div>
           )}
-          {staged && !error && (
+          {staged && upToDate && !error && (
             <div style={{ marginBottom: 'var(--sp-3)' }}>
               <Notice tone="ok" title="Parche preparado">
-                <p className="notice-text">Se verificará píxel a píxel antes de crear la copia.</p>
+                <p className="notice-text">Se verificará píxel a píxel antes de crear la copia. Si cambias el texto, vuelve a prepararlo para actualizarlo.</p>
               </Notice>
             </div>
           )}
-          <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={!changed || submitting || busy}>
-            {submitting ? 'Preparando…' : 'Preparar parche'}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{ width: '100%' }}
+            disabled={!changed || submitting || busy || upToDate}
+          >
+            {submitting ? 'Preparando…' : upToDate ? 'Parche preparado' : staged ? 'Actualizar parche preparado' : 'Preparar parche'}
           </button>
         </form>
       )}

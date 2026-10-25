@@ -382,6 +382,9 @@ class TransactionManager:
                 dx_ok = False
                 dy_ok = False
                 font_ok = False
+                dx = None
+                dy = None
+                fonts_obs = set()
                 if band:
                     first = band[0]
                     dx = abs(first["origin"][0] - expected_x)
@@ -398,15 +401,52 @@ class TransactionManager:
                     op.status = "VERIFICATION_FAILED"
                     all_passed = False
 
+                checks = [
+                    {
+                        "id": "text",
+                        "label": "El texto nuevo aparece en la copia",
+                        "expected": op.new_text,
+                        "actual": norm_concat,
+                        "pass": text_ok,
+                    },
+                    {
+                        "id": "dx",
+                        "label": "Posición horizontal dentro de la tolerancia",
+                        "expected": f"±{engine.ORIGIN_TOLERANCE_PT:.1f} pt",
+                        "actual": "sin texto" if dx is None else f"{dx:.2f} pt",
+                        "pass": dx_ok,
+                    },
+                    {
+                        "id": "dy",
+                        "label": "Posición vertical dentro de la tolerancia",
+                        "expected": f"±{engine.ORIGIN_TOLERANCE_PT:.1f} pt",
+                        "actual": "sin texto" if dy is None else f"{dy:.2f} pt",
+                        "pass": dy_ok,
+                    },
+                    {
+                        "id": "font",
+                        "label": "La tipografía de la copia coincide",
+                        "expected": op.font,
+                        "actual": ", ".join(sorted(fonts_obs)) if fonts_obs else "sin fuentes detectadas",
+                        "pass": font_ok,
+                    },
+                ]
                 verification_details.append({
                     "op_id": op.op_id,
                     "target_id": op.target_id,
+                    "page": getattr(op, "page", None),
                     "expected_text": op.new_text,
                     "found_text": norm_concat,
                     "text_ok": text_ok,
                     "dx_ok": dx_ok,
                     "dy_ok": dy_ok,
                     "font_ok": font_ok,
+                    "dx_pt": None if dx is None else round(dx, 2),
+                    "dy_pt": None if dy is None else round(dy, 2),
+                    "tolerance_pt": engine.ORIGIN_TOLERANCE_PT,
+                    "expected_font": op.font,
+                    "found_fonts": sorted(fonts_obs),
+                    "checks": checks,
                     "pass": op_pass,
                 })
         finally:

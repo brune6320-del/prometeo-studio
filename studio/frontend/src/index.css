@@ -993,3 +993,155 @@ kbd {
   .progress::after { animation: none; width: 100%; opacity: 0.6; }
   .spinner { animation: none; border-top-color: var(--line-strong); border-right-color: var(--ember); }
 }
+
+/* ---------- G6 · por qué falla la verificación ---------- */
+.failure-block {
+  margin: var(--sp-3) 0 var(--sp-4);
+  padding: var(--sp-3);
+  border: 1px solid var(--st-failed);
+  border-radius: var(--radius-md);
+  background: var(--st-failed-soft);
+}
+
+.failure-title {
+  margin: 0 0 var(--sp-2);
+  color: var(--st-failed);
+  font-size: var(--font-size-label);
+}
+
+.failure-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-caption);
+  line-height: 1.45;
+}
+
+.failure-table th,
+.failure-table td {
+  padding: 5px 6px;
+  border-bottom: 1px dotted var(--line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.failure-table thead th {
+  color: var(--text-2);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.failure-table tbody th {
+  color: var(--text-1);
+  font-weight: 600;
+}
+
+.failure-table tbody td {
+  color: var(--text-2);
+  font-family: var(--font-mono);
+}
+
+.failure-table tbody tr:last-child th,
+.failure-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* ---------- G6 · paneles plegables y ventana estrecha ---------- */
+.workspace.left-collapsed {
+  grid-template-columns: 0 0 minmax(320px, 1fr) 6px var(--right-w, 340px);
+}
+
+.workspace.left-collapsed > .outliner-panel,
+.workspace.left-collapsed > .resizer-left {
+  display: none;
+}
+
+.workspace.right-collapsed {
+  grid-template-columns: var(--left-w, 280px) 6px minmax(320px, 1fr) 0 0;
+}
+
+.workspace.right-collapsed > .inspector-panel,
+.workspace.right-collapsed > .resizer-right {
+  display: none;
+}
+
+.workspace.left-collapsed.right-collapsed {
+  grid-template-columns: 0 0 minmax(0, 1fr) 0 0;
+}
+
+.panel-scrim {
+  display: none;
+}
+
+@media (max-width: 1000px) {
+  .workspace,
+  .workspace.left-collapsed,
+  .workspace.right-collapsed,
+  .workspace.left-collapsed.right-collapsed {
+    grid-template-columns: 0 0 minmax(0, 1fr) 0 0;
+  }
+
+  .workspace > .resizer-left,
+  .workspace > .resizer-right {
+    display: none;
+  }
+
+  .workspace > .outliner-panel,
+  .workspace > .inspector-panel {
+    position: fixed;
+    top: var(--header-h);
+    bottom: var(--statusbar-h);
+    z-index: 45;
+    display: flex;
+    width: min(340px, 92vw);
+    height: auto;
+    box-shadow: var(--shadow-2);
+  }
+
+  .workspace > .outliner-panel { left: 0; }
+  .workspace > .inspector-panel { right: 0; }
+
+  .workspace.left-collapsed > .outliner-panel,
+  .workspace.right-collapsed > .inspector-panel {
+    display: none;
+  }
+
+  .panel-scrim {
+    position: fixed;
+    inset: var(--header-h) 0 var(--statusbar-h);
+    z-index: 40;
+    display: block;
+    padding: 0;
+    border: 0;
+    background: rgba(0, 0, 0, 0.34);
+    cursor: pointer;
+  }
+
+  .header {
+    gap: 8px;
+    padding: 0 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .header::-webkit-scrollbar { display: none; }
+  .header .select { width: 156px !important; }
+  .file-meta { display: none; }
+}
+
+@media (max-width: 700px) {
+  .brand-name { display: none; }
+  .header-actions .btn-sm { padding: 0 7px; }
+  .tray-head { flex-wrap: wrap; gap: var(--sp-2); }
+  .page-indicator { white-space: nowrap; }
+}
+
+/* Cabecera a 1280: el estado del documento no debe pisar los controles. */
+@media (max-width: 1380px) {
+  .file-meta { display: none; }
+  .brand-sub { display: none; }
+  .header .select { width: 180px !important; }
+}

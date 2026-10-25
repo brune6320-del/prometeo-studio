@@ -73,8 +73,27 @@ const Studio: React.FC<{
   const [viewMode, setViewMode] = useState<'original' | 'compare'>('original');
   const [dockTab, setDockTab] = useState<DockTab>('changes');
   const [dockOpen, setDockOpen] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(() => window.innerWidth > 1000);
+  const [rightOpen, setRightOpen] = useState(() => window.innerWidth > 1000);
+  const [narrowPanels, setNarrowPanels] = useState(() => window.innerWidth <= 1000);
+  const wasNarrow = useRef(window.innerWidth <= 1000);
   const [dockHeight, setDockHeight] = useState(() => Math.round(Math.max(170, Math.min(260, window.innerHeight * 0.3))));
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Al entrar en una ventana estrecha los paneles se pliegan para no tapar el visor;
+  // al volver a una ancha se recuperan. Las palancas siguen disponibles en ambos casos.
+  useEffect(() => {
+    const onResize = () => {
+      const narrow = window.innerWidth <= 1000;
+      if (narrow === wasNarrow.current) return;
+      wasNarrow.current = narrow;
+      setNarrowPanels(narrow);
+      setLeftOpen(!narrow);
+      setRightOpen(!narrow);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [agentThinking, setAgentThinking] = useState(false);
   const [sessionLost, setSessionLost] = useState<ApiError | null>(null);
@@ -163,7 +182,12 @@ const Studio: React.FC<{
     setDockOpen(true);
     setDockTab('verification');
     const res = await verify();
-    if (res?.ok) setViewMode('compare');
+    if (res?.ok) {
+      setViewMode('compare');
+    } else if (res) {
+      // El motivo del fallo vive en «Verificación»: se le da altura suficiente para leerlo.
+      setDockHeight((height) => Math.min(560, Math.max(height, Math.min(window.innerHeight - 170, 380))));
+    }
   }, [verify]);
 
   /** Guarda la copia verificada (escritorio: Descargas › PROMETEO; navegador: descarga). true si quedó guardada. */
@@ -314,6 +338,10 @@ const Studio: React.FC<{
         onToggleMode={() => setUiMode((m) => (m === 'user' ? 'technical' : 'user'))}
         onSearch={() => setSearchOpen(true)}
         onOpenBoard={() => unsaved.guard('open', () => setWorkspaceMode('board'))}
+        leftOpen={leftOpen}
+        rightOpen={rightOpen}
+        onToggleLeft={() => setLeftOpen((open) => !open)}
+        onToggleRight={() => setRightOpen((open) => !open)}
       />
 
       <div className="app-notice-area" aria-live="polite">
@@ -376,7 +404,18 @@ const Studio: React.FC<{
         </main>
       ) : (
         <>
-      <main className="workspace" style={{ ['--left-w' as string]: `${left.size}px`, ['--right-w' as string]: `${right.size}px` }}>
+      <main
+        className={`workspace ${leftOpen ? '' : 'left-collapsed'} ${rightOpen ? '' : 'right-collapsed'}`}
+        style={{ ['--left-w' as string]: `${left.size}px`, ['--right-w' as string]: `${right.size}px` }}
+      >
+        {narrowPanels && (leftOpen || rightOpen) && (
+          <button
+            type="button"
+            className="panel-scrim"
+            aria-label="Cerrar los paneles abiertos"
+            onClick={() => { setLeftOpen(false); setRightOpen(false); }}
+          />
+        )}
         <Outliner
           pageCount={docs.pageCount}
           pageNodes={docs.pageNodes}

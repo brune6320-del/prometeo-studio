@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, Download, FolderOpen, ShieldCheck, XCircle
 import type { SavedCopy, VerifyAndExportResponse } from '../types';
 import type { TxPhase } from '../hooks/useTransaction';
 import { EmptyState } from './ui';
+import { verificationFailures } from '../verification/failures';
 
 interface VerifierPanelProps {
   response: VerifyAndExportResponse | null;
@@ -83,6 +84,7 @@ export const VerifierPanel: React.FC<VerifierPanelProps> = ({ response, phase, s
   const reject = vr.verdict === 'HONEST_REJECT';
   const tone = pass ? 'is-pass' : reject ? 'is-reject' : 'is-failed';
   const reason = (vr.code && REASON_COPY[vr.code]) || vr.reason;
+  const failures = verificationFailures(vr);
 
   return (
     <div className={`result-card ${tone}`} aria-live="polite">
@@ -101,6 +103,30 @@ export const VerifierPanel: React.FC<VerifierPanelProps> = ({ response, phase, s
       </div>
 
       {!pass && reason && <p style={{ margin: '0 0 var(--sp-2)' }}>{reason}</p>}
+
+      {!pass && failures.length > 0 && (
+        <div className="failure-block" aria-label="Por qué falló la verificación">
+          <h4 className="failure-title">Qué falló</h4>
+          <table className="failure-table">
+            <thead>
+              <tr>
+                <th scope="col">Comprobación</th>
+                <th scope="col">Esperado</th>
+                <th scope="col">Obtenido</th>
+              </tr>
+            </thead>
+            <tbody>
+              {failures.map((row) => (
+                <tr key={`${row.id}-${row.label}-${row.expected}-${row.actual}`}>
+                  <th scope="row">{row.label}</th>
+                  <td>{row.expected}</td>
+                  <td>{row.actual}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <ul className="checks" aria-label="Qué se comprobó">
         <li>

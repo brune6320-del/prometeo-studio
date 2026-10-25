@@ -301,14 +301,76 @@ def run_raster_transaction(
             return reject(CODE_VERIFIER_ERROR, "El verificador raster devolvió un resultado no interpretable.",
                           details=reports, verifier_profile=RASTER_VERIFIER_PROFILE), None
 
+        metrics = report.get("metrics", {}) or {}
+        readback = report.get("ocr_readback", {}) or {}
+        border = report.get("border_ring", {}) or {}
+        background = report.get("background", {}) or {}
+        observed_text = readback.get("observed_text") or ""
+        outside = metrics.get("outside_patch_changed_pixel_count", 0)
+        changed = metrics.get("changed_pixel_count", 0)
+        checks = [
+            {
+                "id": "outside",
+                "label": "El parche no toca píxeles fuera de su zona",
+                "expected": "0 píxeles",
+                "actual": f"{outside} píxeles",
+                "pass": outside == 0,
+            },
+            {
+                "id": "changed",
+                "label": "El parche cambia la imagen",
+                "expected": "> 0 píxeles",
+                "actual": f"{changed} píxeles",
+                "pass": changed > 0,
+            },
+            {
+                "id": "border",
+                "label": "El borde del parche queda estable",
+                "expected": "sin saltos (MAE bajo)",
+                "actual": f"MAE {metrics.get('border_ring_mae', 0)}",
+                "pass": bool(border.get("border_ring_pass", False)),
+            },
+            {
+                "id": "background",
+                "label": "El fondo reconstruido coincide con su anillo",
+                "expected": "residual bajo",
+                "actual": f"residual {metrics.get('background_residual', 0)}",
+                "pass": bool(background.get("background_pass", False)),
+            },
+            {
+                "id": "text_new",
+                "label": "El texto nuevo se lee en la copia",
+                "expected": getattr(op, "new_text", ""),
+                "actual": observed_text or "(no se leyó)",
+                "pass": bool(readback.get("new_text_observed", False)),
+            },
+            {
+                "id": "text_old",
+                "label": "El texto anterior ya no aparece",
+                "expected": f"sin «{getattr(op, 'old_observed_text', '')}»",
+                "actual": observed_text or "(sin lectura)",
+                "pass": bool(readback.get("old_text_absent", False)),
+            },
+            {
+                "id": "ocr_confidence",
+                "label": "Confianza suficiente de la lectura OCR",
+                "expected": "≥ 50 %",
+                "actual": f"{readback.get('confidence', 0)} %",
+                "pass": bool(readback.get("confidence_pass", False)),
+            },
+        ]
         reports.append({
             "observation_id": getattr(op, "observation_id", None),
             "page": op.page,
             "status": report["status"],
+            "expected_text": getattr(op, "new_text", ""),
+            "old_text": getattr(op, "old_observed_text", ""),
+            "observed_text": observed_text,
             "physical_pass": report.get("physical_pass"),
             "semantic_pass": report.get("semantic_pass"),
             "reasons": report.get("reasons", []),
-            "metrics": report.get("metrics", {}),
+            "metrics": metrics,
+            "checks": checks,
             "evidence": report.get("evidence", {}),
             "patch_evidence": evidence,
         })

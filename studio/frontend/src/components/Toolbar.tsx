@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { FileUp, LayoutDashboard, Search, Wrench } from 'lucide-react';
+import { FileUp, LayoutDashboard, PanelLeft, PanelRight, Search, Wrench } from 'lucide-react';
 import { BrandMark, StatusBadge, type StatusKind } from './ui';
 import type { OpenDocument } from '../hooks/useDocumentSession';
 import type { TxPhase } from '../hooks/useTransaction';
@@ -27,6 +27,10 @@ interface ToolbarProps {
   onToggleMode: () => void;
   onSearch: () => void;
   onOpenBoard: () => void;
+  leftOpen: boolean;
+  rightOpen: boolean;
+  onToggleLeft: () => void;
+  onToggleRight: () => void;
 }
 
 export const Toolbar: React.FC<ToolbarProps> = ({
@@ -42,6 +46,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onToggleMode,
   onSearch,
   onOpenBoard,
+  leftOpen,
+  rightOpen,
+  onToggleLeft,
+  onToggleRight,
 }) => {
   const fileInput = useRef<HTMLInputElement>(null);
   const status = TX_STATUS[txPhase];
@@ -116,6 +124,28 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         <button className="btn btn-ghost btn-icon" onClick={onSearch} disabled={!doc} aria-label="Buscar en el documento (Cmd+F)" title="Buscar (⌘F)">
           <Search size={16} />
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon"
+          onClick={onToggleLeft}
+          aria-pressed={leftOpen}
+          aria-label={leftOpen ? 'Ocultar el panel Contenido' : 'Mostrar el panel Contenido'}
+          title={leftOpen ? 'Ocultar Contenido' : 'Mostrar Contenido'}
+        >
+          <PanelLeft size={16} aria-hidden="true" />
+        </button>
+
+        <button
+          type="button"
+          className="btn btn-ghost btn-icon"
+          onClick={onToggleRight}
+          aria-pressed={rightOpen}
+          aria-label={rightOpen ? 'Ocultar el panel Inspector' : 'Mostrar el panel Inspector'}
+          title={rightOpen ? 'Ocultar Inspector' : 'Mostrar Inspector'}
+        >
+          <PanelRight size={16} aria-hidden="true" />
         </button>
 
         <button

@@ -565,17 +565,22 @@ class StudioDocumentSession:
         if not target_resolved and not node_resolved:
             return {"ok": False, "error": "No se pudo resolver el target para edición."}
 
-        # Verificar si este target ya está modificado en el lote
+        # Reintentar el mismo cambio actualiza la operación preparada en vez de fallar:
+        # el cambio sigue siendo uno y se vuelve a verificar desde cero.
         for op in self.staged_operations:
-            if target_resolved and op.get("target_id") == target_resolved:
+            same_target = bool(target_resolved) and op.get("target_id") == target_resolved
+            same_node = bool(node_resolved) and op.get("node_id") == node_resolved
+            if same_target or same_node:
+                op["new_text"] = new_text
+                op["status"] = "STAGED"
+                self._on_transaction_changed()
                 return {
-                    "ok": False,
-                    "error": f"Target {target_resolved} ya ha sido preparado en esta transacción (conflicto detectado).",
-                }
-            if node_resolved and op.get("node_id") == node_resolved:
-                return {
-                    "ok": False,
-                    "error": f"Node {node_resolved} ya ha sido preparado en esta transacción (conflicto detectado).",
+                    "ok": True,
+                    "operation": op,
+                    "staged": op,
+                    "reused": True,
+                    "staged_total": len(self.staged_operations),
+                    "transaction_state": self.transaction_state,
                 }
 
         # Inspeccionar valor anterior
@@ -824,11 +829,26 @@ class StudioDocumentSession:
         obs = safety_data["observation"]
         safety_info = safety_data["safety"]
 
+        # Reintentar la misma observación reutiliza su parche y actualiza el texto.
+        # Así «Preparar parche» es idempotente y no obliga a descartar el cambio primero.
         for op in self.staged_operations:
             if op.get("target_id") == observation_id or op.get("observation_id") == observation_id:
+                op["new_text"] = new_text
+                op["status"] = "STAGED"
+                raster_op = op.get("raster_op")
+                if raster_op is not None:
+                    raster_op.new_text = new_text
+                    raster_op.font_family = font_family
+                    raster_op.font_size_pt = font_size_pt
+                self._on_transaction_changed()
+                public = {k: v for k, v in op.items() if k != "raster_op"}
                 return {
-                    "ok": False,
-                    "error": f"Observación {observation_id} ya ha sido preparada en esta transacción.",
+                    "ok": True,
+                    "operation": public,
+                    "staged": public,
+                    "reused": True,
+                    "staged_total": len(self.staged_operations),
+                    "transaction_state": self.transaction_state,
                 }
 
         raster_op = RasterReplaceText(
