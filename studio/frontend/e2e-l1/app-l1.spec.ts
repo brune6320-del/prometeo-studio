@@ -82,16 +82,26 @@ test('R-02: el cierre desde el tablero muestra el diálogo y bloquea el fondo', 
     if (typeof handler !== 'function') throw new Error('Manejador de cierre no instalado');
     handler();
   });
-  const dialog = page.getByRole('alertdialog');
-  await expect(dialog).toBeVisible();
+  // D15 · cerrar fuerza el volcado: si IndexedDB confirma, no hay diálogo y el host cierra.
   await expect.poll(() => page.evaluate(() => {
     const calls = (window as unknown as { __PROMETEO_TEST_INVOKES__: Array<{ cmd: string }> }).__PROMETEO_TEST_INVOKES__;
-    return calls.some((call) => call.cmd === 'close_dialog_shown');
+    return calls.some((call) => call.cmd === 'confirm_close');
   })).toBe(true);
-  await expect(dialog).toContainText('El tablero aún no está guardado');
-  await expect(page.locator('.board-workspace')).toHaveAttribute('inert', '');
-  await dialog.getByRole('button', { name: 'Cancelar' }).click();
-  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(async () => new Promise<number>((resolve) => {
+    const request = indexedDB.open('prometeo-studio-visual-board');
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('boards', 'readonly');
+      const get = tx.objectStore('boards').getAll();
+      get.onsuccess = () => {
+        db.close();
+        resolve((get.result as Array<{ cards?: unknown[] }>).reduce((total, board) => total + (board.cards?.length ?? 0), 0));
+      };
+      get.onerror = () => { db.close(); resolve(-1); };
+    };
+    request.onerror = () => resolve(-1);
+  }))).toBe(1);
 });
 
 test('R-03: los atajos PDF no cambian de página ni abren búsqueda dentro del tablero', async ({ page }) => {

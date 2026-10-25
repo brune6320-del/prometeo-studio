@@ -22,6 +22,10 @@ export type AccionLienzo =
   | 'enviarAtras'
   | 'alFrente'
   | 'alFondo'
+  | 'redimensionarAnchoMenos'
+  | 'redimensionarAnchoMas'
+  | 'redimensionarAltoMenos'
+  | 'redimensionarAltoMas'
   | 'deshacer'
   | 'rehacer'
   | 'cerrar'
@@ -135,6 +139,8 @@ export const ATAJOS_LIENZO: AtajoLienzo[] = [
   { id: 'cerrar', tipo: 'tecla', tecla: 'escape', modificadores: {}, accion: 'cerrar', descripcion: 'Cerrar el diálogo abierto o deseleccionar', grupo: 'Selección' },
   { id: 'seleccion-anadir', tipo: 'gesto', tecla: '⇧ + clic', modificadores: {}, accion: 'pan', descripcion: 'Alternar una tarjeta en la selección', grupo: 'Selección' },
   { id: 'seleccion-restar', tipo: 'gesto', tecla: '⌥ + marquesina', modificadores: {}, accion: 'pan', descripcion: 'Restar del rectángulo las tarjetas que toca', grupo: 'Selección' },
+  { id: 'foco-entrar', tipo: 'gesto', tecla: 'Tab', modificadores: {}, accion: 'pan', descripcion: 'Entrar al lienzo; Esc sale y devuelve el foco', grupo: 'Selección' },
+  { id: 'foco-vecino', tipo: 'gesto', tecla: '⌥ + flechas', modificadores: {}, accion: 'pan', descripcion: 'Ir a la tarjeta vecina; Enter la selecciona', grupo: 'Selección' },
 
   // Edición
   { id: 'borrar', tipo: 'tecla', tecla: 'suprimir', modificadores: {}, accion: 'borrar', descripcion: 'Eliminar la selección al instante', grupo: 'Edición' },
@@ -156,6 +162,10 @@ export const ATAJOS_LIENZO: AtajoLienzo[] = [
   { id: 'mover-derecha-10', tipo: 'tecla', tecla: 'arrowright', modificadores: { shift: true }, accion: 'moverDerecha10', descripcion: 'Mover la selección 10 px', grupo: 'Mover', repetible: true, oculto: true },
   { id: 'mover-arriba-10', tipo: 'tecla', tecla: 'arrowup', modificadores: { shift: true }, accion: 'moverArriba10', descripcion: 'Mover la selección 10 px', grupo: 'Mover', repetible: true, oculto: true },
   { id: 'mover-abajo-10', tipo: 'tecla', tecla: 'arrowdown', modificadores: { shift: true }, accion: 'moverAbajo10', descripcion: 'Mover la selección 10 px', grupo: 'Mover', repetible: true, oculto: true },
+  { id: 'ancho-menos', tipo: 'tecla', tecla: 'arrowleft', modificadores: { primario: true }, accion: 'redimensionarAnchoMenos', descripcion: 'Redimensionar el ancho −10 px', grupo: 'Mover', repetible: true },
+  { id: 'ancho-mas', tipo: 'tecla', tecla: 'arrowright', modificadores: { primario: true }, accion: 'redimensionarAnchoMas', descripcion: 'Redimensionar el ancho +10 px', grupo: 'Mover', repetible: true, oculto: true },
+  { id: 'alto-menos', tipo: 'tecla', tecla: 'arrowup', modificadores: { primario: true }, accion: 'redimensionarAltoMenos', descripcion: 'Redimensionar el alto −10 px', grupo: 'Mover', repetible: true, oculto: true },
+  { id: 'alto-mas', tipo: 'tecla', tecla: 'arrowdown', modificadores: { primario: true }, accion: 'redimensionarAltoMas', descripcion: 'Redimensionar el alto +10 px', grupo: 'Mover', repetible: true, oculto: true },
 
   // Orden
   { id: 'adelante', tipo: 'tecla', tecla: ']', modificadores: {}, accion: 'traerAdelante', descripcion: 'Traer adelante un paso', grupo: 'Orden' },

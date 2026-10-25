@@ -79,7 +79,8 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
       data-card-type="media"
       data-media-libre={card.media?.kind}
       data-alto={alto === undefined ? 'auto' : 'fijo'}
-      tabIndex={0}
+      tabIndex={-1}
+      aria-selected={selected}
       aria-label={`${esVideo ? 'Vídeo' : 'Imagen'}: ${card.title || 'sin título'}`}
       className={`board-free-media ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${card.locked ? 'is-locked' : ''}`}
       data-locked={card.locked ? 'si' : 'no'}

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, RefreshCw, X } from 'lucide-react';
 import type { BoardDocument } from '../board/model';
 import { pedirLecturas, type LecturaPedida } from '../board/referentes/deepseek';
@@ -10,6 +10,7 @@ import {
   type SeleccionMirada,
 } from '../board/referentes/mirar';
 import type { Lectura } from '../board/referentes/model';
+import { useFocusTrap } from './useFocusTrap';
 import { OJOS } from '../board/referentes/ojos';
 
 interface MirarDialogProps {
@@ -53,6 +54,9 @@ export const MirarDialog: React.FC<MirarDialogProps> = ({
     () => seleccionarReferentes(boards, activeBoardId, semilla, ojosId),
     [activeBoardId, boards, ojosId, semilla],
   );
+
+  const dialogRef = useRef<HTMLElement>(null);
+  useFocusTrap(true, dialogRef);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -136,6 +140,7 @@ export const MirarDialog: React.FC<MirarDialogProps> = ({
       onMouseDown={(event) => { if (event.target === event.currentTarget && !cargando) onClose(); }}
     >
       <section
+        ref={(element) => { dialogRef.current = element; }}
         className="board-dialog board-mirar-dialog"
         role="dialog"
         aria-modal="true"

@@ -54,11 +54,22 @@ export const BoardColumn: React.FC<BoardColumnProps> = ({
       data-card-id={card.id}
       data-card-type="columna"
       data-columna-plegada={data.plegada ? 'si' : 'no'}
-      tabIndex={0}
+      tabIndex={-1}
+      aria-selected={selected}
       aria-label={`Columna: ${card.title || 'sin título'}`}
       className={`board-column ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${dropTarget ? 'drop-target' : ''} ${data.plegada ? 'is-folded' : ''} ${card.locked ? 'is-locked' : ''}`}
       style={{ left: card.x, top: card.y, width: card.width }}
+      onPointerMove={onDragMove}
+      onPointerUp={onDragEnd}
+      onPointerCancel={onDragEnd}
       onClick={(event) => onSelect(card, event)}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect(card, event);
+        }
+      }}
       onPointerEnter={(event) => event.stopPropagation()}
     >
       <div className="board-column-head" onPointerDown={(event) => onDragStart(card, event)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} title="Arrastra para mover la columna">

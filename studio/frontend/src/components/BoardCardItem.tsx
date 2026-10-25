@@ -70,7 +70,8 @@ export const BoardCardItem = React.memo(function BoardCardItem({
         data-card-id={card.id}
         data-card-type={card.type}
         data-locked={card.locked ? 'si' : 'no'}
-        tabIndex={0}
+        tabIndex={-1}
+        aria-selected={selected}
         aria-label={`Tarjeta: ${card.title || 'sin título'}`}
         className={`board-card board-card-compact color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${card.locked ? 'is-locked' : ''}`}
         style={{ left: card.x, top: card.y, width: card.width }}
@@ -96,10 +97,14 @@ export const BoardCardItem = React.memo(function BoardCardItem({
       data-card-id={card.id}
       data-card-type={card.type}
       data-locked={card.locked ? 'si' : 'no'}
-      tabIndex={0}
+      tabIndex={-1}
+      aria-selected={selected}
       aria-label={`Tarjeta: ${card.title || 'sin título'}`}
       className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''} ${connectionTarget ? 'connection-target' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${card.locked ? 'is-locked' : ''}`}
       style={{ left: card.x, top: card.y, width: card.width }}
+      onPointerMove={onDragMove}
+      onPointerUp={onDragEnd}
+      onPointerCancel={onDragEnd}
       onClick={(event) => {
         if (connectMode) {
           const target = event.target as HTMLElement;

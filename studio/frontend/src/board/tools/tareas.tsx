@@ -43,8 +43,11 @@ const TareasVista = ({ datos, editar }: { datos: BoardCard; editar: (datos: Boar
                   (event.target as HTMLInputElement).blur();
                   guardar([...tareas, { id: nuevaTareaId(), texto: '', hecha: false, nivel: tarea.nivel }]);
                 } else if (event.key === 'Tab') {
+                  // Tab ya no cambia datos ni secuestra el foco: pasa al siguiente control.
+                  return;
+                } else if (event.altKey && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
                   event.preventDefault();
-                  cambiar(tarea.id, { nivel: Math.max(0, Math.min(2, tarea.nivel + (event.shiftKey ? -1 : 1))) });
+                  cambiar(tarea.id, { nivel: Math.max(0, Math.min(2, tarea.nivel + (event.key === 'ArrowRight' ? 1 : -1))) });
                 }
               }}
             />

@@ -43,6 +43,7 @@ import {
   type BoardRelation,
 } from '../board/model';
 import { geometriaConector, rectDeTarjeta } from '../board/conectores';
+import { vecinoGeometrico, type Direccion } from '../board/navegacion';
 import { readColumnData, setColumnFolded, columnChildIds } from '../board/columnas';
 import { normalizarVistaPrevia } from '../board/vistaPrevia';
 import { borrarPlantillasLegacy, crearPlantilla, leerPlantillasLegacy, listarPlantillas, materializar, type Plantilla } from '../board/plantillas';
@@ -135,6 +136,7 @@ import { BoardCardItem } from './BoardCardItem';
 import { BoardColumn } from './BoardColumn';
 import { BoardFreeMedia, type EsquinaMedia } from './BoardFreeMedia';
 import { TituloEnSitio } from './InlineEdit';
+import { useFocusTrap } from './useFocusTrap';
 import { MirarDialog } from './MirarDialog';
 import { ArchivoView } from './ArchivoView';
 import { MuroView } from './MuroView';
@@ -356,6 +358,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   /** Referente bajo el puntero: una URL de imagen pegada cae en él. */
   const hoveredReferenteId = useRef<string | null>(null);
   const cardHandlers = useRef<CardHandlers | null>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const algunDialogoAbierto = shortcutsOpen || nestedDialog || templateDialog || linkDialog || projectDialog || pdfReferenceDialog || archiveOpen || Boolean(archiveFullscreenId);
+  useFocusTrap(algunDialogoAbierto, dialogRef);
 
   const projectBoards = activeProjectId
     ? boards.filter((board) => projectIdByBoardId.get(board.id) === activeProjectId)
@@ -1530,9 +1535,6 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       altKey: event.altKey,
       duplicated: false,
     };
-    // Capturar en el pointerdown: un gesto rápido no pierde el primer movimiento
-    // por salir del asa antes de superar el umbral de 3 px.
-    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
     setDraggingIds(ids);
     setDropFrameId(null);
     dropFrameIdRef.current = null;
@@ -2052,6 +2054,25 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     };
     const down = (event: KeyboardEvent) => {
       if (locked) return;
+      // H4 · Alt+flecha va al vecino geométrico, no mueve la tarjeta.
+      if (event.altKey && !event.metaKey && !event.ctrlKey && event.key.startsWith('Arrow') && !esObjetivoDeTexto(event.target)) {
+        if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+        const tablero = activeBoardRef.current;
+        if (!tablero?.cards.length) return;
+        const direccion: Direccion = event.key === 'ArrowLeft' ? 'izquierda'
+          : event.key === 'ArrowRight' ? 'derecha'
+            : event.key === 'ArrowUp' ? 'arriba' : 'abajo';
+        const enfocado = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-card-id]')?.dataset.cardId ?? null;
+        const siguiente = enfocado ? vecinoGeometrico(tablero.cards, enfocado, direccion) : tablero.cards[0].id;
+        if (siguiente) {
+          const elemento = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(siguiente)}"]`);
+          if (elemento) {
+            event.preventDefault();
+            elemento.focus();
+          }
+        }
+        return;
+      }
       const atajo = atajoParaEvento(event);
       if (!atajo) return;
       if (event.repeat && !atajo.repetible) return;
@@ -2917,6 +2938,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const lastArrow = useRef<{ clave: string; at: number }>({ clave: '', at: 0 });
+  const lastResize = useRef<{ clave: string; at: number }>({ clave: '', at: 0 });
 
   /** Borra N tarjetas en un solo paso de historial y ofrece deshacer durante 5 s. */
   const deleteCards = useCallback((ids: readonly string[]) => {
@@ -3012,6 +3034,41 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     updateBoard((actual) => moverTarjetas(actual, ids, dx, dy), { coalesceKey: clave });
   }, [selectedCardIds, updateBoard]);
 
+  /** ⌘+flechas · el mismo cambio de tamaño que un asa, sin ratón. */
+  const redimensionarSeleccion = useCallback((dw: number, dh: number) => {
+    const board = activeBoardRef.current;
+    if (!board || !selectedCardIds.length) return;
+    const ids = new Set(selectedCardIds);
+    const ahora = Date.now();
+    const clave = claveDeRafaga(lastResize.current.clave, lastResize.current.at, ahora);
+    lastResize.current = { clave, at: ahora };
+    const limitar = (valor: number, min: number, max: number) => Math.max(min, Math.min(max, valor));
+    updateBoard((actual) => ({
+      ...actual,
+      cards: actual.cards.map((card) => {
+        if (!ids.has(card.id) || card.locked) return card;
+        if (card.type === 'marco') {
+          const data = readFrameData(card);
+          return {
+            ...card,
+            width: limitar(card.width + dw, FRAME_MIN_SIZE, 2400),
+            datos: { ...card.datos, ...data, alto: limitar(data.alto + dh, FRAME_MIN_SIZE, 100000) },
+          };
+        }
+        if (card.type === 'columna') return { ...card, width: limitar(card.width + dw, 210, 2400) };
+        if (card.type === 'media' && (card.media?.kind === 'image' || card.media?.kind === 'video')) {
+          return {
+            ...card,
+            width: limitar(card.width + dw, 80, 1200),
+            height: limitar((card.height ?? Math.round(card.width * 0.75)) + dh, 60, 2400),
+          };
+        }
+        // Nota y enlace: solo ancho; el alto sigue al contenido (A-1 · D4).
+        return { ...card, width: limitar(card.width + dw, 210, 640) };
+      }),
+    }), { coalesceKey: clave });
+  }, [selectedCardIds, updateBoard]);
+
   const ordenarSeleccion = useCallback((modo: 'adelante' | 'atras' | 'frente' | 'fondo') => {
     if (!selectedCardIds.length) return;
     updateBoard((board) => ({ ...board, cards: reordenarTarjetas(board.cards, selectedCardIds, modo) }));
@@ -3085,6 +3142,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (addMenuOpen) {
       event.preventDefault();
       setAddMenuOpen(false);
+      return true;
+    }
+    const enfocado = document.activeElement as HTMLElement | null;
+    if (enfocado?.closest('[data-card-id]') && !enfocado.closest('input, textarea, select')) {
+      event.preventDefault();
+      enfocado.blur();
+      viewportRef.current?.focus({ preventScroll: true });
       return true;
     }
     if (selectedCardIds.length) {
@@ -3186,6 +3250,18 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         break;
       case 'moverAbajo10':
         moverSeleccion(0, 10);
+        break;
+      case 'redimensionarAnchoMenos':
+        redimensionarSeleccion(-10, 0);
+        break;
+      case 'redimensionarAnchoMas':
+        redimensionarSeleccion(10, 0);
+        break;
+      case 'redimensionarAltoMenos':
+        redimensionarSeleccion(0, -10);
+        break;
+      case 'redimensionarAltoMas':
+        redimensionarSeleccion(0, 10);
         break;
       case 'traerAdelante':
         ordenarSeleccion('adelante');
@@ -3561,8 +3637,20 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       <main
         ref={viewportRef}
-        tabIndex={-1}
+        tabIndex={0}
+        aria-label="Lienzo del tablero"
         className={`board-viewport ${isPanning ? 'panning' : ''} ${spacePanActive ? 'space-pan' : ''} ${handMode ? 'hand-mode' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key !== 'Tab' || event.shiftKey) return;
+          const tarjetas = viewportRef.current?.querySelectorAll<HTMLElement>('[data-card-id]');
+          if (!tarjetas?.length) return;
+          event.preventDefault();
+          const preferida = selectedCardIds.length
+            ? viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${CSS.escape(selectedCardIds[0])}"]`)
+            : null;
+          (preferida ?? tarjetas[0]).focus();
+        }}
         onPointerDown={beginViewportGesture}
         onPointerMove={moveViewportGesture}
         onPointerUp={endViewportGesture}
@@ -3661,10 +3749,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   key={card.id}
                   data-card-id={card.id}
                   data-marco={esEntropia ? 'entropia' : 'libre'}
-                  tabIndex={0}
+                  tabIndex={-1}
+                  aria-selected={selectedCardIds.includes(card.id)}
                   aria-label={`Marco: ${card.title || 'sin título'}`}
                   className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''} ${draggingIds.includes(card.id) ? 'dragging' : ''} ${settlingIds.includes(card.id) ? 'settling' : ''} ${dropFrameId === card.id ? 'drop-target' : ''} ${card.locked ? 'is-locked' : ''}`}
                   style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
+                  onPointerMove={moveCardDrag}
+                  onPointerUp={endCardDrag}
+                  onPointerCancel={endCardDrag}
                   onClick={(event) => handleCardSelection(card.id, event)}
                   onDoubleClick={(event) => {
                     if (frame.vista !== 'archivo') return;
@@ -3676,6 +3768,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                     setArchiveFullscreenId(card.id);
                   }}
                   onBlurCapture={onCardBlur}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      handleCardSelection(card.id, event);
+                    }
+                  }}
                 >
                   <div className="board-frame-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover el marco y sus tarjetas">
                     <span className="board-drag-grip" aria-hidden="true">⠿</span>
@@ -3831,6 +3930,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             {historyStatus === 'nueva' ? ' · sesión nueva' : ' · historial restaurado'}
           </span>
         </div>
+        <div className="sr-only" aria-live="polite" aria-atomic="true" data-testid="selection-live">
+          {selectedCardIds.length === 0
+            ? 'Sin selección'
+            : `${selectedCardIds.length} ${selectedCardIds.length === 1 ? 'seleccionada' : 'seleccionadas'}`}
+        </div>
       </main>
 
         <input ref={importInput} type="file" accept="application/json,.json,text/markdown,.md" hidden onChange={(event) => { void importBoard(event.target.files?.[0]); event.target.value = ''; }} />
@@ -3839,7 +3943,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       </div>
 
       {archiveFullscreenFrame && (
-        <div className="board-archive-fullscreen" role="dialog" aria-modal="true" aria-label={`Archivo a pantalla completa: ${archiveFullscreenFrame.title || 'marco'}`}>
+        <div ref={(element) => { dialogRef.current = element; }} className="board-archive-fullscreen" role="dialog" aria-modal="true" aria-label={`Archivo a pantalla completa: ${archiveFullscreenFrame.title || 'marco'}`}>
           <button type="button" className="archivo-fullscreen-close" onClick={() => setArchiveFullscreenId(null)}>Esc · volver a la pizarra</button>
           <ArchivoView
             frameTitle={archiveFullscreenFrame.title}
@@ -3880,7 +3984,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       {archiveOpen && (
         <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setArchiveOpen(false); }}>
-          <div className="board-dialog board-dialog-wide board-archive-dialog" role="dialog" aria-modal="true" aria-labelledby="board-archive-title">
+          <div ref={(element) => { dialogRef.current = element; }} className="board-dialog board-dialog-wide board-archive-dialog" role="dialog" aria-modal="true" aria-labelledby="board-archive-title">
             <div className="board-dialog-heading">
               <h2 id="board-archive-title">Archivo</h2>
               <button type="button" onClick={() => setArchiveOpen(false)} aria-label="Cerrar Archivo"><X size={16} /></button>
@@ -3924,7 +4028,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       {shortcutsOpen && (
         <div className="board-add-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShortcutsOpen(false); }}>
-          <div className="board-dialog board-shortcuts" role="dialog" aria-modal="true" aria-labelledby="board-shortcuts-title">
+          <div ref={(element) => { dialogRef.current = element; }} className="board-dialog board-shortcuts" role="dialog" aria-modal="true" aria-labelledby="board-shortcuts-title">
             <div className="board-dialog-heading">
               <h2 id="board-shortcuts-title">Atajos del tablero</h2>
               <button type="button" onClick={() => setShortcutsOpen(false)} aria-label="Cerrar atajos"><X size={16} /></button>
@@ -3969,7 +4073,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       {nestedDialog && (
         <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setNestedDialog(false); }}>
-          <div className="board-dialog board-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="board-nested-title">
+          <div ref={(element) => { dialogRef.current = element; }} className="board-dialog board-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="board-nested-title">
             <div className="board-dialog-heading"><h2 id="board-nested-title">Anidar un tablero</h2><button type="button" onClick={() => setNestedDialog(false)} aria-label="Cerrar"><X size={16} /></button></div>
             <p className="board-dialog-hint">La tarjeta guarda solo el vínculo. Al abrirla cambias de tablero sin perder lo que estabas mirando.</p>
             <div className="board-template-grid">
@@ -3987,7 +4091,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       {templateDialog && (
         <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setTemplateDialog(false); }}>
-          <div className="board-dialog board-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="board-template-title">
+          <div ref={(element) => { dialogRef.current = element; }} className="board-dialog board-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="board-template-title">
             <div className="board-dialog-heading"><h2 id="board-template-title">Plantillas de tablero</h2><button type="button" onClick={() => setTemplateDialog(false)} aria-label="Cerrar"><X size={16} /></button></div>
             <p className="board-dialog-hint">Crear una plantilla no copia archivos: solo la estructura de tarjetas, columnas y tareas.</p>
             <div className="board-template-grid">
@@ -4014,7 +4118,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       {linkDialog && (
         <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setLinkDialog(false); }}>
-          <form className="board-dialog" role="dialog" aria-modal="true" aria-labelledby="board-link-title" onSubmit={saveLinkCard}>
+          <form ref={(element) => { dialogRef.current = element; }} className="board-dialog" role="dialog" aria-modal="true" aria-labelledby="board-link-title" onSubmit={saveLinkCard}>
             <div className="board-dialog-heading"><h2 id="board-link-title">Añadir enlace</h2><button type="button" onClick={() => setLinkDialog(false)} aria-label="Cerrar"><X size={16} /></button></div>
             <label>Título<input autoFocus value={linkTitle} onChange={(event) => setLinkTitle(event.target.value)} placeholder="Nombre de la referencia" /></label>
             <label>Dirección web<input type="url" required value={linkUrl} onChange={(event) => setLinkUrl(event.target.value)} placeholder="https://…" /></label>
@@ -4026,7 +4130,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       {projectDialog && (
         <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setProjectDialog(false); }}>
-          <form className="board-dialog" role="dialog" aria-modal="true" aria-labelledby="project-dialog-title" onSubmit={(event) => { void handleCreateProject(event); }}>
+          <form ref={(element) => { dialogRef.current = element; }} className="board-dialog" role="dialog" aria-modal="true" aria-labelledby="project-dialog-title" onSubmit={(event) => { void handleCreateProject(event); }}>
             <div className="board-dialog-heading"><h2 id="project-dialog-title">Crear proyecto</h2><button type="button" onClick={() => setProjectDialog(false)} aria-label="Cerrar"><X size={16} /></button></div>
             <p className="board-dialog-hint">Agrupa tableros y referencias PDF. Los archivos originales permanecen en su ubicación.</p>
             <label>Nombre del proyecto<input autoFocus required maxLength={120} value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Por ejemplo, Investigación" /></label>
@@ -4037,7 +4141,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       {pdfReferenceDialog && (
         <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setPdfReferenceDialog(false); }}>
-          <form className="board-dialog" role="dialog" aria-modal="true" aria-labelledby="pdf-reference-title" onSubmit={(event) => { void handleSavePdfReference(event); }}>
+          <form ref={(element) => { dialogRef.current = element; }} className="board-dialog" role="dialog" aria-modal="true" aria-labelledby="pdf-reference-title" onSubmit={(event) => { void handleSavePdfReference(event); }}>
             <div className="board-dialog-heading"><h2 id="pdf-reference-title">Referenciar página PDF</h2><button type="button" onClick={() => setPdfReferenceDialog(false)} aria-label="Cerrar"><X size={16} /></button></div>
             <p className="board-dialog-hint">{pdfReferenceSource?.filename ?? 'Sin PDF abierto'} · página {pdfReferenceSource?.page ?? '—'}</p>
             <p className="board-dialog-hint">Se guarda el nombre, página y huella del PDF, junto con tu nota. El PDF no se copia.</p>
