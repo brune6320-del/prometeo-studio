@@ -27,7 +27,9 @@ export type AccionLienzo =
   | 'cerrar'
   | 'ayuda'
   | 'herramientas'
-  | 'pan';
+  | 'pan'
+  | 'agrupar'
+  | 'desagrupar';
 
 export type GrupoAyuda = 'Selección' | 'Edición' | 'Mover' | 'Orden' | 'Lienzo' | 'Vistas' | 'Herramientas';
 
@@ -131,10 +133,13 @@ export const ATAJOS_LIENZO: AtajoLienzo[] = [
   // Selección
   { id: 'seleccionar-todo', tipo: 'tecla', tecla: 'a', modificadores: { primario: true }, accion: 'seleccionarTodo', descripcion: 'Seleccionar todas las tarjetas visibles', grupo: 'Selección' },
   { id: 'cerrar', tipo: 'tecla', tecla: 'escape', modificadores: {}, accion: 'cerrar', descripcion: 'Cerrar el diálogo abierto o deseleccionar', grupo: 'Selección' },
-  { id: 'seleccion-anadir', tipo: 'gesto', tecla: '⇧ + clic', modificadores: {}, accion: 'pan', descripcion: 'Añadir o quitar una tarjeta de la selección', grupo: 'Selección' },
+  { id: 'seleccion-anadir', tipo: 'gesto', tecla: '⇧ + clic', modificadores: {}, accion: 'pan', descripcion: 'Alternar una tarjeta en la selección', grupo: 'Selección' },
+  { id: 'seleccion-restar', tipo: 'gesto', tecla: '⌥ + marquesina', modificadores: {}, accion: 'pan', descripcion: 'Restar del rectángulo las tarjetas que toca', grupo: 'Selección' },
 
   // Edición
   { id: 'borrar', tipo: 'tecla', tecla: 'suprimir', modificadores: {}, accion: 'borrar', descripcion: 'Eliminar la selección al instante', grupo: 'Edición' },
+  { id: 'agrupar', tipo: 'tecla', tecla: 'g', modificadores: { primario: true }, accion: 'agrupar', descripcion: 'Agrupar la selección en un marco', grupo: 'Edición' },
+  { id: 'desagrupar', tipo: 'tecla', tecla: 'g', modificadores: { primario: true, shift: true }, accion: 'desagrupar', descripcion: 'Desagrupar sin mover nada', grupo: 'Edición' },
   { id: 'duplicar', tipo: 'tecla', tecla: 'd', modificadores: { primario: true }, accion: 'duplicar', descripcion: 'Duplicar la selección', grupo: 'Edición' },
   { id: 'copiar', tipo: 'tecla', tecla: 'c', modificadores: { primario: true }, accion: 'copiar', descripcion: 'Copiar las tarjetas seleccionadas', grupo: 'Edición' },
   { id: 'cortar', tipo: 'tecla', tecla: 'x', modificadores: { primario: true }, accion: 'cortar', descripcion: 'Cortar las tarjetas seleccionadas', grupo: 'Edición' },
@@ -160,8 +165,8 @@ export const ATAJOS_LIENZO: AtajoLienzo[] = [
 
   // Lienzo
   { id: 'pan', tipo: 'tecla', tecla: 'espacio', modificadores: {}, accion: 'pan', descripcion: 'Espacio + arrastrar: mover el lienzo', grupo: 'Lienzo', repetible: true },
-  { id: 'marquesina', tipo: 'gesto', tecla: 'Arrastrar el fondo', modificadores: {}, accion: 'pan', descripcion: 'Seleccionar tarjetas con un rectángulo', grupo: 'Lienzo' },
-  { id: 'marquesina-anadir', tipo: 'gesto', tecla: '⇧ + arrastrar el fondo', modificadores: {}, accion: 'pan', descripcion: 'Añadir al rectángulo sin perder la selección', grupo: 'Lienzo' },
+  { id: 'marquesina', tipo: 'gesto', tecla: 'Arrastrar el fondo', modificadores: {}, accion: 'pan', descripcion: 'Seleccionar tarjetas con un rectángulo (reemplaza la selección)', grupo: 'Lienzo' },
+  { id: 'marquesina-anadir', tipo: 'gesto', tecla: '⇧ + arrastrar el fondo', modificadores: {}, accion: 'pan', descripcion: 'Sumar el rectángulo a la selección actual', grupo: 'Lienzo' },
   { id: 'rueda', tipo: 'gesto', tecla: 'Rueda o dos dedos', modificadores: {}, accion: 'pan', descripcion: 'Mover el lienzo', grupo: 'Lienzo' },
   { id: 'zoom', tipo: 'gesto', tecla: '⌘/Ctrl + rueda', modificadores: {}, accion: 'pan', descripcion: 'Acercar y alejar', grupo: 'Lienzo' },
   { id: 'duplicar-arrastrando', tipo: 'gesto', tecla: 'Alt/Opción + arrastrar', modificadores: {}, accion: 'pan', descripcion: 'Duplicar una tarjeta', grupo: 'Lienzo' },

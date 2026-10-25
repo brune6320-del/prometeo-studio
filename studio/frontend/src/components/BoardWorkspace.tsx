@@ -10,6 +10,8 @@ import {
   LayoutTemplate,
   Library,
   Link2,
+  Lock,
+  LockOpen,
   Pencil,
   Plus,
   Search,
@@ -68,6 +70,8 @@ import {
   type AtajoLienzo,
 } from '../board/atajos';
 import {
+  alternarEnSeleccion,
+  aplicarMarquesina,
   borrarTarjetas,
   claveDeRafaga,
   duplicarSeleccion,
@@ -294,8 +298,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const gestoVisualTimer = useRef<number | null>(null);
   const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; samples: MuestraInercia[]; captureEl: HTMLElement | null } | null>(null);
   const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; sizes: Map<string, CardSize>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null; lastX: number; lastY: number; lastT: number; altKey: boolean; duplicated: boolean } | null>(null);
-  /** Rectángulo de selección (⇧ + arrastrar el fondo), en coordenadas de pantalla. */
-  const marqueeDrag = useRef<{ pointerId: number; startX: number; startY: number; captureEl: HTMLElement | null } | null>(null);
+  /** Rectángulo de selección (arrastrar el fondo), en coordenadas de pantalla. */
+  const marqueeDrag = useRef<{ pointerId: number; startX: number; startY: number; captureEl: HTMLElement | null; modo: 'reemplazar' | 'sumar' | 'restar' } | null>(null);
   const connectOrigin = useRef<{ cardId: string; pointerId: number } | null>(null);
   /** Herramienta de marco elegida en el menú: el siguiente arrastre dibuja el rectángulo. */
   const [frameToolId, setFrameToolId] = useState<string | null>(null);
@@ -1137,7 +1141,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     marcarGestoVisual();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
-    marqueeDrag.current = { pointerId: event.pointerId, startX: x, startY: y, captureEl: event.currentTarget };
+    const modo = event.altKey ? 'restar' : event.shiftKey ? 'sumar' : 'reemplazar';
+    marqueeDrag.current = { pointerId: event.pointerId, startX: x, startY: y, captureEl: event.currentTarget, modo };
     setMarquee({ x, y, width: 0, height: 0 });
     setGuias({});
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
@@ -1178,12 +1183,17 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       const centroY = caja.y + caja.height / 2;
       return centroX >= a.x && centroX <= b.x && centroY >= a.y && centroY <= b.y;
     }).map((card) => card.id);
-    setSelectedCardIds((current) => [...new Set([...current, ...dentro])]);
+    const modo = drag.modo;
+    setSelectedCardIds((current) => aplicarMarquesina(current, dentro, modo));
     suppressViewportClick.current = true;
     window.setTimeout(() => { suppressViewportClick.current = false; }, 0);
-    setNotice(dentro.length
-      ? `${dentro.length} ${dentro.length === 1 ? 'tarjeta seleccionada' : 'tarjetas seleccionadas'} con el rectángulo.`
-      : 'El rectángulo no tocó ninguna tarjeta.');
+    setNotice(modo === 'reemplazar'
+      ? (dentro.length
+        ? `${dentro.length} ${dentro.length === 1 ? 'tarjeta seleccionada' : 'tarjetas seleccionadas'} con el rectángulo.`
+        : 'El rectángulo no tocó ninguna tarjeta.')
+      : modo === 'sumar'
+        ? `Rectángulo sumado: ${dentro.length} ${dentro.length === 1 ? 'tarjeta más' : 'tarjetas más'}.`
+        : `Rectángulo restado: ${dentro.length} ${dentro.length === 1 ? 'tarjeta' : 'tarjetas'}.`);
   };
 
   const beginPan = (event: React.PointerEvent<HTMLDivElement>, force = false) => {
@@ -1327,12 +1337,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const hasModifier = event.shiftKey || event.metaKey || event.ctrlKey;
     let nextSelection = selectedCardIds;
     if (event.metaKey || event.ctrlKey) {
-      nextSelection = selectedCardIds.includes(card.id)
-        ? selectedCardIds.filter((id) => id !== card.id)
-        : [...selectedCardIds, card.id];
+      nextSelection = alternarEnSeleccion(selectedCardIds, card.id);
       suppressCardClick.current = true;
-    } else if (event.shiftKey && !selectedCardIds.includes(card.id)) {
-      nextSelection = [...selectedCardIds, card.id];
+    } else if (event.shiftKey) {
+      nextSelection = alternarEnSeleccion(selectedCardIds, card.id);
       suppressCardClick.current = true;
     } else if (!hasModifier && !selectedCardIds.includes(card.id)) {
       nextSelection = [card.id];
@@ -1375,6 +1383,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       altKey: event.altKey,
       duplicated: false,
     };
+    // Capturar en el pointerdown: un gesto rápido no pierde el primer movimiento
+    // por salir del asa antes de superar el umbral de 3 px.
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
     setDraggingIds(ids);
     setDropFrameId(null);
     dropFrameIdRef.current = null;
@@ -1507,10 +1518,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
     const destino = dropFrameIdRef.current;
     let final = tablero;
-    if (tablero && destino && !drag.ids.some((id) => {
+    const arrastraContenedor = Boolean(tablero && drag.ids.some((id) => {
       const tipo = tablero.cards.find((item) => item.id === id)?.type;
       return tipo === 'marco' || tipo === 'columna';
-    })) {
+    }));
+    if (tablero && !arrastraContenedor) {
       const adoptados = new Set(drag.ids);
       final = {
         ...tablero,
@@ -1519,14 +1531,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           if (item.type === 'columna') {
             const datos = readColumnData(item);
             const hijos = datos.hijos.filter((id) => !adoptados.has(id));
-            return item.id === destino
+            return destino === item.id
               ? { ...item, datos: { ...item.datos, ...datos, hijos: [...new Set([...hijos, ...drag.ids])] } }
               : { ...item, datos: { ...item.datos, ...datos, hijos } };
           }
           if (item.type !== 'marco') return item;
           const datos = readFrameData(item);
           const hijos = datos.hijos.filter((id) => !adoptados.has(id));
-          return item.id === destino
+          return destino === item.id
             ? { ...item, datos: { ...item.datos, ...datos, hijos: [...new Set([...hijos, ...drag.ids])] } }
             : { ...item, datos: { ...item.datos, ...datos, hijos } };
         }),
@@ -1559,7 +1571,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const startFrameResize = (card: BoardCard, event: React.PointerEvent<HTMLButtonElement>) => {
-    if (event.button !== 0 || !activeBoard) return;
+    if (event.button !== 0 || !activeBoard || card.locked) return;
     event.preventDefault();
     event.stopPropagation();
     detenerInercia();
@@ -1775,6 +1787,78 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }));
   };
 
+  /** ⌘G · un marco nuevo alrededor de la selección, detrás de sus hijos y sin mover nada. */
+  const agruparSeleccion = useCallback(() => {
+    const board = activeBoardRef.current;
+    if (!board) return;
+    const ids = selectedCardIds.filter((id) => {
+      const card = board.cards.find((item) => item.id === id);
+      return Boolean(card && card.type !== 'marco' && !card.locked);
+    });
+    if (!ids.length) {
+      setNotice('Selecciona al menos una tarjeta libre para agruparla en un marco.');
+      return;
+    }
+    const sizes = measureCardSizes();
+    const cajas = board.cards
+      .filter((card) => ids.includes(card.id))
+      .map((card) => rectDeTarjeta(card, sizes.get(card.id)));
+    const izquierda = Math.min(...cajas.map((caja) => caja.x));
+    const arriba = Math.min(...cajas.map((caja) => caja.y));
+    const derecha = Math.max(...cajas.map((caja) => caja.x + caja.width));
+    const abajo = Math.max(...cajas.map((caja) => caja.y + caja.height));
+    const margen = 32;
+    const frame = getBoardTool('marco')?.crear(izquierda - margen, arriba - margen) as BoardCard | undefined;
+    if (!frame) return;
+    const data = readFrameData(frame);
+    const ancho = Math.max(FRAME_MIN_SIZE, derecha - izquierda + margen * 2);
+    const alto = Math.max(FRAME_MIN_SIZE, abajo - arriba + margen * 2);
+    const conHijos: BoardCard = {
+      ...frame,
+      title: 'Grupo',
+      width: ancho,
+      datos: { ...frame.datos, ...data, alto, hijos: ids, vista: 'libre' },
+    };
+    updateBoard((actual) => {
+      const primero = Math.min(...ids.map((id) => actual.cards.findIndex((card) => card.id === id)));
+      const indice = primero < 0 ? actual.cards.length : primero;
+      return {
+        ...actual,
+        cards: [...actual.cards.slice(0, indice), conHijos, ...actual.cards.slice(indice)],
+      };
+    });
+    setSelectedCardIds([conHijos.id]);
+    setNotice(`Grupo creado con ${ids.length} ${ids.length === 1 ? 'tarjeta' : 'tarjetas'}.`);
+  }, [measureCardSizes, selectedCardIds, updateBoard]);
+
+  /** ⌘⇧G · quita el marco (o saca las tarjetas seleccionadas) sin tocar posiciones. */
+  const desagruparSeleccion = useCallback(() => {
+    const board = activeBoardRef.current;
+    if (!board || !selectedCardIds.length) return;
+    const seleccionadas = new Set(selectedCardIds);
+    const marcos = board.cards.filter((card) => seleccionadas.has(card.id) && card.type === 'marco');
+    const sueltas = board.cards.filter((card) => seleccionadas.has(card.id) && card.type !== 'marco');
+    if (!marcos.length && !sueltas.length) return;
+    const quitar = new Set([...marcos.map((card) => card.id), ...sueltas.map((card) => card.id)]);
+    updateBoard((actual) => ({
+      ...actual,
+      cards: actual.cards
+        .filter((card) => !marcos.some((marco) => marco.id === card.id))
+        .map((card) => {
+          if (card.type !== 'marco' && card.type !== 'columna') return card;
+          const data = card.type === 'marco' ? readFrameData(card) : readColumnData(card);
+          const hijos = data.hijos.filter((id) => !quitar.has(id));
+          return hijos.length === data.hijos.length
+            ? card
+            : { ...card, datos: { ...card.datos, ...data, hijos } };
+        }),
+    }));
+    setSelectedCardIds((current) => current.filter((id) => !marcos.some((marco) => marco.id === id)));
+    setNotice(marcos.length
+      ? `${marcos.length} ${marcos.length === 1 ? 'marco desagrupado' : 'marcos desagrupados'} sin mover ninguna tarjeta.`
+      : `${sueltas.length} ${sueltas.length === 1 ? 'tarjeta liberada' : 'tarjetas liberadas'} del marco.`);
+  }, [selectedCardIds, updateBoard]);
+
   const mostrarAviso = useCallback((texto: string, deshacer?: () => void, historial = false) => {
     if (avisoTimer.current) window.clearTimeout(avisoTimer.current);
     setAviso({ texto, deshacer, historial });
@@ -1863,9 +1947,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       return;
     }
     if (event.metaKey || event.ctrlKey) {
-      setSelectedCardIds((current) => current.includes(cardId) ? current.filter((id) => id !== cardId) : [...current, cardId]);
+      setSelectedCardIds((current) => alternarEnSeleccion(current, cardId));
     } else if (event.shiftKey) {
-      setSelectedCardIds((current) => current.includes(cardId) ? current : [...current, cardId]);
+      setSelectedCardIds((current) => alternarEnSeleccion(current, cardId));
     } else {
       setSelectedCardIds([cardId]);
     }
@@ -2926,6 +3010,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       case 'duplicar':
         duplicarSeleccionActual();
         break;
+      case 'agrupar':
+        agruparSeleccion();
+        break;
+      case 'desagrupar':
+        desagruparSeleccion();
+        break;
       case 'moverIzquierda':
         moverSeleccion(-1, 0);
         break;
@@ -3418,7 +3508,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   data-marco={esEntropia ? 'entropia' : 'libre'}
                   tabIndex={0}
                   aria-label={`Marco: ${card.title || 'sin título'}`}
-                  className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''} ${draggingIds.includes(card.id) ? 'dragging' : ''} ${settlingIds.includes(card.id) ? 'settling' : ''} ${dropFrameId === card.id ? 'drop-target' : ''}`}
+                  className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''} ${draggingIds.includes(card.id) ? 'dragging' : ''} ${settlingIds.includes(card.id) ? 'settling' : ''} ${dropFrameId === card.id ? 'drop-target' : ''} ${card.locked ? 'is-locked' : ''}`}
                   style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
                   onClick={(event) => handleCardSelection(card.id, event)}
                   onDoubleClick={(event) => {
@@ -3457,7 +3547,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                         aria-label={`Publicar ${card.title || 'marco'}`}
                       >{publishingFrameId === card.id ? '…' : 'Publicar'}</button>
                     )}
-                    <button className="board-frame-delete" onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar marco" title="Eliminar el marco y dejar sus tarjetas"><X size={14} /></button>
+                    <button
+                      type="button"
+                      className="board-frame-lock"
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onClick={(event) => { event.stopPropagation(); updateCard(card.id, { locked: !card.locked }); }}
+                      aria-label={card.locked ? 'Desbloquear marco' : 'Bloquear marco'}
+                      title={card.locked ? 'Desbloquear' : 'Bloquear posición, tamaño y borrado'}
+                    >{card.locked ? <Lock size={13} /> : <LockOpen size={13} />}</button>
+                    <button className="board-frame-delete" disabled={card.locked} onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar marco" title="Eliminar el marco y dejar sus tarjetas"><X size={14} /></button>
                   </div>
                   {esEntropia ? (
                     <EntropiaVista

@@ -4,6 +4,20 @@ import { readColumnData } from './columnas';
 import { readFrameData } from './frames';
 
 export type OrdenTarjetas = 'adelante' | 'atras' | 'frente' | 'fondo';
+export type ModoMarquesina = 'reemplazar' | 'sumar' | 'restar';
+
+/** Contrato de A-1 · D1: la marquesina reemplaza; ⇧ suma; ⌥ resta. */
+export function aplicarMarquesina(actual: readonly string[], dentro: readonly string[], modo: ModoMarquesina): string[] {
+  if (modo === 'reemplazar') return [...new Set(dentro)];
+  if (modo === 'sumar') return [...new Set([...actual, ...dentro])];
+  const quitar = new Set(dentro);
+  return actual.filter((id) => !quitar.has(id));
+}
+
+/** ⇧+clic y ⌘+clic alternan: nunca acumulan sin querer. */
+export function alternarEnSeleccion(actual: readonly string[], id: string): string[] {
+  return actual.includes(id) ? actual.filter((item) => item !== id) : [...actual, id];
+}
 
 /**
  * Tablero activo, no sus tableros anidados: cada documento guarda sus propias

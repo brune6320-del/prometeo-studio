@@ -462,6 +462,14 @@ Checklist antes de dar una herramienta por terminada:
 4. ¿Persiste tras recargar y el estado «Guardado» solo aparece con IndexedDB confirmado?
 5. ¿Existe el test del gesto visible (Playwright) y el del modelo (vitest)?
 
+### Pertenencia única (decisión de Forja 4 · H2)
+
+Una tarjeta pertenece **a un solo marco o columna a la vez**. Adoptar en otro contenedor
+la saca del anterior en el mismo gesto; arrastrarla al vacío la deja libre. La pertenencia
+nunca es invisible: se puede comprobar en `datos.hijos` y deshacer en un solo paso. Un marco
+sigue siendo también una lente: cambiar entre Libre, Archivo, Muro y Mesa no toca `x`, `y`,
+`width` ni `hijos`.
+
 ## 15. Cómo lo usan los agentes
 
 Orden de lectura: **este DESIGN.md → skill de la tarea → código existente**.

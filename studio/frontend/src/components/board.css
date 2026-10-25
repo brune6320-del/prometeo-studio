@@ -5462,3 +5462,27 @@
   .board-archive-item { grid-template-columns: minmax(0, 1fr) auto; }
   .board-archive-kind { grid-column: 1 / -1; }
 }
+
+/* ── H2 · marco contenedor y lente ─────────────────────────────────────── */
+.board-frame-lock {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--fg-3);
+  background: transparent;
+  cursor: pointer;
+}
+
+.board-frame-lock:hover {
+  color: var(--fg-1);
+  background: var(--state-hover);
+}
+
+.board-frame.is-locked {
+  border-style: dashed;
+}

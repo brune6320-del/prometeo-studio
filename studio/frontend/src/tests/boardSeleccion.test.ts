@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createBoard, createCard, type BoardCard } from '../board/model';
 import { emptyBoardHistory, recordBoardChange, undoBoardChange } from '../board/history';
 import {
+  alternarEnSeleccion,
+  aplicarMarquesina,
   borrarTarjetas,
   claveDeRafaga,
   duplicarSeleccion,
@@ -157,5 +159,21 @@ describe('T-2 · seleccionar todo', () => {
     // El documento activo no contiene las tarjetas del otro tablero.
     expect(seleccionarTodoElTablero(board)).toEqual(['nota', 'anidado']);
     expect(board.cards.some((card) => card.id === 'interna')).toBe(false);
+  });
+});
+
+describe('H2 · contrato de selección (A-1 · D1)', () => {
+  it('la marquesina reemplaza, ⇧ suma y ⌥ resta', () => {
+    expect(aplicarMarquesina(['a'], ['b'], 'reemplazar')).toEqual(['b']);
+    expect(aplicarMarquesina(['a'], ['b'], 'sumar')).toEqual(['a', 'b']);
+    expect(aplicarMarquesina(['a', 'b'], ['b'], 'restar')).toEqual(['a']);
+    expect(aplicarMarquesina([], ['b'], 'restar')).toEqual([]);
+  });
+
+  it('⇧+clic alterna sin duplicar', () => {
+    expect(alternarEnSeleccion([], 'a')).toEqual(['a']);
+    expect(alternarEnSeleccion(['a'], 'b')).toEqual(['a', 'b']);
+    expect(alternarEnSeleccion(['a', 'b'], 'a')).toEqual(['b']);
+    expect(alternarEnSeleccion(['a', 'b'], 'b')).toEqual(['a']);
   });
 });
