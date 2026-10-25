@@ -7,7 +7,9 @@
 | Último commit | `7e89ae2` (G3) |
 | Fases cerradas | **G0, G1, G2, G3** |
 | Siguiente fase | **G4 · Irene** (alcance sin spec localizada; ver §5) |
-| Push | **Nunca.** No se ha hecho push. |
+| Push | **Nunca desde aquí.** El remoto es `github.com/brune6320-del/prometeo-studio`; Bruno hace el push. |
+
+**Ramas de otros agentes:** `studio/recortador` y `studio/indice-visual`. No tocar `tools/recortador/` ni `tools/indice/` ni mergearlas desde esta rama.
 
 ## 1. Hashes
 
