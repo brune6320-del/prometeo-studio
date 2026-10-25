@@ -4,9 +4,9 @@
 |---|---|
 | Rama | `studio/collage` |
 | Fecha | 2026-10-25 |
-| Último commit | `4796665` (G2) |
-| Fases cerradas | **G0, G1, G2** |
-| Siguiente fase | **G3 · Paridad Milanote (las 10 de G0)** |
+| Último commit | `7e89ae2` (G3) |
+| Fases cerradas | **G0, G1, G2, G3** |
+| Siguiente fase | **G4 · Irene** (alcance sin spec localizada; ver §5) |
 | Push | **Nunca.** No se ha hecho push. |
 
 ## 1. Hashes
@@ -16,66 +16,56 @@
 | G0 · Inventario | `11bf05f` | `REPORTES/G0-milanote.md`, capturas de referencia, config Playwright Forja 3 |
 | G1 · Trackpad | `2b5394a` | capturas de puntero, limpieza de gestos, rueda estable, `gesture*` de WebKit, inercia/rubber-band, imán con guías, inclinación, hover, 3 tests Playwright |
 | G2 · Medios libres | `4796665` | imagen/vídeo como objeto libre, `BoardFreeMedia`, redimensionar con proporción, drop del Finder, Cmd+V de imagen, vídeo silenciado, 2 tests Playwright |
+| G3 · Paridad Milanote | `7e89ae2` | las 10 de `G0-milanote.md` §3: conectores, rectángulo, Alt+arrastrar, columnas, tareas, URL preview por backend, formato de nota, tablero anidado, bloqueo y plantillas; `REPORTES/G3-paridad.md`; 10 tests Playwright |
 
-## 2. Comprobaciones del último cierre (G2)
+## 2. Comprobaciones del último cierre (G3)
 
 Ejecutadas dentro de `studio/frontend`:
 
 | Comprobación | Resultado |
 |---|---|
 | `npx tsc -b` | limpio |
-| `npx vitest run` | 29 archivos, 165 tests |
+| `npx vitest run` | 30 archivos, 176 tests |
 | `npx oxlint` | 0 errores; warnings preexistentes y de pureza/refs ya declarados |
 | `npx vite build` | correcto |
-| `npx playwright test -c playwright.forja3.config.ts g2-medios` | 2 tests, 2 pasan |
+| `npx playwright test -c playwright.forja3.config.ts` | 16 tests, 16 pasan (G0, G1, G2 y G3) |
 
-Capturas en `REPORTES/capturas-forja3/`: `g0-antes.png`, `g0-despues.png`, `g1-antes.png`, `g1-despues.png`, `g2-antes.png`, `g2-despues.png`, `g2-despues-imagenes.png`.
+Backend: `python3 -m py_compile studio/backend/app.py` correcto. El endpoint `GET /api/url-preview` se probó con el Python empaquetado: bloquea `127.0.0.1` y `ftp://`, normaliza la URL y devuelve `Example Domain` desde `https://example.com/`. Detalle en `REPORTES/G3-paridad.md`.
+
+Capturas en `REPORTES/capturas-forja3/`: `g0-antes.png`, `g0-despues.png`, `g1-antes.png`, `g1-despues.png`, `g2-antes.png`, `g2-despues.png`, `g2-despues-imagenes.png`, `g3-despues.png`.
 
 ## 3. Lo que quedó verificado (E1)
 
-- **G1:** 200 gestos mezclados (pinceladas de pellizco, dos dedos, arrastre de fondo, arrastre de tarjeta, doble clic, cambio de vista y cambio de tablero) sin `panning` ni `dragging` colgados; la rueda sigue moviendo la cámara después de cada bloque; ningún overlay invisible tapa el centro.
-- **G1:** los eventos `gesturestart/gesturechange/gestureend` de WebKit se traducen al zoom de cámara; `requestAnimationFrame` medido a **61,3 fps** en este Brave/Chromium (entorno de 60 Hz).
-- **G1:** hover con subida de 1,5 px y sombra; inclinación según velocidad; asentado con muelle; guías rosadas; `prefers-reduced-motion` apaga inclinación, asentado y transiciones.
-- **G2:** vídeo 1920×1080 libre, `videoWidth` 1920 a 200 % de zoom, proporción 16:9, silencio por defecto, play/pausa con clic, redimensionado desde esquina manteniendo proporción; Shift libera la proporción.
-- **G2:** drop del Finder y Cmd+V de imagen crean objetos libres de 1920×1080; el título/comentario solo se ve al pasar el ratón.
+- **G1:** 200 gestos mezclados sin `panning` ni `dragging` colgados; la rueda sigue moviendo la cámara; zoom por `gesture*` de WebKit; `requestAnimationFrame` a 61,7 fps en este entorno; hover, inclinación, guías y `prefers-reduced-motion`.
+- **G2:** vídeo 1920×1080 libre, `videoWidth` 1920 a 200 % de zoom, 16:9, silencio por defecto, play/pausa, redimensionado con proporción; drop del Finder y Cmd+V crean objetos libres.
+- **G3:** conector con tirador y ancla lateral, etiqueta con doble clic y curva que se recalcula al mover; ⇧ + rectángulo selecciona 3 tarjetas y muestra la barra de alineación; Alt+arrastrar deja 1 original + 1 copia; una nota suelta entra en una columna, la columna se pliega y conserva su hijo; tareas marcan, añaden y guardan; URL con vista previa pinta título, descripción e imagen; tablero anidado se crea y se abre; plantilla «Proyecto» crea 3 columnas; tarjeta bloqueada no se mueve ni se borra hasta desbloquear; nota con título, negrita, lista, cita y código se pinta al abrir y ofrece barra de formato.
+- **G3 URL preview:** el bloqueo SSRF resuelve el host y revalida la URL final tras redirección. No fija la IP durante la conexión: queda como **H1** declarado, no como garantía SPEC.
 
-### 120 Hz
+## 4. Deuda acumulada
 
-No hay un tope artificial de 60 en el código: no existe `setTimeout(…, 16)`; cámara, inercia y guías usan `requestAnimationFrame`. No se encontró una opción **documentada** de WKWebView/Tauri para forzar 120 Hz. No se aplicó ningún truco no documentado. Queda anotado como límite: el WebView empaquetado no se ha medido en un Mac con ProMotion.
-
-### Bug de producto encontrado y cerrado en G1
-
-El selector de tablero leía `event.target.value` **después** de `await flushBoardWrites()`. Al ser un select controlado, el valor ya se había revertido y el cambio de tablero se perdía. Ahora el destino se guarda antes del `await`. El test de 200 gestos lo cubre cambiando de tablero 25 veces.
-
-## 4. Siguiente: G3
-
-Alcance ya fijado en `G0-milanote.md` §3:
-
-1. Conectores que siguen a las tarjetas (tirador, ancla y actualización al mover).
-2. Selección múltiple con rectángulo.
-3. Alt/Opción + arrastrar duplica.
-4. Columnas contenedoras.
-5. Listas de tareas.
-6. Pegar URL con vista previa **por el backend local**, sin claves en el frontend.
-7. Notas con formato mínimo.
-8. Tablero dentro de tablero como tarjeta.
-9. Bloquear tarjeta.
-10. Plantillas de tablero.
-
-Obligatorios dentro de las 10: conectores, rectángulo, Alt+arrastrar, columnas, tareas y URL con vista previa.
-
-## 5. Deuda declarada
-
-- **G3–G8 pendientes.** No se ha tocado código de G3.
+- **G4–G8 pendientes.** No se ha tocado código de G4.
+- **G3 · rectángulo:** exige `⇧` para no quitarle el pan al fondo (G1). Si se quiere arrastre simple, mover el pan a Espacio+arrastrar (fila 15 de G0, G7).
+- **G3 · columnas:** no se redimensionan a mano; el orden es por altura, no manual.
+- **G3 · conectores:** no hay selector visual de color/grosor; el modelo ya guarda `tone`.
+- **G3 · plantillas:** las guardadas viven en `localStorage`, no viajan con el proyecto.
 - **Trackpad físico:** Playwright simula rueda y puntero; falta la prueba de Bruno en la app de escritorio (WKWebView) con dedos reales.
 - **120 Hz:** no medido en WKWebView empaquetado; no hay opción documentada que aplicar.
-- **Medios:** los archivos siguen guardándose como data URL dentro del tablero (límite 12 MB). No hay miniaturas; a menos del 35 % el navegador reescala la fuente completa.
-- **G3 URL preview:** requiere endpoint local; hoy no existe en `studio/backend/app.py` (comprobado).
+- **Medios:** data URL dentro del tablero (límite 12 MB); sin miniaturas.
 - **G0:** la columna «Milanote» se basa en ayuda pública; no se hizo ingeniería inversa ni se copiaron assets.
+
+## 5. Siguiente: G4, con una precisión
+
+Se buscó el encargo `SUPER-2-forja3.txt` en `~/Desktop/deepseek-trabajo`, `/mnt` y el repo: **no existe en esta máquina**. De la supercampaña solo quedan los nombres de fase (`G4 Irene`, `G5 Open Design + open-codesign`, `G6 editor PDF`, `G7 detalles`, `G8 caza de errores`).
+
+La única referencia a «Irene» en el material disponible es la vista **Archivo** (`docs/STUDIO/04-LIENZO-ARCHIVO.md`, `ArchivoView.tsx`, `ARCHIVO` en los reportes H-4/H-5) y la regla de collage `irene`. **G4 no se abrió para no inventar un alcance.** Antes de codificarla hay que fijar si significa:
+
+1. pulir la vista Archivo existente (deudas de H-4: pausar vídeos inactivos, teclado, móvil, contador), o
+2. llevar el tono Irene a toda la app, o
+3. la regla de collage `irene` en la Vista de Entropía.
 
 ## 6. Cómo retomar
 
-1. Leer este archivo, `G0-milanote.md`, `docs/STUDIO/DESIGN.md` y `prometeo-fisica`.
-2. Abrir G3 por el registro (`src/board/tools/registry.ts`): un archivo por herramienta, una línea de registro y su test.
-3. Cerrar G3 con las cuatro comprobaciones + Playwright + capturas antes/después y commit `studio: G3 …`.
-4. No avanzar a G4 con algo en rojo.
+1. Leer este archivo, `G0-milanote.md`, `G3-paridad.md`, `docs/STUDIO/DESIGN.md` y `docs/STUDIO/04-LIENZO-ARCHIVO.md`.
+2. Fijar el alcance de G4 (los tres caminos de §5) y escribirlo en `REPORTES/G4-irene.md` antes de tocar código.
+3. Cerrar cada fase con las cuatro comprobaciones + Playwright + captura antes/después y commit `studio: G4 …`.
+4. No avanzar a G5 con algo en rojo.
