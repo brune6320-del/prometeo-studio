@@ -171,6 +171,73 @@ export function slideIndex(current: number, length: number, delta: number): numb
   return ((start + (Number.isFinite(delta) ? Math.trunc(delta) : 0)) % size + size) % size;
 }
 
+/** Contador legible del carrusel: «1 / 3»; con lista vacía, «0 / 0». */
+export function slideCounter(current: number, length: number): string {
+  if (!Number.isFinite(length) || length <= 0) return '0 / 0';
+  const size = Math.trunc(length);
+  const start = Number.isFinite(current) ? Math.trunc(current) : 0;
+  const safe = Math.min(size - 1, Math.max(0, start));
+  return `${safe + 1} / ${size}`;
+}
+
+function yearFromValue(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 1900 && value <= 2100) return value;
+  if (typeof value !== 'string') return null;
+  const match = value.match(/\b(19\d{2}|20\d{2}|2100)\b/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  return year >= 1900 && year <= 2100 ? year : null;
+}
+
+/**
+ * Año del bloque: primero `datos.año`/`datos.ano`/`datos.year` de sus piezas,
+ * después el primer año de cuatro cifras en código, título o texto.
+ * Si no hay dato, devuelve null; no se inventa una fecha.
+ */
+export function blockYear(block: ArchiveBlock): number | null {
+  for (const item of block.items) {
+    const raw = item.datos;
+    if (typeof raw !== 'object' || raw === null) continue;
+    for (const key of ['año', 'ano', 'year']) {
+      const year = yearFromValue((raw as Record<string, unknown>)[key]);
+      if (year !== null) return year;
+    }
+  }
+  for (const value of [block.code, block.title, block.text]) {
+    const year = yearFromValue(value);
+    if (year !== null) return year;
+  }
+  return null;
+}
+
+export interface YearRow {
+  year: number | null;
+  label: string;
+  blocks: ArchiveBlock[];
+}
+
+/**
+ * Filas por año, de más reciente a más antiguo y «Sin año» al final.
+ * Solo entran bloques con medios: un bloque de solo texto no tiene tira que enseñar.
+ */
+export function groupBlocksByYear(blocks: readonly ArchiveBlock[]): YearRow[] {
+  const rows = new Map<number | null, ArchiveBlock[]>();
+  for (const block of blocks) {
+    if (block.items.length === 0) continue;
+    const year = blockYear(block);
+    const list = rows.get(year) ?? [];
+    list.push(block);
+    rows.set(year, list);
+  }
+  return [...rows.entries()]
+    .sort(([left], [right]) => {
+      if (left === null) return 1;
+      if (right === null) return -1;
+      return right - left;
+    })
+    .map(([year, list]) => ({ year, label: year === null ? 'Sin año' : String(year), blocks: list }));
+}
+
 /** Reloj vivo en formato HH:MM:SS, sin depender del locale del sistema. */
 export function formatClock(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, '0');

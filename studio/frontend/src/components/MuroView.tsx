@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { BoardCard } from '../board/model';
+import { slideCounter } from '../board/archivo';
 import {
   buildMuro,
   distributeMuroColumns,
@@ -8,6 +9,7 @@ import {
   muroOrder,
   stepIndex,
 } from '../board/vistas/muro';
+import { MediaObject } from './MediaObject';
 
 /**
  * Vista «Muro» de un marco: hojas de contacto en columnas con el código de cada
@@ -66,11 +68,29 @@ export const MuroView: React.FC<{
           <div className="muro-lightbox-meta">
             <span className="muro-code">{activeItem.code || '—'}</span>
             <strong>{activeItem.title}</strong>
-            <span className="muro-lightbox-count">{activeIndex + 1} / {order.length}</span>
+            <span className="muro-lightbox-count">{slideCounter(activeIndex, order.length)}</span>
           </div>
           <button type="button" className="muro-lightbox-close" onClick={() => setActiveId(null)} aria-label="Cerrar caja de luz" title="Cerrar (Esc)">ⓧ</button>
         </div>
         <div className="muro-lightbox-stage">
+          <button
+            type="button"
+            className="muro-lightbox-zone previous"
+            onClick={() => {
+              const target = order[stepIndex(activeIndex, order.length, -1)];
+              if (target) setActiveId(target.id);
+            }}
+            aria-label="Pieza anterior (mitad izquierda)"
+          />
+          <button
+            type="button"
+            className="muro-lightbox-zone next"
+            onClick={() => {
+              const target = order[stepIndex(activeIndex, order.length, 1)];
+              if (target) setActiveId(target.id);
+            }}
+            aria-label="Pieza siguiente (mitad derecha)"
+          />
           <button
             type="button"
             className="muro-lightbox-nav previous"
@@ -91,7 +111,7 @@ export const MuroView: React.FC<{
             aria-label="Pieza siguiente"
           >→</button>
         </div>
-        <div className="muro-lightbox-hint"><span>← →</span> recorrer · <span>Esc</span> cerrar</div>
+        <div className="muro-lightbox-hint"><span>clic izquierda / derecha</span> o <span>← →</span> · <span>Esc</span> cerrar</div>
       </div>,
       document.body,
     )
@@ -137,36 +157,12 @@ export const MuroView: React.FC<{
 };
 
 function renderMedia(card: BoardCard, lightbox = false): React.ReactNode {
-  const media = card.media;
-  if (!media) return <span className="muro-media-missing">{card.title || 'Sin medio'}</span>;
-  if (media.kind === 'image') {
-    return <img src={media.dataUrl} alt={card.title || media.name} draggable={false} />;
-  }
-  if (media.kind === 'video') {
-    return (
-      <video
-        src={media.dataUrl}
-        muted
-        loop
-        playsInline
-        autoPlay={lightbox}
-        controls={lightbox}
-        preload={lightbox ? 'auto' : 'metadata'}
-        aria-label={card.title || media.name}
-      />
-    );
-  }
-  if (media.kind === 'audio') {
-    return (
-      <span className="muro-media-file">
-        <span>{media.name}</span>
-        {lightbox && <audio src={media.dataUrl} controls autoPlay preload="metadata" />}
-      </span>
-    );
-  }
   return (
-    <span className="muro-media-file">
-      <a href={media.dataUrl} download={media.name} onClick={(event) => event.stopPropagation()}>{media.name}</a>
-    </span>
+    <MediaObject
+      card={card}
+      playing={lightbox}
+      controls={lightbox}
+      className={lightbox ? 'muro-lightbox-object' : 'muro-thumb-object'}
+    />
   );
 }

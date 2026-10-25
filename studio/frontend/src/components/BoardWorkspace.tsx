@@ -2841,12 +2841,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   ) : frame.vista === 'archivo' ? (
                     <>
                       <ArchivoView frameTitle={card.title} cards={activeBoard.cards} childIds={frame.hijos} />
-                      <div className="board-frame-hint">Doble clic: pantalla completa · Esc para volver</div>
+                      <div className="board-frame-hint">Doble clic en el proyecto: pliego · en el encabezado: pantalla completa</div>
                     </>
                   ) : frame.vista === 'muro' ? (
                     <>
                       <MuroView frameTitle={card.title} cards={activeBoard.cards} childIds={frame.hijos} width={Math.max(180, card.width)} />
-                      <div className="board-frame-hint">Clic en una miniatura: caja de luz</div>
+                      <div className="board-frame-hint">Clic en una miniatura: caja de luz · ← → recorren</div>
                     </>
                   ) : frame.vista === 'mesa' ? (
                     <MesaView frameTitle={card.title} cards={activeBoard.cards} childIds={frame.hijos} width={Math.max(180, card.width)} />

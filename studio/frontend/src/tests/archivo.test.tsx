@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { BoardCard } from '../board/model';
 import { normalizeBoard } from '../board/model';
-import { buildArchive, formatClock, paragraphs, slideIndex } from '../board/archivo';
+import { blockYear, buildArchive, formatClock, groupBlocksByYear, paragraphs, slideCounter, slideIndex } from '../board/archivo';
 import { readFrameData, setFrameView } from '../board/frames';
 import { ArchivoView } from '../components/ArchivoView';
 
@@ -79,6 +79,44 @@ describe('archivo: carrusel circular', () => {
     expect(slideIndex(0, 1, 1)).toBe(0);
     expect(slideIndex(0, 1, -1)).toBe(0);
   });
+
+  it('el contador es 1-based y no se sale de la lista', () => {
+    expect(slideCounter(0, 3)).toBe('1 / 3');
+    expect(slideCounter(2, 3)).toBe('3 / 3');
+    expect(slideCounter(9, 3)).toBe('3 / 3');
+    expect(slideCounter(-2, 3)).toBe('1 / 3');
+    expect(slideCounter(0, 0)).toBe('0 / 0');
+  });
+});
+
+describe('archivo: filas por año', () => {
+  const cards = [
+    card('e1', 'etiqueta', { title: 'IN EXHIBITION', body: 'DE-P01.01' }),
+    card('m1', 'media', { title: 'Pareidolìa', datos: { año: 2024 }, media: { name: 'a.png', mimeType: 'image/png', dataUrl: 'data:image/png;base64,AAAA', kind: 'image' } }),
+    card('e2', 'etiqueta', { title: 'RESEARCH', body: 'AR-P01.01' }),
+    media('m2', 'The Century of the Bed 1999'),
+    card('e3', 'etiqueta', { title: 'RADIO', body: 'FI-P01.01' }),
+    media('m3', 'Sin fecha'),
+  ];
+  const blocks = buildArchive(cards, cards.map((item) => item.id)).blocks;
+
+  it('lee datos.año, luego el primer año del código, título o texto', () => {
+    expect(blockYear(blocks[0])).toBe(2024);
+    expect(blockYear(blocks[1])).toBe(1999);
+    expect(blockYear(blocks[2])).toBeNull();
+  });
+
+  it('ordena de más reciente a más antiguo y deja «Sin año» al final', () => {
+    const rows = groupBlocksByYear(blocks);
+    expect(rows.map((row) => row.label)).toEqual(['2024', '1999', 'Sin año']);
+    expect(rows[0].blocks).toHaveLength(1);
+    expect(rows[2].blocks[0].title).toBe('Sin fecha');
+  });
+
+  it('los bloques de solo texto no crean fila', () => {
+    const onlyText = buildArchive([card('n', 'note', { title: '2020', body: 'Sin medios' })], ['n']).blocks;
+    expect(groupBlocksByYear(onlyText)).toEqual([]);
+  });
 });
 
 describe('archivo: cambiar de vista no toca posiciones ni datos', () => {
@@ -143,5 +181,7 @@ describe('archivo: utilidades de presentación', () => {
     expect(html).toContain('Un dispositivo especulativo.');
     expect(html).toMatch(/\d{2}:\d{2}:\d{2}/);
     expect((html.match(/class="archivo-col /g) ?? []).length).toBe(3);
+    expect(html).toContain('1 / 2');
+    expect(html).toContain('archivo-counter');
   });
 });
