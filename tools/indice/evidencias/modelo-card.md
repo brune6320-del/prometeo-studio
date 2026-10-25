@@ -8,7 +8,7 @@ widget:
   example_title: Cat & Dog
 ---
 
-# SigLIP (base-sized model) 
+# SigLIP (base-sized model)
 
 SigLIP model pre-trained on WebLi at resolution 224x224. It was introduced in the paper [Sigmoid Loss for Language Image Pre-Training](https://arxiv.org/abs/2303.15343) by Zhai et al. and first released in [this repository](https://github.com/google-research/big_vision).
 
@@ -100,7 +100,7 @@ alt="drawing" width="600"/>
 
 ```bibtex
 @misc{zhai2023sigmoid,
-      title={Sigmoid Loss for Language Image Pre-Training}, 
+      title={Sigmoid Loss for Language Image Pre-Training},
       author={Xiaohua Zhai and Basil Mustafa and Alexander Kolesnikov and Lucas Beyer},
       year={2023},
       eprint={2303.15343},
