@@ -66,6 +66,17 @@ class IndiceSinteticoTest(unittest.TestCase):
             self.assertTrue(all(max(im.size) <= 513 for im, _ in paginas))
             for imagen, _ in paginas:
                 imagen.close()
+            gustos = origen / "gustos.json"
+            gustos.write_text(json.dumps({"referentes": {sha_pdf: 2}, "items": [
+                {"ruta": "recortador/pieza.png", "voto": "✕"}]}))
+            resumen = exportar(destino, base / "dataset")
+            registros = []
+            for nombre in ("train", "holdout"):
+                registros.extend(json.loads(x) for x in
+                                 (base / "dataset" / f"{nombre}.jsonl").read_text().splitlines())
+            self.assertEqual({x["pagina"] for x in registros if x["tipo"] == "pagina_pdf"}, {1, 2})
+            self.assertEqual(len({x["split"] for x in registros if x["tipo"] == "pagina_pdf"}), 1)
+            self.assertEqual(resumen["raices_medios"]["recortador"], str(recortes))
             # Una raíz de recortes ya incluida no debe duplicarse.
             segundo = construir_indice(base, base / "otro-indice", CodificadorFalso(),
                                        recortes=recortes)
@@ -176,6 +187,34 @@ class IndiceSinteticoTest(unittest.TestCase):
             self.assertEqual(len({x["split"] for x in registros if x["sha256_archivo"] == sha_a}), 1)
             with self.assertRaises(ValueError):
                 exportar(indice_dir, salida, gustos, porcentaje=25)
+            # También se validan asignaciones de fuentes que ya no están en el índice.
+            congelado_path = salida / "holdout.json"
+            corrupto = json.loads(congelado_path.read_text())
+            corrupto["asignaciones"]["0" * 64] = "alterado"
+            congelado_path.write_text(json.dumps(corrupto))
+            with self.assertRaises(ValueError):
+                exportar(indice_dir, salida, gustos)
+
+    def test_exportar_protege_gustos_y_funciona_sin_etiquetas(self):
+        cache = Path(__file__).parent / ".cache"
+        cache.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=cache) as temporal:
+            base = Path(temporal)
+            origen = base / "origen"
+            origen.mkdir()
+            Image.new("RGB", (24, 24), "red").save(origen / "a.png")
+            indice_dir = base / "indice"
+            construir_indice(origen, indice_dir, CodificadorFalso(), recortes=None)
+            salida = base / "dataset"
+            resumen = exportar(indice_dir, salida)
+            self.assertEqual(resumen["totales"], {"train": 0, "holdout": 0, "sin_etiqueta": 1})
+            # El nombre del archivo no autoriza a escribir sobre una entrada de gustos.
+            gustos = salida / "train.jsonl"
+            contenido = '{"items": [{"ruta": "a.png", "voto": "♥"}]}'
+            gustos.write_text(contenido)
+            with self.assertRaises(ValueError):
+                exportar(indice_dir, salida, gustos)
+            self.assertEqual(gustos.read_text(), contenido)
 
 
 if __name__ == "__main__":

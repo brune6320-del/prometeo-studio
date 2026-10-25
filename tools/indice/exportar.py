@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import math
 from pathlib import Path
 
 from buscar import cargar_indice
@@ -43,7 +44,8 @@ def leer_gustos(path: Path | None) -> tuple[dict[str, tuple[str, float | None]],
         referentes = datos.get("referentes", {})
         if isinstance(referentes, dict):
             for clave, peso in referentes.items():
-                if isinstance(clave, str) and isinstance(peso, (int, float)) and not isinstance(peso, bool):
+                if (isinstance(clave, str) and isinstance(peso, (int, float))
+                        and not isinstance(peso, bool) and math.isfinite(peso)):
                     if peso > 1:
                         etiquetas[clave] = ("♥", float(peso))
                     elif peso < 1:
@@ -85,7 +87,8 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
     salida = salida.expanduser().resolve()
     _, indice = cargar_indice(indice_dir)
     if gustos is None:
-        for candidato in (Path(indice["raiz"]) / "gustos.json", indice_dir / "gustos.json"):
+        for candidato in (Path(indice["raiz"]) / "gustos.json", indice_dir / "gustos.json",
+                          Path(__file__).resolve().parents[2] / "gustos.json"):
             if candidato.is_file():
                 gustos = candidato
                 break
@@ -94,6 +97,12 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
         if not gustos.is_file():
             raise FileNotFoundError(gustos)
     etiquetas, sha_gustos = leer_gustos(gustos)
+    protegidos = {indice_dir / "indice.json", indice_dir / "vectores.npz"}
+    if gustos is not None:
+        protegidos.add(gustos)
+    nombres = {"holdout.json", "train.jsonl", "holdout.jsonl", "sin_etiqueta.jsonl", "manifest.json"}
+    if any((salida / nombre).resolve() in protegidos for nombre in nombres):
+        raise ValueError("La salida sobrescribiría una entrada de solo lectura")
     salida.mkdir(parents=True, exist_ok=True)
     congelado_path = salida / "holdout.json"
     if congelado_path.exists():
@@ -103,6 +112,9 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
         asignaciones = congelado.get("asignaciones", {})
         if not isinstance(asignaciones, dict):
             raise ValueError("holdout.json inválido")
+        for sha, split in asignaciones.items():
+            if split != split_sha(sha, porcentaje, sal):
+                raise ValueError(f"Asignación congelada inconsistente para {sha}")
     else:
         asignaciones = {}
     usados = set()
@@ -125,8 +137,11 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
             "sha256_archivo": sha,
             "sha256_visual": item["sha256_visual"],
             "ruta": item["ruta"],
+            "ruta_fuente": item.get("ruta_fuente", item["ruta"]),
+            "origen": item.get("origen", "carpeta"),
             "tipo": item["tipo"],
             "fotograma": item.get("fotograma"),
+            "pagina": item.get("pagina"),
             "split": split,
             "etiqueta": etiqueta,
             "peso_gusto": peso,
@@ -145,6 +160,7 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
         "version": 1,
         "indice": str(indice_dir),
         "raiz_medios": indice["raiz"],
+        "raices_medios": indice.get("raices", {"carpeta": indice["raiz"]}),
         "sha256_indice_json": sha256_archivo(indice_dir / "indice.json"),
         "sha256_vectores_npz": sha256_archivo(indice_dir / "vectores.npz"),
         "gustos": str(gustos) if gustos else None,
