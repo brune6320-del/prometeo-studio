@@ -4,9 +4,9 @@
 |---|---|
 | Rama | `studio/collage` |
 | Fecha | 2026-10-25 |
-| Último commit | `6f64c7e` (G5) |
-| Fases cerradas | **G0, G1, G2, G3, G4, G5** |
-| Siguiente fase | **G6 · editor PDF** |
+| Último commit | `4c335d6` (G6) |
+| Fases cerradas | **G0, G1, G2, G3, G4, G5, G6** |
+| Siguiente fase | **G7 · detalles** |
 | Push | **Nunca desde aquí.** El remoto es `github.com/brune6320-del/prometeo-studio`; Bruno hace el push. |
 
 **Ramas de otros agentes:** `studio/recortador` y `studio/indice-visual`. No tocar `tools/recortador/` ni `tools/indice/` ni mergearlas desde esta rama.
@@ -21,22 +21,25 @@
 | G3 · Paridad Milanote | `7e89ae2` | las 10 de `G0-milanote.md` §3: conectores, rectángulo, Alt+arrastrar, columnas, tareas, URL preview por backend, formato de nota, tablero anidado, bloqueo y plantillas; `REPORTES/G3-paridad.md`; 10 tests Playwright |
 | G4 · Irene, 2.ª pasada | `4b898f5` | deuda H-4 (vídeos inactivos, flechas, contador, móvil), pliego de dos páginas, filas por año, zonas de cursor en muro, tono mono/punteado en Archivo, Muro y Mesa; `REPORTES/G4-irene.md`; 4 tests unitarios y 5 E2E nuevos |
 | G5 · Open Design | `6f64c7e` | clone y licencias verificadas, estudio de catálogos de skills/sistemas, «+ Más» navegable con búsqueda/categorías/vista previa, selector de sistema por tablero (Forja 2 + Archivo Irene); `PROCEDENCIA.md`, `REPORTES/G5-open-design.md`; 7 tests unitarios y 2 E2E |
+| G6 · Editor PDF | `4c335d6` | reintento de parche idempotente (reutiliza la operación), tabla «Comprobación / Esperado / Obtenido», checks vectoriales y raster, paneles plegables y ventana estrecha; `REPORTES/G6-pdf.md`; 3 tests unittest y 3 E2E con motor real |
 
-## 2. Comprobaciones del último cierre (G5)
+## 2. Comprobaciones del último cierre (G6)
 
 Ejecutadas dentro de `studio/frontend`:
 
 | Comprobación | Resultado |
 |---|---|
 | `npx tsc -b` | limpio |
-| `npx vitest run` | 32 archivos, 187 tests |
-| `npx oxlint` | 0 errores; sin warnings nuevos en los archivos de G5 |
+| `npx vitest run` | 33 archivos, 191 tests |
+| `npx oxlint` | 0 errores; sin warnings nuevos en los archivos de G6 |
 | `npx vite build` | correcto (aviso de chunk > 500 kB, ya existente) |
 | `npx playwright test -c playwright.forja3.config.ts` | 23 tests, 23 pasan (G0–G5) |
+| `playwright.config.ts g6-pdf.spec.ts` | 3 tests, 3 pasan con motor real |
+| `unittest tests.studio.test_g6_pdf` | 3 tests, 3 pasan con `case_a` y `case_b_scan` |
 
 Backend sin cambios en G4. El endpoint `GET /api/url-preview` sigue como se cerró en G3. Detalle en `REPORTES/G3-paridad.md`.
 
-Capturas en `REPORTES/capturas-forja3/`: las de G0–G4 más `g5-antes-mas.png`, `g5-despues-mas.png`, `g5-despues-irene.png`.
+Capturas en `REPORTES/capturas-forja3/`: las de G0–G5 más `g6-antes-760.png`, `g6-antes-520.png`, `g6-despues-760.png`, `g6-despues-520.png`, `g6-despues-reintento.png`, `g6-despues-fallo.png`.
 
 ## 3. Lo que quedó verificado (E1)
 
@@ -48,7 +51,7 @@ Capturas en `REPORTES/capturas-forja3/`: las de G0–G4 más `g5-antes-mas.png`,
 
 ## 4. Deuda acumulada
 
-- **G6–G8 pendientes.** No se ha tocado código de G6.
+- **G7–G8 pendientes.** No se ha tocado código de G7.
 - **G5 · biblioteca:** el test de G3 que abría «Tablero anidado» se adaptó al nuevo flujo (elegir + «Añadir al tablero»); no cambió la app para complacer al test.
 - **G5 · sistemas:** el sistema Irene cambia tokens, no la geometría interna de cada herramienta. No se copió código de los repos estudiados; ver `PROCEDENCIA.md`.
 - **G3 · rectángulo:** exige `⇧` para no quitarle el pan al fondo (G1). Si se quiere arrastre simple, mover el pan a Espacio+arrastrar (fila 15 de G0, G7).
@@ -60,19 +63,20 @@ Capturas en `REPORTES/capturas-forja3/`: las de G0–G4 más `g5-antes-mas.png`,
 - **Medios:** data URL dentro del tablero (límite 12 MB); sin miniaturas.
 - **G0:** la columna «Milanote» se basa en ayuda pública; no se hizo ingeniería inversa ni se copiaron assets.
 
-## 5. Siguiente: G6 · editor PDF
+## 5. Siguiente: G7 · detalles
 
 Alcance del encargo de Bruno:
 
-1. Con los PDFs de «Abrir un ejemplo…» (no documentos de terceros), reparar «Observación … ya ha sido preparada en esta transacción» al reintentar un cambio: reintentar debe rehacer o reutilizar la preparación, no fallar.
-2. Mostrar por qué falla la verificación: qué comprobación, qué valor esperado y cuál obtuvo.
-3. Adaptar la interfaz al achicar la ventana: nada en blanco, paneles plegables.
-4. Tests con los ejemplos.
-5. Escribir el alcance en `REPORTES/G6-pdf.md` antes de codificar.
+1. Renombrar proyecto con doble clic.
+2. Editar la URL de un enlace con doble clic.
+3. Atajos visibles en un panel «?».
+4. Mover las plantillas guardadas de `localStorage` al proyecto.
+5. Rectángulo de selección sin ⇧ si el pan pasa a Espacio+arrastrar o dos dedos.
+6. Escribir el alcance en `REPORTES/G7-detalles.md` antes de codificar.
 
 ## 6. Cómo retomar
 
 1. Leer este archivo, `G4-irene.md`, `G0-milanote.md`, `G3-paridad.md` y `docs/STUDIO/DESIGN.md`.
-2. Escribir el alcance de G6 en `REPORTES/G6-pdf.md` antes de tocar código.
-3. Cerrar cada fase con las cuatro comprobaciones + Playwright + captura antes/después y commit `studio: G6 …`.
-4. No avanzar a G7 con algo en rojo.
+2. Escribir el alcance de G7 en `REPORTES/G7-detalles.md` antes de tocar código.
+3. Cerrar cada fase con las cuatro comprobaciones + Playwright + captura antes/después y commit `studio: G7 …`.
+4. No avanzar a G8 con algo en rojo.
