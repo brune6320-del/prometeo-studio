@@ -1,0 +1,8 @@
+numpy>=1.24,<3
+Pillow>=10,<12
+torch>=2.2,<3
+transformers>=4.44,<5
+huggingface-hub>=0.24,<1
+safetensors>=0.4,<1
+
+# Para indexar fotogramas de video: pip install opencv-python-headless>=4.8,<5
