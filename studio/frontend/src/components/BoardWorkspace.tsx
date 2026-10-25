@@ -56,7 +56,17 @@ import { leerReferente, type Lectura } from '../board/referentes/model';
 import { loadBoardWorkspace } from '../board/storage';
 import { BoardCardContent } from '../board/tools/CardView';
 import { BoardToolMenu } from '../board/tools/menu';
-import { getBoardTool } from '../board/tools/registry';
+import { getBoardTool, listBoardTools } from '../board/tools/registry';
+import { EntropiaVista } from '../board/tools/entropiaVista';
+import {
+  esMarcoEntropia,
+  leerEntropia,
+  nuevaSemilla,
+  tirarEntropia,
+  type EntropiaDatos,
+  type FuenteEntropia,
+} from '../board/vanguardia/entropia';
+import { gustosVacios, like, nope, type Gustos } from '../board/vanguardia/gustos';
 import { enqueueBoardSave, flushBoardWrites, removeBoardFromStore, rememberActiveBoard } from '../board/saveQueue';
 import { publishFrameToDirectory } from '../board/publicar';
 import {
@@ -73,6 +83,7 @@ import {
   loadProjectWorkspace,
   removeBoardProjectLink,
   savePdfReference,
+  saveProjectGustos,
   setActiveProject,
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
@@ -214,6 +225,28 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const archiveFullscreenFrame = archiveFullscreenId
     ? activeBoard?.cards.find((card) => card.id === archiveFullscreenId && card.type === 'marco') ?? null
     : null;
+
+  /** Referentes de todo el proyecto: son las fuentes posibles de una tirada de Entropía. */
+  const fuentesEntropia = useMemo<FuenteEntropia[]>(() => {
+    const sourceBoards = projectBoards.length ? projectBoards : activeBoard ? [activeBoard] : [];
+    const vistas = new Set<string>();
+    const fuentes: FuenteEntropia[] = [];
+    for (const board of sourceBoards) {
+      for (const card of board.cards) {
+        if (card.type !== 'referente' || vistas.has(card.id)) continue;
+        vistas.add(card.id);
+        const referente = leerReferente(card);
+        const imagen = referente.imagenes[0];
+        fuentes.push({
+          id: card.id,
+          nombre: referente.nombre || card.title || 'Referente sin nombre',
+          etiquetas: referente.etiquetas,
+          ...(imagen ? { imagen: { src: imagen.dataUrl, nombre: imagen.name } } : {}),
+        });
+      }
+    }
+    return fuentes;
+  }, [projectBoards, activeBoard]);
 
   const leaveBoard = async () => {
     // Salir con cambios que no están confirmados en el almacenamiento sería perderlos: se queda y se explica.
@@ -436,7 +469,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const tool = getBoardTool(toolId);
     if (!tool || !activeBoard) return;
     const frame = tool.crear(rect.x, rect.y) as BoardCard;
-    const children = cardsInsideFrame(activeBoard.cards, rect, measureCardSizes());
+    // Entropía pinta copias de las fuentes, no adopta las tarjetas que queden debajo.
+    const children = esMarcoEntropia(frame) ? [] : cardsInsideFrame(activeBoard.cards, rect, measureCardSizes());
     const data = readFrameData(frame);
     frame.width = Math.max(FRAME_MIN_SIZE, rect.width);
     frame.datos = {
@@ -1117,6 +1151,77 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     updateBoard((board) => ({ ...board, cards: board.cards.map((card) => card.id === next.id ? next : card) }), { coalesceKey });
   }, [activeBoard, updateBoard]);
 
+  /** La memoria de gusto vive en el proyecto y se escribe en su propio almacén. */
+  const actualizarGustosProyecto = useCallback((actualizar: (gustos: Gustos) => Gustos) => {
+    if (!activeProject) {
+      setNotice('Entropía necesita un proyecto activo para recordar el gusto.');
+      return;
+    }
+    const siguiente = actualizar(activeProject.gustos);
+    setProjects((current) => current.map((project) =>
+      project.id === activeProject.id
+        ? { ...project, gustos: siguiente, updatedAt: new Date().toISOString() }
+        : project,
+    ));
+    void saveProjectGustos(activeProject.id, siguiente).catch((error: unknown) => {
+      setNotice(error instanceof Error ? error.message : 'No se pudo guardar la memoria de gusto.');
+    });
+  }, [activeProject]);
+
+  /** Tira con una semilla (nueva o la indicada) y deja la tirada dentro del marco. */
+  const tirarEnMarcoEntropia = (card: BoardCard, semilla: string = nuevaSemilla()) => {
+    const frame = readFrameData(card);
+    const tamano = { ancho: Math.max(120, card.width), alto: Math.max(120, frame.alto - 96) };
+    try {
+      const tirada = tirarEntropia({
+        semilla,
+        fuentes: fuentesEntropia,
+        herramientas: listBoardTools().map((tool) => ({ id: tool.id, nombre: tool.nombre })),
+        tamano,
+        gustos: activeProject?.gustos ?? gustosVacios(),
+      });
+      updateCard(card.id, { datos: { ...card.datos, ...tirada } });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'No se pudo tirar la combinación.');
+    }
+  };
+
+  const combinacionDeTirada = (datos: EntropiaDatos) => ({
+    semilla: datos.semilla,
+    referentes: datos.fuentes,
+    herramienta: datos.herramienta,
+    regla: datos.regla,
+    restriccion: datos.restriccion,
+    azarPuro: datos.azarPuro,
+  });
+
+  /** ♥ guarda una copia con procedencia y suma 1 a los gustos del proyecto. */
+  const guardarCollageEntropia = (card: BoardCard) => {
+    const datos = leerEntropia(card);
+    if (!datos) return;
+    const guardado: EntropiaDatos = { ...datos, guardado: true, creado: new Date().toISOString() };
+    const nueva: BoardCard = {
+      ...card,
+      id: newBoardId('card'),
+      x: card.x + card.width + 32,
+      y: card.y,
+      title: `Collage · ${datos.reglaNombre || datos.regla}`,
+      datos: { ...card.datos, ...guardado, hijos: [], vista: 'libre' },
+    };
+    updateBoard((board) => ({ ...board, cards: [...board.cards, nueva] }));
+    setSelectedCardIds([nueva.id]);
+    actualizarGustosProyecto((gustos) => like(gustos, combinacionDeTirada(datos)));
+    setNotice(`Collage guardado con la semilla ${datos.semilla}.`);
+  };
+
+  /** ✕ solo resta 1 a los gustos; la tirada se queda como estaba. */
+  const descartarCollageEntropia = (card: BoardCard) => {
+    const datos = leerEntropia(card);
+    if (!datos) return;
+    actualizarGustosProyecto((gustos) => nope(gustos, combinacionDeTirada(datos)));
+    setNotice('Entropía: «no» recordado sin tocar el collage.');
+  };
+
   /**
    * Pegar una URL de imagen sobre un Referente (o con uno seleccionado) añade un
    * medio que apunta a esa fuente con la fecha del día. No descarga la imagen.
@@ -1361,11 +1466,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             if (card.type === 'marco') {
               const frame = readFrameData(card);
               const childCount = frame.hijos.filter((id) => cardsById.has(id)).length;
+              const esEntropia = esMarcoEntropia(card);
+              const collage = esEntropia ? leerEntropia(card) : null;
               return (
                 <article
                   key={card.id}
                   data-card-id={card.id}
-                  className={`board-frame ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''}`}
+                  data-marco={esEntropia ? 'entropia' : 'libre'}
+                  className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''}`}
                   style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
                   onClick={(event) => handleCardSelection(card.id, event)}
                   onDoubleClick={(event) => {
@@ -1382,27 +1490,40 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   <div className="board-frame-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover el marco y sus tarjetas">
                     <span className="board-drag-grip" aria-hidden="true">⠿</span>
                     <input className="board-frame-title" value={card.title} maxLength={200} onChange={(event) => updateCard(card.id, { title: event.target.value })} aria-label="Título del marco" />
-                    <label className="board-frame-view">
-                      Ver como
-                      <select value={frame.vista} onChange={(event) => updateFrameView(card.id, event.target.value as FrameView)} aria-label={`Ver como: ${card.title || 'marco'}`}>
-                        <option value="libre">Libre</option>
-                        <option value="archivo">Archivo</option>
-                        <option value="muro">Muro</option>
-                        <option value="mesa">Mesa de luz</option>
-                      </select>
-                    </label>
-                    <button
-                      className="board-frame-publish"
-                      type="button"
-                      disabled={publishingFrameId === card.id}
-                      onPointerDown={(event) => event.stopPropagation()}
-                      onClick={(event) => { event.stopPropagation(); void publishFrame(card); }}
-                      title="Publicar esta vista como web local (index.html + style.css + media/)"
-                      aria-label={`Publicar ${card.title || 'marco'}`}
-                    >{publishingFrameId === card.id ? '…' : 'Publicar'}</button>
+                    {!esEntropia && (
+                      <label className="board-frame-view">
+                        Ver como
+                        <select value={frame.vista} onChange={(event) => updateFrameView(card.id, event.target.value as FrameView)} aria-label={`Ver como: ${card.title || 'marco'}`}>
+                          <option value="libre">Libre</option>
+                          <option value="archivo">Archivo</option>
+                          <option value="muro">Muro</option>
+                          <option value="mesa">Mesa de luz</option>
+                        </select>
+                      </label>
+                    )}
+                    {!esEntropia && (
+                      <button
+                        className="board-frame-publish"
+                        type="button"
+                        disabled={publishingFrameId === card.id}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => { event.stopPropagation(); void publishFrame(card); }}
+                        title="Publicar esta vista como web local (index.html + style.css + media/)"
+                        aria-label={`Publicar ${card.title || 'marco'}`}
+                      >{publishingFrameId === card.id ? '…' : 'Publicar'}</button>
+                    )}
                     <button className="board-frame-delete" onClick={(event) => { event.stopPropagation(); removeCard(card.id); }} aria-label="Eliminar marco" title="Eliminar el marco y dejar sus tarjetas"><X size={14} /></button>
                   </div>
-                  {frame.vista === 'archivo' ? (
+                  {esEntropia ? (
+                    <EntropiaVista
+                      datos={collage}
+                      fuentes={fuentesEntropia}
+                      onTirar={() => tirarEnMarcoEntropia(card)}
+                      onOtra={() => tirarEnMarcoEntropia(card, nuevaSemilla())}
+                      onLike={() => guardarCollageEntropia(card)}
+                      onNope={() => descartarCollageEntropia(card)}
+                    />
+                  ) : frame.vista === 'archivo' ? (
                     <>
                       <ArchivoView frameTitle={card.title} cards={activeBoard.cards} childIds={frame.hijos} />
                       <div className="board-frame-hint">Doble clic: pantalla completa · Esc para volver</div>

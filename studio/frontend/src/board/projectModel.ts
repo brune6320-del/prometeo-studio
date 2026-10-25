@@ -1,4 +1,5 @@
 import { boardFilename, type BoardDocument } from './model';
+import { gustosVacios, normalizarGustos, type Gustos } from './vanguardia/gustos';
 
 export const PROJECT_WORKSPACE_SCHEMA_VERSION = 2 as const;
 
@@ -8,6 +9,8 @@ export interface BoardProject {
   name: string;
   createdAt: string;
   updatedAt: string;
+  /** Memoria de gusto de la vanguardia (♥/✕). Vive en el proyecto, no en localStorage. */
+  gustos: Gustos;
 }
 
 export interface BoardProjectLink {
@@ -117,6 +120,7 @@ export function createBoardProject(name: string): BoardProject {
     name: cleanSingleLine(name, 'Proyecto nuevo', 120),
     createdAt: now,
     updatedAt: now,
+    gustos: gustosVacios(),
   };
 }
 
@@ -130,6 +134,7 @@ export function normalizeBoardProject(value: unknown): BoardProject | null {
     name: cleanSingleLine(value.name, 'Proyecto sin nombre', 120),
     createdAt: validTimestamp(value.createdAt),
     updatedAt: validTimestamp(value.updatedAt),
+    gustos: normalizarGustos(value.gustos),
   };
 }
 

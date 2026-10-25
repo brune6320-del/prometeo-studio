@@ -2521,3 +2521,124 @@
   .board-mirar-propuesta header { flex-direction: column; }
   .board-mirar-propuesta header small { text-align: left; }
 }
+
+/* Entropía: marco de collage con procedencia visible (semilla · regla · restricción · fuentes). */
+.board-frame.is-entropia {
+  background: #131316;
+  border-color: rgba(255, 138, 82, 0.75);
+  overflow: hidden;
+}
+
+.board-frame.is-entropia.is-guardado {
+  border-style: solid;
+}
+
+.board-entropia {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: 0;
+  padding: 6px 8px 8px;
+}
+
+.board-entropia-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0;
+  color: #9b9ba6;
+  font-size: 9.5px;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.board-entropia-semilla {
+  color: #d0d0d8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+}
+
+.board-entropia-vacio {
+  margin: 0;
+  padding: 10px 4px;
+  color: #9b9ba6;
+  font-size: 11px;
+}
+
+.board-entropia-lienzo {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 70px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #e9e4da;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+
+.board-entropia-pieza {
+  position: absolute;
+  overflow: hidden;
+  background: #f4f0e9;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.32), 0 1px 2px rgba(0, 0, 0, 0.2);
+  transform-origin: center;
+}
+
+.board-entropia-pieza img {
+  display: block;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+}
+
+.board-entropia-pieza.sin-imagen {
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  color: #5b5852;
+  font-size: 10px;
+  line-height: 1.2;
+  text-align: center;
+  background: repeating-linear-gradient(135deg, #f4f0e9 0 7px, #ece6db 7px 14px);
+}
+
+.board-entropia-acciones {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.board-entropia-acciones button {
+  min-width: 28px;
+  min-height: 25px;
+  padding: 2px 9px;
+  border: 1px solid rgba(255, 138, 82, 0.45);
+  border-radius: 6px;
+  color: #ededf2;
+  background: rgba(255, 138, 82, 0.1);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.board-entropia-acciones button:hover {
+  border-color: rgba(255, 138, 82, 0.9);
+  background: rgba(255, 138, 82, 0.24);
+}
+
+.board-entropia-acciones .board-entropia-tirar {
+  border-color: rgba(255, 138, 82, 0.85);
+  background: rgba(255, 138, 82, 0.2);
+  font-weight: 700;
+}
+
+.board-entropia-acciones .board-entropia-like {
+  color: #ff9d9d;
+}
+
+.board-entropia-acciones .board-entropia-nope {
+  color: #b9b9c4;
+}

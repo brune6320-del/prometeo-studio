@@ -10,6 +10,7 @@ import {
   type BoardProjectLink,
   type PdfReference,
 } from './projectModel';
+import { normalizarGustos, type Gustos } from './vanguardia/gustos';
 
 const DATABASE_NAME = 'prometeo-studio-project-workspace';
 const DATABASE_VERSION = 2;
@@ -281,6 +282,34 @@ export async function createProject(name: string): Promise<BoardProject> {
     throw error;
   }
   return project;
+}
+
+export async function saveProjectGustos(projectId: string, gustos: Gustos): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(PROJECTS_STORE, 'readwrite');
+  const finished = transactionFinished(transaction);
+  const store = transaction.objectStore(PROJECTS_STORE);
+  const request = store.get(projectId);
+  let missing = false;
+  request.onsuccess = () => {
+    const project = normalizeBoardProject(request.result);
+    if (!project) {
+      missing = true;
+      try { transaction.abort(); } catch { /* transaction already closed */ }
+      return;
+    }
+    store.put({
+      ...project,
+      gustos: normalizarGustos(gustos),
+      updatedAt: new Date().toISOString(),
+    } satisfies BoardProject);
+  };
+  try {
+    await finished;
+  } catch (error) {
+    if (missing) throw new Error('El proyecto ya no existe en el almacenamiento local.');
+    throw error;
+  }
 }
 
 export async function setActiveProject(projectId: string): Promise<void> {
