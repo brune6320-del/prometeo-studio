@@ -66,7 +66,7 @@ import {
   type EntropiaDatos,
   type FuenteEntropia,
 } from '../board/vanguardia/entropia';
-import { gustosVacios, like, nope, type Gustos } from '../board/vanguardia/gustos';
+import { gustosVacios, importarGustosParciales, like, nope, type Gustos } from '../board/vanguardia/gustos';
 import { enqueueBoardSave, flushBoardWrites, removeBoardFromStore, rememberActiveBoard } from '../board/saveQueue';
 import { publishFrameToDirectory } from '../board/publicar';
 import {
@@ -197,6 +197,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const previousBoardId = useRef('');
   const importInput = useRef<HTMLInputElement>(null);
   const mediaInput = useRef<HTMLInputElement>(null);
+  const gustosInput = useRef<HTMLInputElement>(null);
   /** Referente bajo el puntero: una URL de imagen pegada cae en él. */
   const hoveredReferenteId = useRef<string | null>(null);
 
@@ -1068,6 +1069,33 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       : `Tablero «Biblioteca» actualizado: ${result.referentes} referentes en ${result.marcos} marcos, sin duplicados.`);
   };
 
+  /** Suma los ♥/✕ de un `gustos-parcial.json` a la memoria del proyecto activo. */
+  const importGustos = async (file?: File) => {
+    if (!file) return;
+    if (!activeProject) {
+      setNotice('Entropía necesita un proyecto activo para recordar el gusto.');
+      return;
+    }
+    if (file.size > 2_000_000) {
+      setNotice('El archivo de gustos es demasiado grande (máximo 2 MB).');
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(await file.text());
+    } catch {
+      setNotice('El archivo de gustos no es un JSON válido.');
+      return;
+    }
+    const resultado = importarGustosParciales(activeProject.gustos, parsed);
+    if (!resultado.likes && !resultado.nopes) {
+      setNotice('El archivo no tiene votos de Entropía válidos.');
+      return;
+    }
+    actualizarGustosProyecto(() => resultado.gustos);
+    setNotice(`Gustos importados: ${resultado.likes} ♥ y ${resultado.nopes} ✕${resultado.ignorados ? `; ${resultado.ignorados} ignorados` : ''}.`);
+  };
+
   const exportJson = () => {
     if (!activeBoard) return;
     downloadText(boardFilename(activeBoard.title, 'json'), JSON.stringify(makeBoardExport(activeBoard), null, 2), 'application/json');
@@ -1394,12 +1422,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         <div className="board-spacer" />
         <button className="board-tool" onClick={() => setMirarOpen(true)} title="Elegir tres referentes y unos ojos, y pedir tres lecturas"><Eye size={14} /> Volver a mirar</button>
         <button className="board-tool" onClick={() => void importReferentes()} title="Crear o actualizar el tablero Biblioteca con los referentes de los vídeos"><Library size={14} /> Importar referentes</button>
+        <button className="board-tool" onClick={() => gustosInput.current?.click()} title="Sumar los ♥/✕ de un gustos-parcial.json a este proyecto">Importar gustos</button>
         <button className="board-tool" onClick={exportReferentesObsidian} title="Descargar un ZIP con una nota Markdown por referente, con enlaces entre los del mismo marco"><BookOpen size={14} /> Referentes a Obsidian</button>
         <button className="board-tool" onClick={() => importInput.current?.click()}><Upload size={14} /> Importar</button>
         <button className="board-tool" onClick={exportJson}><Download size={14} /> Exportar JSON</button>
         <button className="board-tool" onClick={exportMarkdown}>Obsidian Markdown</button>
         <input ref={importInput} type="file" accept="application/json,.json,text/markdown,.md" hidden onChange={(event) => { void importBoard(event.target.files?.[0]); event.target.value = ''; }} />
         <input ref={mediaInput} type="file" accept="image/*,video/*,audio/*,application/pdf,text/plain,.txt" hidden onChange={(event) => { void addMedia(event.target.files?.[0]); event.target.value = ''; }} />
+        <input ref={gustosInput} type="file" accept="application/json,.json" hidden aria-label="Archivo de gustos parciales" onChange={(event) => { void importGustos(event.target.files?.[0]); event.target.value = ''; }} />
       </nav>
 
       {engineMessage && <div className="board-engine-notice" role="status"><span>{engineMessage}</span>{onRetryEngine && <button className="board-tool" onClick={onRetryEngine}>Reintentar motor PDF</button>}</div>}

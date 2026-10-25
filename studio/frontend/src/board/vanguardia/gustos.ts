@@ -131,3 +131,103 @@ export function gustosDesdeJson(texto: string): Gustos | null {
     return null;
   }
 }
+
+/** Voto de una noche de entropía; se importa a la memoria del proyecto. */
+export type VotoParcial = 'like' | 'nope';
+
+export interface GustoParcial {
+  semilla: string;
+  referentes: string[];
+  regla: string;
+  herramienta: string;
+  restriccion: string;
+  voto: VotoParcial;
+}
+
+export interface ResultadoGustosParciales {
+  gustos: Gustos;
+  likes: number;
+  nopes: number;
+  ignorados: number;
+}
+
+export const MAX_GUSTOS_PARCIALES = 5000;
+
+function idDe(value: unknown): string {
+  if (typeof value === 'string') return value.trim().slice(0, 120);
+  if (isRecord(value) && typeof value.id === 'string') return value.id.trim().slice(0, 120);
+  return '';
+}
+
+function referentesDe(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const vistos = new Set<string>();
+  const result: string[] = [];
+  for (const item of value) {
+    const id = idDe(item);
+    if (!id || vistos.has(id)) continue;
+    vistos.add(id);
+    result.push(id);
+    if (result.length >= 12) break;
+  }
+  return result;
+}
+
+function votoDe(value: unknown): VotoParcial | null {
+  if (typeof value !== 'string') return null;
+  const voto = value.trim().toLocaleLowerCase();
+  if (voto === 'like' || voto === '♥' || voto === 'me gusta') return 'like';
+  if (voto === 'nope' || voto === '✕' || voto === 'x' || voto === 'no') return 'nope';
+  return null;
+}
+
+function itemParcial(value: unknown): GustoParcial | null {
+  if (!isRecord(value)) return null;
+  const voto = votoDe(value.voto);
+  const referentes = referentesDe(value.referentes);
+  const regla = idDe(value.regla);
+  const herramienta = idDe(value.herramienta);
+  if (!voto || !referentes.length || !regla || !herramienta) return null;
+  return {
+    semilla: typeof value.semilla === 'string' ? value.semilla.slice(0, 120) : '',
+    referentes,
+    regla,
+    herramienta,
+    restriccion: typeof value.restriccion === 'string' ? value.restriccion.slice(0, 200) : '',
+    voto,
+  };
+}
+
+/**
+ * Suma a la memoria actual los votos de un `gustos-parcial.json` exportado por
+ * el muro de Entropía. No reemplaza: aplica ♥/✕ en orden sobre lo que ya había.
+ * Un archivo viejo o con entradas raras no rompe la importación: se ignoran.
+ */
+export function importarGustosParciales(gustos: Gustos, value: unknown): ResultadoGustosParciales {
+  let actual = normalizarGustos(gustos);
+  let likes = 0;
+  let nopes = 0;
+  let ignorados = 0;
+  const items = isRecord(value) && Array.isArray(value.items) ? value.items : [];
+
+  for (const raw of items.slice(0, MAX_GUSTOS_PARCIALES)) {
+    const item = itemParcial(raw);
+    if (!item) {
+      ignorados += 1;
+      continue;
+    }
+    const combinacion: Combinacion = {
+      semilla: item.semilla,
+      referentes: item.referentes,
+      herramienta: item.herramienta,
+      regla: item.regla,
+      restriccion: item.restriccion,
+      azarPuro: false,
+    };
+    actual = item.voto === 'like' ? like(actual, combinacion) : nope(actual, combinacion);
+    if (item.voto === 'like') likes += 1;
+    else nopes += 1;
+  }
+
+  return { gustos: actual, likes, nopes, ignorados };
+}
