@@ -84,13 +84,13 @@ test('V-3: tres tiradas y ♥ deja una tarjeta con la última semilla', async ({
   await openBoard(page);
 
   // La biblioteca aporta los referentes del proyecto, aunque el collage viva en otro tablero.
-  await page.getByRole('button', { name: 'Importar referentes' }).click();
+  await page.getByRole('button', { name: /^Biblioteca/ }).click();
+  await page.getByRole('menuitem', { name: 'Importar referentes' }).click();
   await expect(page.getByText(/Biblioteca.*(creado|actualizado)/)).toBeVisible();
   await page.locator('.board-header').getByRole('button', { name: 'Crear tablero' }).click();
   await expect(page.getByText('Tu espacio de ideas está listo')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Añadir', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Entropía' }).click();
+  await page.getByRole('button', { name: 'Añadir entropía' }).click();
   const viewport = page.locator('.board-viewport');
   const box = await viewport.boundingBox();
   if (!box) throw new Error('No hay viewport del tablero.');

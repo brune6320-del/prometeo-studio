@@ -440,7 +440,29 @@ Reglas:
 }
 ```
 
-## 14. Cómo lo usan los agentes
+## 14. Definición de terminado (regla 20)
+
+Ninguna herramienta nueva del tablero entra en el producto sin estos cinco contratos. La
+frase es de la auditoría A-1 y vive también en `.agents/skills/prometeo-lienzo-saber/SKILL.md`
+(regla 20). Un contrato sin prueba no se considera terminado.
+
+| Contrato | Qué exige | Prueba mínima |
+|---|---|---|
+| **Borrado** | `Supr` / `⌫` borra al instante; nunca pregunta por algo que `⌘Z` repara. Las tarjetas borradas quedan en la memoria de 30 días o en los 100 pasos de historial. | Borrar N tarjetas y recuperarlas con `⌘Z`; borrar un tablero y recuperarlo tras recargar. |
+| **Deshacer** | Toda mutación del tablero pasa por el historial; un gesto (arrastrar, redimensionar, pegar, borrar en bloque) es un solo paso. | Un gesto → un `⌘Z` vuelve al estado anterior exacto. |
+| **Teclado** | La misma acción existe sin puntero; `Tab` entra y sale; los diálogos atrapan el foco y lo devuelven al disparador; `aria-selected` y un `aria-live` anuncian la selección. | Recorrer la herramienta solo con teclado y comprobar el foco al cerrar. |
+| **Estado vacío** | Sin contenido, la herramienta dice qué es y ofrece la acción que la llena sin buscar en menús. | Captura del estado vacío y una acción visible que crea el primer objeto. |
+| **Prueba por herramienta** | Cada tipo de tarjeta (nota, enlace, imagen, tareas, columna, referente, marco, entropía, tablero anidado) tiene al menos un test propio de creación, edición, borrado y persistencia. | Un test de vitest para el modelo y uno de Playwright para el gesto visible. |
+
+Checklist antes de dar una herramienta por terminada:
+
+1. ¿Se puede borrar sin diálogo y deshacerlo en un paso?
+2. ¿Se puede hacer lo mismo con teclado y el foco nunca queda atrapado?
+3. ¿Tiene estado vacío con una acción clara?
+4. ¿Persiste tras recargar y el estado «Guardado» solo aparece con IndexedDB confirmado?
+5. ¿Existe el test del gesto visible (Playwright) y el del modelo (vitest)?
+
+## 15. Cómo lo usan los agentes
 
 Orden de lectura: **este DESIGN.md → skill de la tarea → código existente**.
 

@@ -114,12 +114,23 @@ test('R-09: todas las herramientas quedan visibles sin desbordamiento horizontal
   await mockReadyBackend(page);
   await page.goto('/');
   await openBoard(page);
-  const metrics = await page.locator('.board-controls').evaluate((element) => {
-    const style = getComputedStyle(element);
-    return { scrollWidth: element.scrollWidth, clientWidth: element.clientWidth, flexWrap: style.flexWrap };
-  });
-  expect(metrics.flexWrap).toBe('wrap');
-  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.clientWidth + 1);
+  // Desde Forja 2 las herramientas viven en un rail vertical y la barra superior
+  // es una sola fila. El contrato es el mismo: nada se sale de su caja.
+  const rail = await page.locator('.board-rail').evaluate((element) => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+  }));
+  expect(rail.scrollWidth).toBeLessThanOrEqual(rail.clientWidth + 1);
+  expect(rail.scrollHeight).toBeLessThanOrEqual(rail.clientHeight + 1);
+  const header = await page.locator('.board-header').evaluate((element) => ({
+    scrollWidth: element.scrollWidth,
+    clientWidth: element.clientWidth,
+  }));
+  expect(header.scrollWidth).toBeLessThanOrEqual(header.clientWidth + 1);
+  // Las ocho herramientas del rail más «Más» siguen visibles a 800 px de alto.
+  await expect(page.locator('.board-rail .board-rail-tool')).toHaveCount(9);
 });
 
 test('R-10: el tablero abre mientras el motor PDF no responde', async ({ page }) => {
@@ -131,10 +142,11 @@ test('R-10: el tablero abre mientras el motor PDF no responde', async ({ page })
   await expect(page.locator('.board-workspace')).toBeVisible();
   await expect(page.getByText('Guardado', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Nueva nota' }).click();
+  await page.locator('.board-card-title').last().dblclick();
   await page.getByLabel('Título de tarjeta').last().fill('Persistencia sin motor');
   await expect(page.getByText('Guardado', { exact: true })).toBeVisible();
   await page.locator('.board-back').click();
   await expect(button).toBeVisible();
   await button.click();
-  await expect(page.getByLabel('Título de tarjeta').last()).toHaveValue('Persistencia sin motor');
+  await expect(page.locator('.board-card-title').last()).toHaveText('Persistencia sin motor');
 });

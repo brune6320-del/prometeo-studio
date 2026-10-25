@@ -77,7 +77,8 @@ test('V-4: importar gustos-parcial suma ♥ y ✕ al proyecto activo', async ({ 
   await mockReadyBackend(page);
   await page.goto('/');
   await openBoard(page);
-  await page.getByRole('button', { name: 'Importar referentes' }).click();
+  await page.getByRole('button', { name: /^Biblioteca/ }).click();
+  await page.getByRole('menuitem', { name: 'Importar referentes' }).click();
   await expect(page.getByText(/Biblioteca.*(creado|actualizado)/)).toBeVisible();
   const projectId = await page.locator('#project-select').inputValue();
 
