@@ -2988,7 +2988,6 @@
   opacity: 0.96;
   box-shadow: var(--shadow-3);
   cursor: grabbing;
-  pointer-events: none;
 }
 
 .board-frame.dragging {
@@ -3047,4 +3046,133 @@
 @media (prefers-reduced-motion: reduce) {
   .board-card.settling,
   .board-frame.settling { animation: none; }
+}
+
+/* ── F5 · edición en el sitio ───────────────────────────────────────────── */
+.board-inline-text {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0 calc(-1 * var(--space-1));
+  padding: 3px var(--space-1);
+  border-radius: var(--radius-xs);
+  cursor: text;
+}
+
+.board-inline-text.is-empty { color: var(--paper-muted); }
+
+.board-card .board-inline-text:hover,
+.board-referente .board-inline-text:hover,
+.board-inline-text:focus-visible {
+  background: color-mix(in srgb, var(--paper-ink) 7%, transparent);
+  outline: none;
+}
+
+.board-frame .board-inline-text:hover {
+  background: var(--state-hover);
+}
+
+.board-inline-input {
+  width: 100%;
+  min-width: 0;
+  padding: 3px var(--space-1);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-xs);
+  outline: none;
+  color: var(--fg-1);
+  background: var(--surface-2);
+  font: inherit;
+}
+
+.board-card .board-inline-input,
+.board-referente .board-inline-input {
+  color: var(--paper-ink);
+  background: var(--paper-white);
+  border-color: var(--accent-paper);
+}
+
+.board-card-text {
+  width: 100%;
+  min-height: 54px;
+  max-height: 260px;
+  padding: 5px var(--space-1);
+  overflow: auto;
+  border-radius: var(--radius-xs);
+  color: var(--paper-ink-soft);
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+
+.board-card-text.is-empty { color: var(--paper-muted); }
+
+.board-card-text:hover { background: color-mix(in srgb, var(--paper-ink) 5%, transparent); }
+
+.board-card-text-editor {
+  width: 100%;
+  min-height: 54px;
+  max-height: 260px;
+  padding: 5px var(--space-1);
+  resize: vertical;
+  border: 1px solid var(--accent-paper);
+  border-radius: var(--radius-xs);
+  outline: none;
+  color: var(--paper-ink);
+  background: var(--paper-white);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+}
+
+.board-card-etiqueta.board-card-text {
+  min-height: 0;
+  color: var(--paper-muted-2);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.board-referente-noimg {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: var(--board-empty-h);
+  border: 1px dashed var(--line-control);
+  border-radius: var(--radius-md);
+  color: var(--paper-muted);
+  background: transparent;
+  font: inherit;
+  font-size: var(--font-size-caption);
+  cursor: pointer;
+}
+
+.board-referente-noimg:hover {
+  color: var(--accent-paper);
+  border-color: var(--accent-paper);
+  background: var(--accent-soft);
+}
+
+.board-frame-hint,
+.board-referente-hint {
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.board-frame:hover .board-frame-hint,
+.board-frame:focus-within .board-frame-hint,
+.board-referente:hover .board-referente-hint,
+.board-referente:focus-within .board-referente-hint {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-frame-hint,
+  .board-referente-hint { transition: none; }
+}
+
+/* El título del referente vive una sola vez: en su ficha, no en la cabecera. */
+.board-card[data-card-type='referente'] .board-card-title {
+  display: none;
 }

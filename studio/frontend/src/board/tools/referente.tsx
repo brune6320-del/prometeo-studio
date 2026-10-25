@@ -13,6 +13,7 @@ import {
 } from '../referentes/model';
 import { filtrarLecturas, opcionesDeFiltro, ordenarLecturas } from '../referentes/historial';
 import type { BoardTool } from './registry';
+import { TituloEnSitio } from '../../components/InlineEdit';
 
 function comoDatos(referente: Referente): Record<string, unknown> {
   return { ...referente };
@@ -180,7 +181,16 @@ export const referenteTool: BoardTool<BoardCard> = {
         }}
         title="Doble clic para editar"
       >
-        <h3 className="board-referente-nombre">{referente.nombre || 'Referente sin nombre'}</h3>
+        <TituloEnSitio
+          value={referente.nombre}
+          onCommit={(nombre) => {
+            const actual = leerReferente(datos);
+            editar({ ...datos, title: nombre, datos: comoDatos({ ...actual, nombre }) });
+          }}
+          ariaLabel="Título del referente"
+          className="board-referente-nombre"
+          placeholder="Referente sin nombre"
+        />
         <div className="board-referente-tabs" role="tablist" aria-label="Vista del referente" onDoubleClick={(event) => event.stopPropagation()}>
           <button type="button" role="tab" aria-selected={panel === 'ficha'} className={panel === 'ficha' ? 'active' : ''} onClick={(event) => { event.stopPropagation(); setPanel('ficha'); }}>Ficha</button>
           <button type="button" role="tab" aria-selected={panel === 'historial'} className={panel === 'historial' ? 'active' : ''} onClick={(event) => { event.stopPropagation(); setPanel('historial'); }}>Historial{referente.lecturas.length ? ` (${referente.lecturas.length})` : ''}</button>
@@ -231,7 +241,7 @@ export const referenteTool: BoardTool<BoardCard> = {
             {principal ? (
               <img className="board-referente-imagen" src={principal.dataUrl} alt={referente.nombre || principal.name} draggable={false} />
             ) : (
-              <div className="board-referente-noimg">Sin imagen</div>
+              <button type="button" className="board-referente-noimg" onClick={(event) => { event.stopPropagation(); empezarEdicion(); }} title="Añadir una imagen al referente">Añadir imagen</button>
             )}
             <div className="board-referente-meta">
               <span>{referente.archivoOrigen || 'archivo sin nombre'} · {referente.anio || 's.f.'}</span>

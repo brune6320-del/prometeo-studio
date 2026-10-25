@@ -86,6 +86,7 @@ import {
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
 import { BoardCardItem } from './BoardCardItem';
+import { TituloEnSitio } from './InlineEdit';
 import { MirarDialog } from './MirarDialog';
 import { ArchivoView } from './ArchivoView';
 import { MuroView } from './MuroView';
@@ -200,7 +201,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const wheelIdle = useRef<number | null>(null);
   const wheelVelocity = useRef({ vx: 0, vy: 0, t: 0 });
   const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; samples: MuestraInercia[] } | null>(null);
-  const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; startBoard: BoardDocument; gesture: string; moved: boolean } | null>(null);
+  const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null } | null>(null);
   /** Herramienta de marco elegida en el menú: el siguiente arrastre dibuja el rectángulo. */
   const [frameToolId, setFrameToolId] = useState<string | null>(null);
   const [frameDraft, setFrameDraft] = useState<FrameRect | null>(null);
@@ -779,7 +780,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || frameToolId || connectMode || (event.target as HTMLElement).closest('input,button,a,textarea,select') || !activeBoard) return;
+    if (event.button !== 0 || event.detail > 1 || frameToolId || connectMode || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
     suppressCardClick.current = false;
     const hasModifier = event.shiftKey || event.metaKey || event.ctrlKey;
     let nextSelection = selectedCardIds;
@@ -815,16 +816,22 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       startBoard: activeBoard,
       gesture: newBoardId('move'),
       moved: false,
+      captureEl: event.currentTarget,
     };
     setDraggingIds(ids);
     setSettlingIds([]);
     setDropFrameId(null);
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const moveCardDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = cardDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    const distancia = Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y);
+    if (!drag.moved && distancia < 3) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      try { drag.captureEl?.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
+    }
     let deltaX = (event.clientX - drag.x) / cameraRef.current.zoom;
     let deltaY = (event.clientY - drag.y) / cameraRef.current.zoom;
     const anchor = drag.positions.get(drag.ids[0]);
@@ -905,6 +912,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       enqueueBoardSave(final);
     }
     if (drag.moved || destino) suppressCardClick.current = true;
+    try { drag.captureEl?.releasePointerCapture(drag.pointerId); } catch { /* ya liberado */ }
     setDraggingIds([]);
     setDropFrameId(null);
     if (drag.moved) asentar(drag.ids);
@@ -1922,7 +1930,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                 >
                   <div className="board-frame-head" onPointerDown={(event) => startCardDrag(card, event)} onPointerMove={moveCardDrag} onPointerUp={endCardDrag} onPointerCancel={endCardDrag} title="Arrastra para mover el marco y sus tarjetas">
                     <span className="board-drag-grip" aria-hidden="true">⠿</span>
-                    <input className="board-frame-title" value={card.title} maxLength={200} onChange={(event) => updateCard(card.id, { title: event.target.value })} aria-label="Título del marco" />
+                    <TituloEnSitio value={card.title} onCommit={(title) => updateCard(card.id, { title })} ariaLabel="Título del marco" className="board-frame-title" />
                     {!esEntropia && (
                       <label className="board-frame-view">
                         Ver como

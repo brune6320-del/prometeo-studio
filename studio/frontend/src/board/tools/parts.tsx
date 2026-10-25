@@ -1,5 +1,6 @@
 import React from 'react';
 import type { BoardCard } from '../model';
+import { TextoEnSitio } from '../../components/InlineEdit';
 
 /** Cuerpo de texto común a las herramientas que ya existían (nota, enlace y medio). */
 export const CuerpoTexto: React.FC<{
@@ -7,12 +8,10 @@ export const CuerpoTexto: React.FC<{
   editar: (datos: BoardCard) => void;
   placeholder: string;
 }> = ({ datos, editar, placeholder }) => (
-  <textarea
-    className="board-card-body"
+  <TextoEnSitio
     value={datos.body}
-    maxLength={12000}
-    onChange={(event) => editar({ ...datos, body: event.target.value })}
+    onCommit={(body) => editar({ ...datos, body })}
     placeholder={placeholder}
-    aria-label="Contenido de tarjeta"
+    ariaLabel="Contenido de tarjeta"
   />
 );

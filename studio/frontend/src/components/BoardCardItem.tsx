@@ -2,6 +2,7 @@ import React from 'react';
 import { Link2, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
 import { BoardCardContent } from '../board/tools/CardView';
+import { TituloEnSitio } from './InlineEdit';
 import { metricas } from '../motion/metricas';
 
 export interface BoardCardItemProps {
@@ -49,6 +50,7 @@ export const BoardCardItem = React.memo(function BoardCardItem({
   return (
     <article
       data-card-id={card.id}
+      data-card-type={card.type}
       className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''}`}
       style={{ left: card.x, top: card.y, width: card.width }}
       onClick={(event) => {
@@ -64,7 +66,7 @@ export const BoardCardItem = React.memo(function BoardCardItem({
     >
       <div className="board-card-head" onPointerDown={(event) => onDragStart(card, event)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} title="Arrastra para mover la tarjeta">
         <span className="board-drag-grip" aria-hidden="true">⠿</span>
-        <input className="board-card-title" value={card.title} maxLength={200} onChange={(event) => onPatch(card.id, { title: event.target.value })} aria-label="Título de tarjeta" />
+        <TituloEnSitio value={card.title} onCommit={(title) => onPatch(card.id, { title })} ariaLabel="Título de tarjeta" className="board-card-title" />
         <button className={`board-connect-button ${connectMode ? 'visible' : ''}`} onClick={(event) => { event.stopPropagation(); onConnect(card.id); }} title="Elegir para relacionar" aria-label="Relacionar esta tarjeta"><Link2 size={13} /></button>
         <button className="board-card-delete" onClick={(event) => { event.stopPropagation(); onDelete(card.id); }} aria-label="Eliminar tarjeta"><X size={14} /></button>
       </div>
