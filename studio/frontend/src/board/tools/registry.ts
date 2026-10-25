@@ -7,6 +7,9 @@ import { etiquetaTool } from './etiqueta';
 import { marcoTool } from './marco';
 import { referenteTool } from './referente';
 import { entropiaTool } from './entropia';
+import { columnaTool } from './columna';
+import { tareasTool } from './tareas';
+import { tableroTool } from './tablero';
 
 /**
  * Contrato de una herramienta de la pizarra (skill prometeo-herramientas).
@@ -50,3 +53,6 @@ registerBoardTool(etiquetaTool);
 registerBoardTool(referenteTool);
 registerBoardTool(marcoTool);
 registerBoardTool(entropiaTool);
+registerBoardTool(columnaTool);
+registerBoardTool(tareasTool);
+registerBoardTool(tableroTool);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pause, Play, X } from 'lucide-react';
+import { Lock, LockOpen, Pause, Play, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
 import { metricas } from '../motion/metricas';
 
@@ -22,6 +22,7 @@ export interface BoardFreeMediaProps {
   onDragMove: (event: React.PointerEvent<HTMLElement>) => void;
   onDragEnd: (event: React.PointerEvent<HTMLElement>) => void;
   onDelete: (cardId: string) => void;
+  onPatch: (cardId: string, patch: Partial<BoardCard>) => void;
   onResizeStart: (card: BoardCard, corner: EsquinaMedia, event: React.PointerEvent<HTMLElement>) => void;
   onResizeMove: (event: React.PointerEvent<HTMLElement>) => void;
   onResizeEnd: (event: React.PointerEvent<HTMLElement>) => void;
@@ -46,6 +47,7 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
   onDragMove,
   onDragEnd,
   onDelete,
+  onPatch,
   onResizeStart,
   onResizeMove,
   onResizeEnd,
@@ -79,12 +81,13 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
       data-alto={alto === undefined ? 'auto' : 'fijo'}
       tabIndex={0}
       aria-label={`${esVideo ? 'Vídeo' : 'Imagen'}: ${card.title || 'sin título'}`}
-      className={`board-free-media ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''}`}
+      className={`board-free-media ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${card.locked ? 'is-locked' : ''}`}
+      data-locked={card.locked ? 'si' : 'no'}
       style={{ left: card.x, top: card.y, width: card.width, height: alto }}
       onPointerDown={(event) => {
         inicioRef.current = { x: event.clientX, y: event.clientY };
         movidoRef.current = false;
-        onDragStart(card, event);
+        if (!card.locked) onDragStart(card, event);
       }}
       onPointerMove={(event) => {
         if (inicioRef.current && Math.hypot(event.clientX - inicioRef.current.x, event.clientY - inicioRef.current.y) > 3) {
@@ -158,7 +161,19 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
 
       <button
         type="button"
+        className="board-free-media-lock"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => { event.stopPropagation(); onPatch(card.id, { locked: !card.locked }); }}
+        aria-label={card.locked ? 'Desbloquear pieza' : 'Bloquear pieza'}
+        title={card.locked ? 'Desbloquear' : 'Bloquear posición y borrado'}
+      >
+        {card.locked ? <Lock size={12} /> : <LockOpen size={12} />}
+      </button>
+
+      <button
+        type="button"
         className="board-free-media-delete"
+        disabled={card.locked}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => { event.stopPropagation(); onDelete(card.id); }}
         aria-label={`Eliminar ${card.title || 'pieza'}`}
@@ -167,7 +182,7 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
         <X size={14} />
       </button>
 
-      {ESQUINAS.map((esquina) => (
+      {!card.locked && ESQUINAS.map((esquina) => (
         <span
           key={esquina}
           className={`board-free-media-handle ${esquina}`}

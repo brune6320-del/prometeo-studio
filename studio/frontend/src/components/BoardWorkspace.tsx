@@ -5,6 +5,7 @@ import {
   FolderPlus,
   Magnet,
   Download,
+  LayoutTemplate,
   Library,
   Link2,
   Pencil,
@@ -23,6 +24,7 @@ import {
   boardToMarkdown,
   cloneBoardForImport,
   createBoard,
+  duplicateCards,
   isSafeExternalUrl,
   makeBoardExport,
   markdownToBoard,
@@ -32,7 +34,14 @@ import {
   type BoardCard,
   type BoardDocument,
   type BoardMedia,
+  type BoardRelation,
 } from '../board/model';
+import { geometriaConector, rectDeTarjeta } from '../board/conectores';
+import { readColumnData, setColumnFolded, columnChildIds } from '../board/columnas';
+import { normalizarVistaPrevia } from '../board/vistaPrevia';
+import { guardarPlantilla, eliminarPlantilla, listarPlantillas, materializar, type Plantilla } from '../board/plantillas';
+import { ABRIR_TABLERO_EVENT } from '../board/tools/tablero';
+import { studioApi } from '../api/client';
 import { fitBoardCamera, MAX_BOARD_ZOOM, MIN_BOARD_ZOOM, zoomAtPoint, screenToWorld } from '../board/camera';
 import { movimientoReducido, pasoInercia, resortar, seguir, TAU, velocidadDeMuestras, type MuestraInercia } from '../motion/muelle';
 import { alignCards, distributeCards, snapPosition, type Alignment, type CardSize, type DistributionAxis } from '../board/geometry';
@@ -89,6 +98,7 @@ import {
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
 import { BoardCardItem } from './BoardCardItem';
+import { BoardColumn } from './BoardColumn';
 import { BoardFreeMedia, type EsquinaMedia } from './BoardFreeMedia';
 import { TituloEnSitio } from './InlineEdit';
 import { MirarDialog } from './MirarDialog';
@@ -109,7 +119,7 @@ interface BoardWorkspaceProps {
 
 const GRID_SIZE = 24;
 const COLORS: Array<BoardCard['color']> = ['paper', 'sand', 'sage', 'rose'];
-const RAIL_TOOLS = ['note', 'link', 'media', 'referente', 'marco', 'entropia'];
+const RAIL_TOOLS = ['note', 'link', 'media', 'tareas', 'columna', 'referente', 'marco', 'entropia'];
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -138,10 +148,6 @@ function downloadText(filename: string, content: string, mimeType: string): void
   window.setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 
-function cardCenter(card: BoardCard): { x: number; y: number } {
-  return { x: card.x + card.width / 2, y: card.y + 100 };
-}
-
 interface Modificadores {
   metaKey: boolean;
   ctrlKey: boolean;
@@ -157,6 +163,7 @@ interface GestoWebKit extends Event {
 interface CardHandlers {
   select: (cardId: string, event: Modificadores) => void;
   connect: (cardId: string) => void;
+  connectStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
   dragStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
   dragMove: (event: React.PointerEvent<HTMLElement>) => void;
   dragEnd: (event: React.PointerEvent<HTMLElement>) => void;
@@ -199,6 +206,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
   const [connectMode, setConnectMode] = useState(false);
   const [connectFromId, setConnectFromId] = useState<string | null>(null);
+  /** Tirador de conector: tarjeta de origen y puntero en coordenadas de pantalla. */
+  const [connectDraft, setConnectDraft] = useState<{ from: string; x: number; y: number; mundo: { x: number; y: number }; target: string | null } | null>(null);
+  const [marquee, setMarquee] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [nestedDialog, setNestedDialog] = useState(false);
+  const [templateDialog, setTemplateDialog] = useState(false);
+  const [templates, setTemplates] = useState<Plantilla[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -219,6 +232,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const viewportRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const relationsRef = useRef<SVGGElement>(null);
+  const boardsRef = useRef<BoardDocument[]>([]);
+  const activeBoardRef = useRef<BoardDocument | null>(null);
   const zoomValueRef = useRef<HTMLButtonElement>(null);
   const cameraRef = useRef({ pan: { x: 0, y: 0 }, zoom: 1 });
   const paintRaf = useRef(0);
@@ -228,13 +243,17 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const wheelIdle = useRef<number | null>(null);
   const wheelVelocity = useRef({ vx: 0, vy: 0, t: 0 });
   const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; samples: MuestraInercia[]; captureEl: HTMLElement | null } | null>(null);
-  const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; sizes: Map<string, CardSize>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null; lastX: number; lastY: number; lastT: number } | null>(null);
+  const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; sizes: Map<string, CardSize>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null; lastX: number; lastY: number; lastT: number; altKey: boolean; duplicated: boolean } | null>(null);
+  /** Rectángulo de selección (⇧ + arrastrar el fondo), en coordenadas de pantalla. */
+  const marqueeDrag = useRef<{ pointerId: number; startX: number; startY: number; captureEl: HTMLElement | null } | null>(null);
+  const connectOrigin = useRef<{ cardId: string; pointerId: number } | null>(null);
   /** Herramienta de marco elegida en el menú: el siguiente arrastre dibuja el rectángulo. */
   const [frameToolId, setFrameToolId] = useState<string | null>(null);
   const [frameDraft, setFrameDraft] = useState<FrameRect | null>(null);
   const [draggingIds, setDraggingIds] = useState<string[]>([]);
   const [settlingIds, setSettlingIds] = useState<string[]>([]);
   const [dropFrameId, setDropFrameId] = useState<string | null>(null);
+  const dropFrameIdRef = useRef<string | null>(null);
   const frameResize = useRef<{ pointerId: number; cardId: string; startX: number; startY: number; width: number; height: number; startBoard: BoardDocument; captureEl: HTMLElement | null } | null>(null);
   const freeResize = useRef<{ pointerId: number; cardId: string; corner: EsquinaMedia; startX: number; startY: number; x: number; y: number; width: number; height: number; ratio: number; startBoard: BoardDocument; captureEl: HTMLElement | null } | null>(null);
   const settleTimer = useRef<number | null>(null);
@@ -281,9 +300,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const framedChildIds = useMemo(() => {
     const ids = new Set<string>();
     for (const card of activeBoard?.cards ?? []) {
+      if (card.type === 'columna') {
+        for (const id of readColumnData(card).hijos) ids.add(id);
+        continue;
+      }
       if (card.type !== 'marco' || readFrameData(card).vista === 'libre') continue;
       for (const id of readFrameData(card).hijos) ids.add(id);
     }
+    for (const id of columnChildIds(activeBoard?.cards ?? [])) ids.add(id);
     return ids;
   }, [activeBoard]);
   const archiveFullscreenFrame = archiveFullscreenId
@@ -556,15 +580,22 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (draw) liberarPuntero(draw.captureEl, draw.pointerId);
     const resize = frameResize.current;
     if (resize) liberarPuntero(resize.captureEl, resize.pointerId);
+    const marquesina = marqueeDrag.current;
+    if (marquesina) liberarPuntero(marquesina.captureEl, marquesina.pointerId);
     panDrag.current = null;
     cardDrag.current = null;
     frameDraw.current = null;
     frameResize.current = null;
+    marqueeDrag.current = null;
+    connectOrigin.current = null;
+    setConnectDraft(null);
     setIsPanning(false);
     setDraggingIds([]);
     setSettlingIds([]);
     setDropFrameId(null);
+    dropFrameIdRef.current = null;
     setFrameDraft(null);
+    setMarquee(null);
     setGuias({});
     limpiarInclinacion();
   }, [detenerInercia, detenerRetornoZoom, limpiarInclinacion]);
@@ -572,6 +603,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   useLayoutEffect(() => {
     aplicarCamara();
   });
+
+  // Los guardados asíncronos (vista previa, lectura, referente) necesitan el tablero más reciente,
+  // no el de la renderización en la que se lanzó la petición.
+  useLayoutEffect(() => {
+    boardsRef.current = boards;
+    activeBoardRef.current = activeBoard;
+  }, [activeBoard, boards]);
 
   useEffect(() => () => {
     if (paintRaf.current) cancelAnimationFrame(paintRaf.current);
@@ -587,7 +625,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   // Red de seguridad para cuando el pointerup ocurre fuera de la ventana o el WebView pierde el foco.
   useEffect(() => {
     const alSoltar = () => {
-      if (panDrag.current || cardDrag.current || frameDraw.current || frameResize.current) cancelarGestos();
+      if (panDrag.current || cardDrag.current || frameDraw.current || frameResize.current || marqueeDrag.current) cancelarGestos();
     };
     const alOcultar = () => { if (document.hidden) alSoltar(); };
     window.addEventListener('pointerup', alSoltar);
@@ -631,21 +669,59 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     rememberActiveBoard(activeBoardId);
   }, [activeBoardId, loaded]);
 
+  // Un tablero anidado pide abrirse desde su tarjeta (botón o doble clic).
+  useEffect(() => {
+    const abrir = (event: Event) => {
+      const boardId = (event as CustomEvent<{ boardId?: string }>).detail?.boardId;
+      if (!boardId) return;
+      const destino = boards.find((board) => board.id === boardId);
+      if (!destino) {
+        setNotice('Ese tablero anidado ya no existe. La tarjeta conserva su referencia.');
+        return;
+      }
+      void (async () => {
+        const guardado = await flushBoardWrites();
+        if (!guardado) {
+          setNotice('No se abrió el tablero anidado porque el actual aún no se pudo guardar.');
+          return;
+        }
+        const proyecto = projectIdByBoardId.get(boardId);
+        if (proyecto && proyecto !== activeProjectId) {
+          try {
+            await setActiveProject(proyecto);
+            setActiveProjectId(proyecto);
+          } catch {
+            /* El tablero se abre igual: el vínculo de proyecto no bloquea la lectura. */
+          }
+        }
+        setActiveBoardId(boardId);
+        setSelectedCardIds([]);
+      })();
+    };
+    window.addEventListener(ABRIR_TABLERO_EVENT, abrir);
+    return () => window.removeEventListener(ABRIR_TABLERO_EVENT, abrir);
+  }, [activeProjectId, boards, projectIdByBoardId]);
+
   const updateBoard = useCallback((
     mutate: (board: BoardDocument) => BoardDocument,
     options: { recordHistory?: boolean; coalesceKey?: string } = {},
   ) => {
-    if (!activeBoard) return;
-    const nextBoard = { ...mutate(activeBoard), updatedAt: new Date().toISOString() };
+    const actual = activeBoardRef.current ?? boardsRef.current.find((board) => board.id === activeBoardId);
+    if (!actual) return;
+    const nextBoard = { ...mutate(actual), updatedAt: new Date().toISOString() };
     if (options.recordHistory !== false) {
       setBoardHistories((current) => ({
         ...current,
-        [activeBoard.id]: recordBoardChange(current[activeBoard.id] ?? emptyBoardHistory(), activeBoard, nextBoard, options.coalesceKey),
+        [actual.id]: recordBoardChange(current[actual.id] ?? emptyBoardHistory(), actual, nextBoard, options.coalesceKey),
       }));
     }
+    activeBoardRef.current = nextBoard;
+    boardsRef.current = boardsRef.current.length
+      ? boardsRef.current.map((board) => board.id === nextBoard.id ? nextBoard : board)
+      : [nextBoard];
     enqueueBoardSave(nextBoard);
-    setBoards((current) => current.map((board) => board.id === activeBoard.id ? nextBoard : board));
-  }, [activeBoard]);
+    setBoards(boardsRef.current);
+  }, [activeBoardId]);
 
   /** Una lectura aceptada puede caer en la Biblioteca aunque el tablero abierto sea otro. */
   const updateBoardById = useCallback((
@@ -653,7 +729,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     mutate: (board: BoardDocument) => BoardDocument,
     options: { recordHistory?: boolean; coalesceKey?: string } = {},
   ) => {
-    const target = boards.find((board) => board.id === boardId);
+    const target = boardsRef.current.find((board) => board.id === boardId);
     if (!target) return;
     const nextBoard = { ...mutate(target), updatedAt: new Date().toISOString() };
     if (options.recordHistory !== false) {
@@ -662,9 +738,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         [boardId]: recordBoardChange(current[boardId] ?? emptyBoardHistory(), target, nextBoard, options.coalesceKey),
       }));
     }
+    boardsRef.current = boardsRef.current.map((board) => board.id === boardId ? nextBoard : board);
+    if (activeBoardRef.current?.id === boardId) activeBoardRef.current = nextBoard;
     enqueueBoardSave(nextBoard);
-    setBoards((current) => current.map((board) => board.id === boardId ? nextBoard : board));
-  }, [boards]);
+    setBoards(boardsRef.current);
+  }, []);
 
   const aceptarLecturaEnReferente = useCallback((boardId: string, cardId: string, lectura: Lectura) => {
     const nombre = boards
@@ -732,6 +810,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (toolId === 'marco') {
       setFrameToolId(toolId);
       setNotice('Arrastra en la pizarra para dibujar el marco. Escape para cancelar.');
+      return;
+    }
+    if (toolId === 'tablero') {
+      setNestedDialog(true);
       return;
     }
     setFrameToolId(null);
@@ -933,6 +1015,62 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const fitBoard = () => centerCamera(activeBoard);
 
+  const iniciarMarquesina = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    detenerInercia();
+    detenerRetornoZoom();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    marqueeDrag.current = { pointerId: event.pointerId, startX: x, startY: y, captureEl: event.currentTarget };
+    setMarquee({ x, y, width: 0, height: 0 });
+    setGuias({});
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
+  };
+
+  const moverMarquesina = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = marqueeDrag.current;
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!drag || !rect || drag.pointerId !== event.pointerId) return;
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    setMarquee({
+      x: Math.min(drag.startX, x),
+      y: Math.min(drag.startY, y),
+      width: Math.abs(x - drag.startX),
+      height: Math.abs(y - drag.startY),
+    });
+  };
+
+  const terminarMarquesina = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = marqueeDrag.current;
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!drag || !rect || drag.pointerId !== event.pointerId) return;
+    marqueeDrag.current = null;
+    liberarPuntero(drag.captureEl, event.pointerId);
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const ancho = Math.abs(x - drag.startX);
+    const alto = Math.abs(y - drag.startY);
+    setMarquee(null);
+    if (ancho < 5 && alto < 5) return;
+    const a = screenToWorld({ x: Math.min(drag.startX, x), y: Math.min(drag.startY, y) }, cameraRef.current);
+    const b = screenToWorld({ x: Math.max(drag.startX, x), y: Math.max(drag.startY, y) }, cameraRef.current);
+    const dentro = (activeBoard?.cards ?? []).filter((card) => {
+      if (framedChildIds.has(card.id)) return false;
+      const caja = rectDeTarjeta(card);
+      const centroX = caja.x + caja.width / 2;
+      const centroY = caja.y + caja.height / 2;
+      return centroX >= a.x && centroX <= b.x && centroY >= a.y && centroY <= b.y;
+    }).map((card) => card.id);
+    setSelectedCardIds((current) => [...new Set([...current, ...dentro])]);
+    suppressViewportClick.current = true;
+    window.setTimeout(() => { suppressViewportClick.current = false; }, 0);
+    setNotice(dentro.length
+      ? `${dentro.length} ${dentro.length === 1 ? 'tarjeta seleccionada' : 'tarjetas seleccionadas'} con el rectángulo.`
+      : 'El rectángulo no tocó ninguna tarjeta.');
+  };
+
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-frame, .board-free-media, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
     detenerInercia();
@@ -1026,16 +1164,25 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       startFrameDraw(event);
       return;
     }
+    if (event.shiftKey && event.button === 0) {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.board-card, .board-column, .board-frame, .board-free-media, .board-controls, .board-dialog, button, input, select, a, .board-empty')) {
+        iniciarMarquesina(event);
+        return;
+      }
+    }
     beginPan(event);
   };
 
   const moveViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (frameDraw.current) moveFrameDraw(event);
+    if (marqueeDrag.current) moverMarquesina(event);
+    else if (frameDraw.current) moveFrameDraw(event);
     else movePan(event);
   };
 
   const endViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (frameDraw.current) endFrameDraw(event);
+    if (marqueeDrag.current) terminarMarquesina(event);
+    else if (frameDraw.current) endFrameDraw(event);
     else endPan(event);
   };
 
@@ -1043,7 +1190,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     detenerInercia();
     detenerRetornoZoom();
     if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
-    if (event.button !== 0 || event.detail > 1 || frameToolId || connectMode || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
+    if (event.button !== 0 || event.detail > 1 || frameToolId || connectMode || card.locked || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
     suppressCardClick.current = false;
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
     setSettlingIds([]);
@@ -1065,11 +1212,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (nextSelection !== selectedCardIds) setSelectedCardIds(nextSelection);
     if (hasModifier && !nextSelection.includes(card.id)) return;
 
-    const ids = hasModifier
+    const idsBrutos = hasModifier
       ? [card.id]
       : card.type === 'marco'
         ? [...new Set([...nextSelection.includes(card.id) ? nextSelection : [card.id], ...readFrameData(card).hijos])]
-        : nextSelection.includes(card.id) ? nextSelection : [card.id];
+        : card.type === 'columna'
+          ? [...new Set([...nextSelection.includes(card.id) ? nextSelection : [card.id], ...readColumnData(card).hijos])]
+          : nextSelection.includes(card.id) ? nextSelection : [card.id];
+    // Una tarjeta bloqueada nunca entra en un arrastre múltiple.
+    const ids = idsBrutos.filter((id) => !activeBoard.cards.find((item) => item.id === id)?.locked);
     const positions = new Map(
       activeBoard.cards.filter((item) => ids.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]),
     );
@@ -1093,9 +1244,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       lastX: event.clientX,
       lastY: event.clientY,
       lastT: performance.now(),
+      altKey: event.altKey,
+      duplicated: false,
     };
     setDraggingIds(ids);
     setDropFrameId(null);
+    dropFrameIdRef.current = null;
   };
 
   const moveCardDrag = (event: React.PointerEvent<HTMLElement>) => {
@@ -1107,6 +1261,29 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       drag.moved = true;
       try { drag.captureEl?.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
     }
+    // Alt/Opción + arrastrar: la copia nace en el primer movimiento, no al hacer clic.
+    let base: BoardDocument = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
+    if (!base) return;
+    if (drag.altKey && !drag.duplicated) {
+      const dup = duplicateCards(base.cards, base.relations, drag.ids, { x: 0, y: 0 });
+      const sizes = new Map<string, CardSize>();
+      for (const [viejo, nuevo] of dup.idMap) {
+        const medida = drag.sizes.get(viejo);
+        if (medida) sizes.set(nuevo, medida);
+      }
+      base = {
+        ...base,
+        updatedAt: new Date().toISOString(),
+        cards: [...base.cards, ...dup.cards],
+        relations: [...base.relations, ...dup.relations],
+      };
+      drag.ids = dup.newIds;
+      drag.positions = new Map(dup.cards.map((item) => [item.id, { x: item.x, y: item.y }]));
+      drag.sizes = sizes;
+      drag.duplicated = true;
+      setSelectedCardIds(dup.newIds);
+      setNotice(`Copia creada: ${dup.newIds.length === 1 ? '1 tarjeta' : `${dup.newIds.length} tarjetas`}.`);
+    }
     let deltaX = (event.clientX - drag.x) / cameraRef.current.zoom;
     let deltaY = (event.clientY - drag.y) / cameraRef.current.zoom;
     const anchor = drag.positions.get(drag.ids[0]);
@@ -1114,7 +1291,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       deltaX = snapPosition(anchor.x + deltaX, GRID_SIZE) - anchor.x;
       deltaY = snapPosition(anchor.y + deltaY, GRID_SIZE) - anchor.y;
     }
-    const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
+    const tablero = base;
     const arrastrados = new Set(drag.ids);
     if (anchor && tablero) {
       const tamano = drag.sizes.get(drag.ids[0]) ?? { width: 260, height: 200 };
@@ -1149,28 +1326,37 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       viewportRef.current?.style.setProperty('--drag-tilt', `${inclinacionPorVelocidad(vx)}deg`);
     }
 
-    updateBoard((board) => ({
-      ...board,
-      cards: board.cards.map((item) => {
+    updateBoard(() => ({
+      ...tablero,
+      cards: tablero.cards.map((item) => {
         const position = drag.positions.get(item.id);
         return position ? { ...item, x: position.x + deltaX, y: position.y + deltaY } : item;
       }),
     }), { recordHistory: false });
 
-    const esMarcoArrastrado = drag.ids.some((id) => tablero?.cards.find((item) => item.id === id)?.type === 'marco');
+    const esMarcoArrastrado = drag.ids.some((id) => {
+      const tipo = tablero?.cards.find((item) => item.id === id)?.type;
+      return tipo === 'marco' || tipo === 'columna';
+    });
     if (!tablero || esMarcoArrastrado) {
       setDropFrameId(null);
+      dropFrameIdRef.current = null;
       return;
     }
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
     const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
     const destino = tablero.cards.find((item) => {
-      if (item.type !== 'marco' || arrastrados.has(item.id)) return false;
-      const alto = readFrameData(item).alto;
+      if (arrastrados.has(item.id)) return false;
+      if (item.type !== 'marco' && item.type !== 'columna') return false;
+      const alto = item.type === 'columna'
+        ? (viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${item.id}"]`)?.getBoundingClientRect().height ?? 200) / cameraRef.current.zoom
+        : readFrameData(item).alto;
       return punto.x >= item.x && punto.x <= item.x + item.width && punto.y >= item.y && punto.y <= item.y + alto;
     });
-    setDropFrameId((actual) => actual === (destino?.id ?? null) ? actual : destino?.id ?? null);
+    const siguienteDestino = destino?.id ?? null;
+    dropFrameIdRef.current = siguienteDestino;
+    setDropFrameId((actual) => actual === siguienteDestino ? actual : siguienteDestino);
   };
 
   const asentar = (ids: string[]) => {
@@ -1191,14 +1377,24 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const drag = cardDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
-    const destino = dropFrameId;
+    const destino = dropFrameIdRef.current;
     let final = tablero;
-    if (tablero && destino && !drag.ids.some((id) => tablero.cards.find((item) => item.id === id)?.type === 'marco')) {
+    if (tablero && destino && !drag.ids.some((id) => {
+      const tipo = tablero.cards.find((item) => item.id === id)?.type;
+      return tipo === 'marco' || tipo === 'columna';
+    })) {
       const adoptados = new Set(drag.ids);
       final = {
         ...tablero,
         updatedAt: new Date().toISOString(),
         cards: tablero.cards.map((item) => {
+          if (item.type === 'columna') {
+            const datos = readColumnData(item);
+            const hijos = datos.hijos.filter((id) => !adoptados.has(id));
+            return item.id === destino
+              ? { ...item, datos: { ...item.datos, ...datos, hijos: [...new Set([...hijos, ...drag.ids])] } }
+              : { ...item, datos: { ...item.datos, ...datos, hijos } };
+          }
           if (item.type !== 'marco') return item;
           const datos = readFrameData(item);
           const hijos = datos.hijos.filter((id) => !adoptados.has(id));
@@ -1226,6 +1422,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     liberarPuntero(drag.captureEl, drag.pointerId);
     setDraggingIds([]);
     setDropFrameId(null);
+    dropFrameIdRef.current = null;
     setGuias({});
     if (drag.moved) asentar(drag.ids);
     else limpiarInclinacion();
@@ -1511,6 +1708,75 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
   };
 
+  const crearRelacion = useCallback((from: string, to: string) => {
+    if (!activeBoard || from === to) return false;
+    const exists = activeBoard.relations.some((relation) => [relation.from, relation.to].sort().join(':') === [from, to].sort().join(':'));
+    if (exists) {
+      setNotice('Estas tarjetas ya están relacionadas.');
+      return false;
+    }
+    updateBoard((board) => ({ ...board, relations: [...board.relations, { id: newBoardId('relation'), from, to }] }));
+    setNotice('Conector creado. Doble clic sobre la curva para ponerle etiqueta.');
+    return true;
+  }, [activeBoard, updateBoard]);
+
+  const iniciarConector = (card: BoardCard, event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !activeBoard) return;
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    connectOrigin.current = { cardId: card.id, pointerId: event.pointerId };
+    const mundo = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
+    setConnectDraft({ from: card.id, x: event.clientX - rect.left, y: event.clientY - rect.top, mundo, target: null });
+  };
+
+  const conectorActivo = connectDraft !== null;
+  useEffect(() => {
+    if (!conectorActivo) return;
+    const mover = (event: PointerEvent) => {
+      const origin = connectOrigin.current;
+      const rect = viewportRef.current?.getBoundingClientRect();
+      if (!origin || !rect) return;
+      const bajo = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-card-id]');
+      const target = bajo?.dataset.cardId ?? null;
+      const mundo = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
+      setConnectDraft({ from: origin.cardId, x: event.clientX - rect.left, y: event.clientY - rect.top, mundo, target: target === origin.cardId ? null : target });
+    };
+    const soltar = (event: PointerEvent) => {
+      const origin = connectOrigin.current;
+      if (!origin) return;
+      const bajo = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-card-id]');
+      const target = bajo?.dataset.cardId ?? null;
+      connectOrigin.current = null;
+      setConnectDraft(null);
+      if (target && target !== origin.cardId) crearRelacion(origin.cardId, target);
+      else setNotice('Suelta el conector sobre otra tarjeta para relacionarlas.');
+    };
+    const cancelar = () => {
+      connectOrigin.current = null;
+      setConnectDraft(null);
+    };
+    window.addEventListener('pointermove', mover);
+    window.addEventListener('pointerup', soltar);
+    window.addEventListener('pointercancel', cancelar);
+    return () => {
+      window.removeEventListener('pointermove', mover);
+      window.removeEventListener('pointerup', soltar);
+      window.removeEventListener('pointercancel', cancelar);
+    };
+  }, [conectorActivo, crearRelacion]);
+
+  const editarEtiquetaRelacion = (relation: BoardRelation) => {
+    const valor = window.prompt('Etiqueta del conector (vacío para quitarla)', relation.label ?? '');
+    if (valor === null) return;
+    const label = valor.trim().slice(0, 160);
+    updateBoard((board) => ({
+      ...board,
+      relations: board.relations.map((item) => item.id === relation.id
+        ? { ...item, ...(label ? { label } : { label: undefined }) }
+        : item),
+    }));
+  };
+
   const handleConnectCard = (cardId: string) => {
     if (!connectMode || !activeBoard) return;
     if (!connectFromId) {
@@ -1523,12 +1789,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       setNotice('Relación cancelada.');
       return;
     }
-    const exists = activeBoard.relations.some((relation) => [relation.from, relation.to].sort().join(':') === [connectFromId, cardId].sort().join(':'));
-    if (exists) setNotice('Estas tarjetas ya están relacionadas.');
-    else {
-      updateBoard((board) => ({ ...board, relations: [...board.relations, { id: newBoardId('relation'), from: connectFromId, to: cardId }] }));
-      setNotice('Relación creada.');
-    }
+    crearRelacion(connectFromId, cardId);
     setConnectFromId(null);
   };
 
@@ -1667,6 +1928,58 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     enqueueBoardSave(board, { immediate: true });
   };
 
+  const crearTableroAnidado = (destino: BoardDocument) => {
+    setNestedDialog(false);
+    const creada = addToolCard('tablero', (card) => {
+      card.title = destino.title || 'Tablero';
+      card.datos = { boardId: destino.id, boardTitle: destino.title || 'Tablero' };
+    });
+    if (creada) setNotice(`Tablero «${destino.title || 'sin título'}» anidado como tarjeta.`);
+  };
+
+  const abrirPlantillas = () => {
+    setTemplates(listarPlantillas());
+    setTemplateDialog(true);
+  };
+
+  const aplicarPlantilla = async (plantilla: Plantilla) => {
+    if (!(await flushBoardWrites())) {
+      setNotice('No se aplicó la plantilla porque el tablero actual aún no se pudo guardar. Reintenta o exporta una copia.');
+      return;
+    }
+    const { cards, relations, title } = materializar(plantilla.board, plantilla.nombre);
+    const board: BoardDocument = {
+      ...createBoard(title.slice(0, 120)),
+      cards,
+      relations,
+    };
+    if (activeProjectId) {
+      try {
+        await assignBoardToProject(board.id, activeProjectId);
+        setProjectIdByBoardId((current) => new Map(current).set(board.id, activeProjectId));
+      } catch (error) {
+        setProjectError(error instanceof Error ? error.message : 'No se pudo asignar el tablero al proyecto.');
+        return;
+      }
+    }
+    setBoards((current) => [...current, board]);
+    setActiveBoardId(board.id);
+    setSelectedCardIds([]);
+    enqueueBoardSave(board, { immediate: true });
+    setTemplateDialog(false);
+    setNotice(`Tablero «${board.title}» creado desde la plantilla «${plantilla.nombre}».`);
+  };
+
+  const guardarTableroComoPlantilla = () => {
+    if (!activeBoard) return;
+    setTemplates(guardarPlantilla(activeBoard));
+    setNotice(`«${activeBoard.title}» guardado como plantilla reutilizable.`);
+  };
+
+  const borrarPlantillaGuardada = (id: string) => {
+    setTemplates(eliminarPlantilla(id));
+  };
+
   const renameBoard = (title: string) => {
     updateBoard((board) => ({ ...board, title: title.slice(0, 120) }));
   };
@@ -1711,6 +2024,32 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
   };
 
+  /** La vista previa la resuelve el motor local; si falla, el enlace queda igual de válido. */
+  const aplicarVistaPrevia = useCallback(async (cardId: string, url: string) => {
+    try {
+      const respuesta = await studioApi.vistaPreviaUrl(url);
+      const preview = normalizarVistaPrevia(respuesta, url);
+      if (!preview) {
+        setNotice('El enlace se guardó, pero la página no publica título, descripción ni imagen.');
+        return;
+      }
+      updateBoard((board) => ({
+        ...board,
+        cards: board.cards.map((card) => card.id === cardId
+          ? {
+            ...card,
+            title: card.title && card.title !== card.url ? card.title : (preview.titulo || preview.sitio || card.title),
+            datos: { ...card.datos, vistaPrevia: preview },
+          }
+          : card),
+      }));
+      setNotice('Vista previa añadida desde el motor local.');
+    } catch {
+      setNotice('El enlace se guardó. No se pudo leer la vista previa; puedes añadir una nota a mano.');
+    } finally {
+    }
+  }, [updateBoard]);
+
   const saveLinkCard = (event: React.FormEvent) => {
     event.preventDefault();
     if (!isSafeExternalUrl(linkUrl)) {
@@ -1718,15 +2057,17 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       return;
     }
     if (!activeBoard) return;
+    const url = linkUrl.trim();
     const created = addToolCard('link', (card) => {
-      card.title = linkTitle.trim() || linkUrl.trim();
-      card.url = linkUrl.trim();
+      card.title = linkTitle.trim() || url;
+      card.url = url;
     });
     if (!created) return;
     setLinkDialog(false);
     setLinkTitle('');
     setLinkUrl('');
     setLinkError(null);
+    void aplicarVistaPrevia(created.id, url);
   };
 
   const addMedia = useCallback(async (file?: File, at?: { x: number; y: number }) => {
@@ -2070,29 +2411,44 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         return;
       }
       const text = event.clipboardData?.getData('text/plain').trim() ?? '';
-      if (!text || !isSafeExternalUrl(text)) return;
+      if (!text || !isSafeExternalUrl(text) || !activeBoard) return;
       const selectedId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
       const targetId = hoveredReferenteId.current ?? selectedId;
-      if (!targetId) return;
-      const card = activeBoard?.cards.find((item) => item.id === targetId && item.type === 'referente');
-      if (!card) return;
-      const before = leerReferente(card);
-      const next = agregarImagenDesdeUrl(before, text);
-      if (!next) return;
-      event.preventDefault();
-      if (next.imagenes.length === before.imagenes.length) {
-        setNotice('Esa imagen ya estaba en el Referente, con su fuente y fecha.');
+      const card = targetId ? activeBoard.cards.find((item) => item.id === targetId && item.type === 'referente') : undefined;
+      if (card) {
+        const before = leerReferente(card);
+        const next = agregarImagenDesdeUrl(before, text);
+        if (!next) return;
+        event.preventDefault();
+        if (next.imagenes.length === before.imagenes.length) {
+          setNotice('Esa imagen ya estaba en el Referente, con su fuente y fecha.');
+          return;
+        }
+        replaceCard({ ...card, title: next.nombre.trim() || card.title, datos: { ...card.datos, ...next } });
+        setNotice(`Imagen añadida a «${next.nombre || card.title || 'Referente'}» con su fuente y fecha.`);
         return;
       }
-      replaceCard({ ...card, title: next.nombre.trim() || card.title, datos: { ...card.datos, ...next } });
-      setNotice(`Imagen añadida a «${next.nombre || card.title || 'Referente'}» con su fuente y fecha.`);
+      // Sin referente debajo: la URL pegada se convierte en tarjeta de enlace con
+      // vista previa pedida al backend local (las claves nunca viven en el frontend).
+      event.preventDefault();
+      const creada = addToolCard('link', (nueva) => {
+        nueva.url = text;
+        nueva.title = text;
+      });
+      if (!creada) return;
+      setNotice('Enlace pegado. Buscando título, descripción e imagen…');
+      void aplicarVistaPrevia(creada.id, text);
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [activeBoard, replaceCard, selectedCardIds]);
+  }, [activeBoard, addToolCard, aplicarVistaPrevia, replaceCard, selectedCardIds]);
 
   const removeCard = (id: string) => {
     const card = activeBoard?.cards.find((item) => item.id === id);
+    if (card?.locked) {
+      setNotice('Esta tarjeta está bloqueada. Desbloquéala para moverla o eliminarla.');
+      return;
+    }
     const isFrame = card?.type === 'marco';
     if (!window.confirm(isFrame
       ? '¿Eliminar este marco? Las tarjetas de dentro seguirán en la pizarra.'
@@ -2112,9 +2468,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const deleteSelectedCards = () => {
     if (!selectedCardIds.length || !activeBoard) return;
-    const count = selectedCardIds.length;
+    const bloqueadas = activeBoard.cards.filter((card) => card.locked && selectedCardIds.includes(card.id));
+    const eliminables = selectedCardIds.filter((id) => !bloqueadas.some((card) => card.id === id));
+    if (!eliminables.length) {
+      setNotice('Todas las tarjetas seleccionadas están bloqueadas.');
+      return;
+    }
+    if (bloqueadas.length) setNotice(`${bloqueadas.length} ${bloqueadas.length === 1 ? 'tarjeta bloqueada se queda' : 'tarjetas bloqueadas se quedan'}; se eliminan las demás.`);
+    const count = eliminables.length;
     if (!window.confirm(`¿Eliminar ${count} ${count === 1 ? 'tarjeta seleccionada' : 'tarjetas seleccionadas'} y sus relaciones?`)) return;
-    const selected = new Set(selectedCardIds);
+    const selected = new Set(eliminables);
     updateBoard((board) => {
       let cards = board.cards.filter((card) => !selected.has(card.id));
       for (const id of selected) cards = detachCardFromFrames(cards, id);
@@ -2129,6 +2492,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const onCardSelect = useCallback((card: BoardCard, event: Modificadores) => cardHandlers.current?.select(card.id, event), []);
   const onCardConnect = useCallback((cardId: string) => cardHandlers.current?.connect(cardId), []);
+  const onCardConnectStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.connectStart(card, event), []);
   const onCardDragStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragStart(card, event), []);
   const onCardDragMove = useCallback((event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragMove(event), []);
   const onCardDragEnd = useCallback((event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragEnd(event), []);
@@ -2141,6 +2505,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   cardHandlers.current = {
     select: handleCardSelection,
     connect: handleConnectCard,
+    connectStart: iniciarConector,
     dragStart: startCardDrag,
     dragMove: moveCardDrag,
     dragEnd: endCardDrag,
@@ -2205,6 +2570,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           <button className="board-icon-button" onClick={() => { const nombre = window.prompt('Nombre del tablero', activeBoard.title); if (nombre !== null) renameBoard(nombre.trim() || activeBoard.title); }} aria-label="Renombrar tablero" title="Renombrar tablero"><Pencil size={15} /></button>
           <button className="board-icon-button" onClick={() => { setProjectName(''); setProjectDialog(true); }} aria-label="Crear proyecto" title="Crear proyecto"><FolderPlus size={16} /></button>
           <button className="board-icon-button" onClick={() => void addNewBoard()} aria-label="Crear tablero" title="Crear tablero"><Plus size={16} /></button>
+          <button className="board-icon-button" onClick={abrirPlantillas} aria-label="Plantillas de tablero" title="Crear un tablero desde una plantilla"><LayoutTemplate size={15} /></button>
           <button className="board-icon-button" onClick={() => importInput.current?.click()} aria-label="Importar tablero" title="Importar tablero desde JSON o Markdown"><Upload size={15} /></button>
           <button className="board-icon-button danger" onClick={() => void removeCurrentBoard()} aria-label="Eliminar tablero" title="Eliminar tablero"><Trash2 size={15} /></button>
           <span className={`board-save-state ${saveState}`} aria-live="polite">
@@ -2295,8 +2661,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             const tool = getBoardTool(toolId);
             if (!tool) return null;
             const Icono = tool.icono;
-            const etiquetas: Record<string, string> = { note: 'Nota', link: 'Enlace', media: 'Imagen', referente: 'Referente', marco: 'Marco', entropia: 'Entropía' };
-            const aria: Record<string, string> = { note: 'Nueva nota', link: 'Añadir enlace', media: 'Añadir imagen', referente: 'Añadir referente', marco: 'Dibujar marco', entropia: 'Añadir entropía' };
+            const etiquetas: Record<string, string> = { note: 'Nota', link: 'Enlace', media: 'Imagen', tareas: 'Tareas', columna: 'Columna', referente: 'Referente', marco: 'Marco', entropia: 'Entropía' };
+            const aria: Record<string, string> = { note: 'Nueva nota', link: 'Añadir enlace', media: 'Añadir imagen', tareas: 'Nueva lista de tareas', columna: 'Nueva columna', referente: 'Añadir referente', marco: 'Dibujar marco', entropia: 'Añadir entropía' };
             return (
               <button
                 key={toolId}
@@ -2350,10 +2716,31 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
               const from = activeBoard.cards.find((card) => card.id === relation.from);
               const to = activeBoard.cards.find((card) => card.id === relation.to);
               if (!from || !to) return null;
-              const a = cardCenter(from);
-              const b = cardCenter(to);
-              return <line key={relation.id} x1={a.x} y1={a.y} x2={b.x} y2={b.y} markerEnd="url(#board-arrow)" />;
+              const geo = geometriaConector(rectDeTarjeta(from), rectDeTarjeta(to));
+              return (
+                <g key={relation.id} className={`board-relation tone-${relation.tone ?? 'ember'}`}>
+                  <path
+                    className="board-relation-path"
+                    d={geo.path}
+                    markerEnd="url(#board-arrow)"
+                    onDoubleClick={(event) => { event.stopPropagation(); editarEtiquetaRelacion(relation); }}
+                  >
+                    <title>{relation.label || 'Doble clic para etiquetar el conector'}</title>
+                  </path>
+                  {relation.label && (
+                    <text className="board-relation-label" x={geo.medio.x} y={geo.medio.y} textAnchor="middle" dominantBaseline="middle" onDoubleClick={(event) => { event.stopPropagation(); editarEtiquetaRelacion(relation); }}>
+                      {relation.label}
+                    </text>
+                  )}
+                </g>
+              );
             })}
+            {connectDraft && (() => {
+              const desde = activeBoard.cards.find((card) => card.id === connectDraft.from);
+              if (!desde) return null;
+              const geo = geometriaConector(rectDeTarjeta(desde), { x: connectDraft.mundo.x, y: connectDraft.mundo.y, width: 1, height: 1 });
+              return <path className={`board-relation-draft ${connectDraft.target ? 'has-target' : ''}`} d={geo.path} />;
+            })()}
             </g>
           </svg>
         <div className="board-stage" ref={stageRef}>
@@ -2365,6 +2752,30 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           )}
           {activeBoard.cards.map((card) => {
             const matches = matchingCards.has(card.id);
+            if (card.type === 'columna') {
+              const hijos = readColumnData(card).hijos
+                .map((id) => cardsById.get(id))
+                .filter((item): item is BoardCard => Boolean(item));
+              return (
+                <BoardColumn
+                  key={card.id}
+                  card={card}
+                  childrenCards={hijos}
+                  selected={selectedCardIds.includes(card.id)}
+                  dimmed={!matches}
+                  dragging={draggingIds.includes(card.id)}
+                  settling={settlingIds.includes(card.id)}
+                  dropTarget={dropFrameId === card.id}
+                  onSelect={onCardSelect}
+                  onDragStart={onCardDragStart}
+                  onDragMove={onCardDragMove}
+                  onDragEnd={onCardDragEnd}
+                  onDelete={onCardDelete}
+                  onPatch={onCardPatch}
+                  onToggleFold={(id) => updateBoard((board) => ({ ...board, cards: setColumnFolded(board.cards, id, !readColumnData(card).plegada) }))}
+                />
+              );
+            }
             if (card.type === 'marco') {
               const frame = readFrameData(card);
               const childCount = frame.hijos.filter((id) => cardsById.has(id)).length;
@@ -2470,8 +2881,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   onDragStart={onCardDragStart}
                   onDragMove={onCardDragMove}
                   onDragEnd={onCardDragEnd}
-                  onDelete={onCardDelete}
-                  onResizeStart={startFreeResize}
+                   onDelete={onCardDelete}
+                   onPatch={onCardPatch}
+                   onResizeStart={startFreeResize}
                   onResizeMove={moveFreeResize}
                   onResizeEnd={endFreeResize}
                   onNaturalSize={ajustarAlturaNatural}
@@ -2486,11 +2898,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                 dimmed={!matches}
                 dragging={draggingIds.includes(card.id)}
                 settling={settlingIds.includes(card.id)}
-                connectionSource={connectFromId === card.id}
-                connectMode={connectMode}
-                colors={COLORS}
-                onSelect={onCardSelect}
-                onConnect={onCardConnect}
+                 connectionSource={connectFromId === card.id}
+                 connectionTarget={connectDraft?.target === card.id}
+                 connectMode={connectMode}
+                 colors={COLORS}
+                 onSelect={onCardSelect}
+                 onConnect={onCardConnect}
+                 onConnectStart={onCardConnectStart}
                 onDragStart={onCardDragStart}
                 onDragMove={onCardDragMove}
                 onDragEnd={onCardDragEnd}
@@ -2518,7 +2932,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           )}
         </div>
 
-        <div className="board-count">{activeBoard.cards.length} {activeBoard.cards.length === 1 ? 'tarjeta' : 'tarjetas'} · arrastra el fondo para moverte · ⌘/Ctrl + rueda para acercar</div>
+        {marquee && (
+          <div
+            className="board-marquee"
+            data-testid="board-marquee"
+            style={{ left: marquee.x, top: marquee.y, width: marquee.width, height: marquee.height }}
+            aria-hidden="true"
+          />
+        )}
+
+        <div className="board-count">{activeBoard.cards.length} {activeBoard.cards.length === 1 ? 'tarjeta' : 'tarjetas'} · ⇧ + arrastra el fondo para seleccionar un área · ⌘/Ctrl + rueda para acercar</div>
       </main>
 
         <input ref={importInput} type="file" accept="application/json,.json,text/markdown,.md" hidden onChange={(event) => { void importBoard(event.target.files?.[0]); event.target.value = ''; }} />
@@ -2577,6 +3000,51 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
               <button type="button" onClick={() => setAddMenuOpen(false)} aria-label="Cerrar menú"><X size={15} /></button>
             </div>
             <BoardToolMenu onChoose={chooseTool} />
+          </div>
+        </div>
+      )}
+
+      {nestedDialog && (
+        <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setNestedDialog(false); }}>
+          <div className="board-dialog board-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="board-nested-title">
+            <div className="board-dialog-heading"><h2 id="board-nested-title">Anidar un tablero</h2><button type="button" onClick={() => setNestedDialog(false)} aria-label="Cerrar"><X size={16} /></button></div>
+            <p className="board-dialog-hint">La tarjeta guarda solo el vínculo. Al abrirla cambias de tablero sin perder lo que estabas mirando.</p>
+            <div className="board-template-grid">
+              {projectBoards.map((board) => (
+                <button key={board.id} type="button" className="board-template-card" onClick={() => crearTableroAnidado(board)}>
+                  <strong>{board.title || 'Sin título'}</strong>
+                  <span>{board.cards.length} {board.cards.length === 1 ? 'tarjeta' : 'tarjetas'}</span>
+                </button>
+              ))}
+            </div>
+            <div className="board-dialog-actions"><button type="button" className="board-tool" onClick={() => setNestedDialog(false)}>Cancelar</button></div>
+          </div>
+        </div>
+      )}
+
+      {templateDialog && (
+        <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setTemplateDialog(false); }}>
+          <div className="board-dialog board-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="board-template-title">
+            <div className="board-dialog-heading"><h2 id="board-template-title">Plantillas de tablero</h2><button type="button" onClick={() => setTemplateDialog(false)} aria-label="Cerrar"><X size={16} /></button></div>
+            <p className="board-dialog-hint">Crear una plantilla no copia archivos: solo la estructura de tarjetas, columnas y tareas.</p>
+            <div className="board-template-grid">
+              {templates.map((plantilla) => (
+                <div key={plantilla.id} className="board-template-card-wrap">
+                  <button type="button" className="board-template-card" onClick={() => { void aplicarPlantilla(plantilla); }}>
+                    <strong>{plantilla.nombre}</strong>
+                    <span>{plantilla.descripcion}</span>
+                    <small>{plantilla.builtin ? 'Incluida' : 'Guardada por ti'}</small>
+                  </button>
+                  {!plantilla.builtin && (
+                    <button type="button" className="board-template-delete" onClick={() => borrarPlantillaGuardada(plantilla.id)} aria-label={`Eliminar plantilla ${plantilla.nombre}`} title="Eliminar plantilla guardada"><Trash2 size={12} /></button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="board-dialog-actions">
+              <button type="button" className="board-tool" onClick={guardarTableroComoPlantilla} disabled={!activeBoard}>Guardar este tablero como plantilla</button>
+              <button type="button" className="board-tool primary" onClick={() => setTemplateDialog(false)}>Cerrar</button>
+            </div>
           </div>
         </div>
       )}

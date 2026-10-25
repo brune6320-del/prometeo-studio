@@ -183,6 +183,17 @@ export const studioApi = {
     });
   },
 
+  /**
+   * Vista previa de una URL. El backend local descarga solo los metadatos
+   * og:/<title>/<meta description> con un tiempo máximo; aquí no hay claves.
+   */
+  vistaPreviaUrl(url: string, signal?: AbortSignal) {
+    return request<{ ok: boolean; url: string; titulo: string; descripcion: string; imagen: string }>(
+      `/api/url-preview?url=${enc(url)}`,
+      { signal, timeoutMs: 12_000, stage: 'API' },
+    );
+  },
+
   async getHostStatus(): Promise<HostStatus | null> {
     const internals = (window as unknown as { __TAURI_INTERNALS__?: { invoke?: (cmd: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
     if (!internals?.invoke) return null;

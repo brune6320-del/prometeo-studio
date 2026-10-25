@@ -36,9 +36,9 @@ const renderContent = (card: BoardCard) =>
   renderToStaticMarkup(<BoardCardContent card={card} editar={NOOP} />);
 
 describe('registro de herramientas del tablero', () => {
-  it('registra note, link, media, etiqueta, referente, marco y entropía con su contrato', () => {
-    expect(listBoardTools().map((tool) => tool.id)).toEqual(['note', 'link', 'media', 'etiqueta', 'referente', 'marco', 'entropia']);
-    for (const id of ['note', 'link', 'media', 'etiqueta', 'referente', 'marco', 'entropia']) {
+  it('registra las diez herramientas de G3 con su contrato', () => {
+    expect(listBoardTools().map((tool) => tool.id)).toEqual(['note', 'link', 'media', 'etiqueta', 'referente', 'marco', 'entropia', 'columna', 'tareas', 'tablero']);
+    for (const id of ['note', 'link', 'media', 'etiqueta', 'referente', 'marco', 'entropia', 'columna', 'tareas', 'tablero']) {
       const tool = getBoardTool(id);
       expect(tool).toBeDefined();
       expect(tool?.tipo).toBe(id === 'marco' || id === 'entropia' ? 'marco' : 'tarjeta');
@@ -49,16 +49,16 @@ describe('registro de herramientas del tablero', () => {
     expect(getBoardTool('muro')).toBeUndefined();
   });
 
-  it('el menú se arma desde el registro y muestra las 7 herramientas', () => {
+  it('el menú se arma desde el registro y muestra las 10 herramientas', () => {
     const html = renderToStaticMarkup(<BoardToolMenu onChoose={NOOP} />);
-    expect((html.match(/role="menuitem"/g) ?? []).length).toBe(7);
-    for (const nombre of ['Nota', 'Enlace', 'Multimedia', 'Etiqueta', 'Referente', 'Marco', 'Entropía']) {
+    expect((html.match(/role="menuitem"/g) ?? []).length).toBe(10);
+    for (const nombre of ['Nota', 'Enlace', 'Multimedia', 'Etiqueta', 'Referente', 'Marco', 'Entropía', 'Columna', 'Lista de tareas', 'Tablero anidado']) {
       expect(html).toContain(nombre);
     }
   });
 
   it('crear con cualquier herramienta y deshacer devuelve el tablero a su estado anterior', () => {
-    for (const id of ['note', 'link', 'media', 'etiqueta', 'referente', 'marco', 'entropia']) {
+    for (const id of ['note', 'link', 'media', 'etiqueta', 'referente', 'marco', 'entropia', 'columna', 'tareas', 'tablero']) {
       const tool = getBoardTool(id);
       const before = createBoard('Prueba');
       const card = tool!.crear(120, 80);

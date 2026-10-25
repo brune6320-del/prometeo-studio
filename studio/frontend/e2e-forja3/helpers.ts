@@ -52,8 +52,8 @@ export function marco(id: string, x: number, y: number, extra: Partial<SemillaTa
   };
 }
 
-export async function sembrarTablero(page: Page, cards: SemillaTarjeta[], title = 'Tablero Forja 2') {
-  await page.evaluate(async ({ db, cards: semilla, title: nombre }) => {
+export async function sembrarTablero(page: Page, cards: SemillaTarjeta[], title = 'Tablero Forja 2', relations: Array<{ id: string; from: string; to: string; label?: string; tone?: string }> = []) {
+  await page.evaluate(async ({ db, cards: semilla, title: nombre, relations: relaciones }) => {
     const requestValue = <T,>(request: IDBRequest<T>) => new Promise<T>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -67,7 +67,7 @@ export async function sembrarTablero(page: Page, cards: SemillaTarjeta[], title 
       createdAt: now,
       updatedAt: now,
       cards: semilla,
-      relations: [],
+      relations: relaciones,
     };
     const tx = database.transaction(['boards', 'meta'], 'readwrite');
     tx.objectStore('boards').put(board);
@@ -78,7 +78,7 @@ export async function sembrarTablero(page: Page, cards: SemillaTarjeta[], title 
       tx.onabort = () => reject(tx.error);
     });
     database.close();
-  }, { db: BOARD_DB, cards, title });
+  }, { db: BOARD_DB, cards, title, relations });
 }
 
 export async function abrirTablero(page: Page) {
@@ -90,10 +90,10 @@ export async function abrirTablero(page: Page) {
   await expect(page.getByTestId('board-topbar')).toBeVisible();
 }
 
-export async function abrirTableroCon(page: Page, cards: SemillaTarjeta[], title?: string) {
+export async function abrirTableroCon(page: Page, cards: SemillaTarjeta[], title?: string, relations?: Array<{ id: string; from: string; to: string; label?: string; tone?: string }>) {
   await mockBackend(page);
   await abrirTablero(page);
-  await sembrarTablero(page, cards, title);
+  await sembrarTablero(page, cards, title, relations);
   await page.reload();
   await abrirTablero(page);
   await expect(page.locator('.board-card, .board-frame').first()).toBeVisible();

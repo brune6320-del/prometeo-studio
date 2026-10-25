@@ -1,4 +1,5 @@
 import { normalizeFrameData, readFrameData } from './frames';
+import { normalizeColumnData } from './columnas';
 
 export type BoardCardType = 'note' | 'link' | 'media' | (string & {});
 export type BoardMediaKind = 'image' | 'video' | 'audio' | 'file';
@@ -23,14 +24,21 @@ export interface BoardCard {
   color: 'paper' | 'sand' | 'sage' | 'rose';
   url?: string;
   media?: BoardMedia;
-  /** Campos propios de una herramienta que esta versión no conoce; se guardan sin interpretar. */
+  /** Una tarjeta bloqueada no se mueve, no se borra y no entra en una selección de arrastre. */
+  locked?: boolean;
+  /** Campos propios de una herramienta; se guardan acotados y sin interpretar. */
   datos?: Record<string, unknown>;
 }
+
+export type BoardRelationTone = 'ember' | 'sage' | 'sky' | 'rose';
 
 export interface BoardRelation {
   id: string;
   from: string;
   to: string;
+  /** Etiqueta opcional sobre la curva (doble clic en el conector). */
+  label?: string;
+  tone?: BoardRelationTone;
 }
 
 export interface BoardDocument {
@@ -125,6 +133,21 @@ function boundedNumber(value: unknown, fallback: number, min: number, max: numbe
   return typeof value === 'number' && Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 }
 
+const MAX_DATOS_BYTES = 120_000;
+
+/** Copia acotada de los datos de una herramienta: sin funciones, sin ciclos y sin crecer sin freno. */
+export function normalizeDatos(value: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(value)) return undefined;
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized.length > MAX_DATOS_BYTES) return undefined;
+    const copy = JSON.parse(serialized);
+    return isRecord(copy) ? copy : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function normalizeMedia(value: unknown): BoardMedia | undefined {
   if (!isRecord(value)) return undefined;
   const dataUrl = typeof value.dataUrl === 'string' ? value.dataUrl : '';
@@ -162,11 +185,14 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
       x: boundedNumber(entry.x, 120, -100000, 100000),
       y: boundedNumber(entry.y, 120, -100000, 100000),
       // Un marco puede ser más ancho que una tarjeta: su vista «Libre» contiene varias columnas.
-      width: type === 'marco'
+      width: type === 'marco' || type === 'columna'
         ? boundedNumber(entry.width, 520, 210, 2400)
         : boundedNumber(entry.width, 260, 210, 440),
       color: entry.color === 'sand' || entry.color === 'sage' || entry.color === 'rose' ? entry.color : 'paper',
     };
+    if (entry.locked === true) card.locked = true;
+    const datos = normalizeDatos(entry.datos);
+    if (datos) card.datos = datos;
     if (type === 'media' && (media?.kind === 'image' || media?.kind === 'video')) {
       card.width = boundedNumber(entry.width, 420, 120, 1200);
       card.height = boundedNumber(entry.height, Math.round(card.width * 0.75), 60, 2400);
@@ -177,9 +203,9 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
       // Sin herramienta instalada no se interpreta el contenido: se guarda literal.
       if (url) card.url = url;
       if (media) card.media = media;
-      const reserved = new Set(['id', 'type', 'title', 'body', 'x', 'y', 'width', 'height', 'color', 'url', 'media', 'datos']);
+      const reserved = new Set(['id', 'type', 'title', 'body', 'x', 'y', 'width', 'height', 'color', 'url', 'media', 'datos', 'locked']);
       const extras = Object.fromEntries(Object.entries(entry).filter(([key]) => !reserved.has(key)));
-      const propios = isRecord(entry.datos) ? { ...entry.datos, ...extras } : extras;
+      const propios = { ...(isRecord(card.datos) ? card.datos : {}), ...extras };
       if (Object.keys(propios).length > 0) card.datos = propios;
     }
     cards.push(card);
@@ -188,9 +214,10 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
   const cardIds = new Set(cards.map((card) => card.id));
   // Un marco guarda solo ids: al cargar se descartan los que ya no existen y se acota su alto.
   const normalizedCards = cards.map((card) => {
-    if (card.type !== 'marco') return card;
     const raw = isRecord(card.datos) ? card.datos : {};
-    return { ...card, datos: { ...raw, ...normalizeFrameData(raw, card.id, cardIds) } };
+    if (card.type === 'marco') return { ...card, datos: { ...raw, ...normalizeFrameData(raw, card.id, cardIds) } };
+    if (card.type === 'columna') return { ...card, datos: { ...raw, ...normalizeColumnData(raw, card.id, cardIds) } };
+    return card;
   });
   const relationIds = new Set<string>();
   const relations: BoardRelation[] = [];
@@ -202,7 +229,15 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
     const key = [from, to].sort().join(':');
     if (relationIds.has(key)) continue;
     relationIds.add(key);
-    relations.push({ id: boundedText(entry.id, '', 120) || newBoardId('relation'), from, to });
+    const label = boundedText(entry.label, '', 160).trim();
+    const tone = entry.tone === 'sage' || entry.tone === 'sky' || entry.tone === 'rose' ? entry.tone : 'ember';
+    relations.push({
+      id: boundedText(entry.id, '', 120) || newBoardId('relation'),
+      from,
+      to,
+      ...(label ? { label } : {}),
+      ...(tone !== 'ember' ? { tone } : {}),
+    });
   }
 
   return {
@@ -246,6 +281,54 @@ export function cloneBoardForImport(board: BoardDocument): BoardDocument {
       return mapped;
     }),
     relations: copy.relations.map((relation) => ({
+      id: newBoardId('relation'),
+      from: idMap.get(relation.from)!,
+      to: idMap.get(relation.to)!,
+    })),
+  };
+}
+
+/**
+ * Copia tarjetas para Alt+arrastrar. Remapea ids, hijos de marcos y columnas,
+ * y las relaciones internas del grupo; las externas se quedan fuera.
+ */
+export function duplicateCards(
+  cards: BoardCard[],
+  relations: BoardRelation[],
+  ids: string[],
+  offset: { x: number; y: number },
+): { cards: BoardCard[]; relations: BoardRelation[]; idMap: Map<string, string>; newIds: string[] } {
+  const selected = new Set(ids);
+  const idMap = new Map<string, string>();
+  for (const card of cards) {
+    if (selected.has(card.id)) idMap.set(card.id, newBoardId('card'));
+  }
+  const copies = cards
+    .filter((card) => selected.has(card.id))
+    .map((card) => {
+      const datos = normalizeDatos(card.datos);
+      if (datos && Array.isArray(datos.hijos)) {
+        datos.hijos = datos.hijos
+          .map((id) => (typeof id === 'string' ? idMap.get(id) : undefined))
+          .filter((id): id is string => Boolean(id));
+      }
+      return {
+        ...card,
+        id: idMap.get(card.id)!,
+        x: card.x + offset.x,
+        y: card.y + offset.y,
+        locked: false,
+        ...(datos ? { datos } : {}),
+      };
+    });
+  const newIds = copies.map((card) => card.id);
+  const internal = relations.filter((relation) => selected.has(relation.from) && selected.has(relation.to));
+  return {
+    cards: copies,
+    newIds,
+    idMap,
+    relations: internal.map((relation) => ({
+      ...relation,
       id: newBoardId('relation'),
       from: idMap.get(relation.from)!,
       to: idMap.get(relation.to)!,

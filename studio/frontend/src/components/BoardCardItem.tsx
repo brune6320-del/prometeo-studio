@@ -1,15 +1,15 @@
 import React from 'react';
+import { Link2, Lock, LockOpen, X } from 'lucide-react';
+import type { BoardCard } from '../board/model';
+import { BoardCardContent } from '../board/tools/CardView';
+import { TituloEnSitio } from './InlineEdit';
+import { metricas } from '../motion/metricas';
 
 interface Modificadores {
   metaKey: boolean;
   ctrlKey: boolean;
   shiftKey: boolean;
 }
-import { Link2, X } from 'lucide-react';
-import type { BoardCard } from '../board/model';
-import { BoardCardContent } from '../board/tools/CardView';
-import { TituloEnSitio } from './InlineEdit';
-import { metricas } from '../motion/metricas';
 
 export interface BoardCardItemProps {
   card: BoardCard;
@@ -18,10 +18,12 @@ export interface BoardCardItemProps {
   dragging: boolean;
   settling: boolean;
   connectionSource: boolean;
+  connectionTarget?: boolean;
   connectMode: boolean;
   colors: Array<BoardCard['color']>;
   onSelect: (card: BoardCard, modifiers: Modificadores) => void;
   onConnect: (cardId: string) => void;
+  onConnectStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
   onDragStart: (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => void;
   onDragMove: (event: React.PointerEvent<HTMLDivElement>) => void;
   onDragEnd: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -39,10 +41,12 @@ export const BoardCardItem = React.memo(function BoardCardItem({
   dragging,
   settling,
   connectionSource,
+  connectionTarget = false,
   connectMode,
   colors,
   onSelect,
   onConnect,
+  onConnectStart,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -53,13 +57,18 @@ export const BoardCardItem = React.memo(function BoardCardItem({
   onBlurCapture,
 }: BoardCardItemProps) {
   metricas.rendersTarjeta += 1;
+  const iniciarArrastre = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (card.locked) return;
+    onDragStart(card, event);
+  };
   return (
     <article
       data-card-id={card.id}
       data-card-type={card.type}
+      data-locked={card.locked ? 'si' : 'no'}
       tabIndex={0}
       aria-label={`Tarjeta: ${card.title || 'sin título'}`}
-      className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''}`}
+      className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''} ${connectionTarget ? 'connection-target' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${card.locked ? 'is-locked' : ''}`}
       style={{ left: card.x, top: card.y, width: card.width }}
       onClick={(event) => {
         if (connectMode) {
@@ -79,16 +88,35 @@ export const BoardCardItem = React.memo(function BoardCardItem({
         }
       }}
     >
-      <div className="board-card-head" onPointerDown={(event) => onDragStart(card, event)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} title="Arrastra para mover la tarjeta">
-        <span className="board-drag-grip" aria-hidden="true">⠿</span>
+      <div className={`board-card-head ${card.locked ? 'is-locked' : ''}`} onPointerDown={iniciarArrastre} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} title={card.locked ? 'Tarjeta bloqueada' : 'Arrastra para mover la tarjeta'}>
+        <span className="board-drag-grip" aria-hidden="true">{card.locked ? <Lock size={11} /> : '⠿'}</span>
         <TituloEnSitio value={card.title} onCommit={(title) => onPatch(card.id, { title })} ariaLabel="Título de tarjeta" className="board-card-title" />
+        <button
+          type="button"
+          className="board-card-lock"
+          onClick={(event) => { event.stopPropagation(); onPatch(card.id, { locked: !card.locked }); }}
+          aria-label={card.locked ? 'Desbloquear tarjeta' : 'Bloquear tarjeta'}
+          title={card.locked ? 'Desbloquear' : 'Bloquear posición y borrado'}
+        >
+          {card.locked ? <Lock size={12} /> : <LockOpen size={12} />}
+        </button>
         <button className={`board-connect-button ${connectMode ? 'visible' : ''}`} onClick={(event) => { event.stopPropagation(); onConnect(card.id); }} title="Elegir para relacionar" aria-label="Relacionar esta tarjeta"><Link2 size={13} /></button>
-        <button className="board-card-delete" onClick={(event) => { event.stopPropagation(); onDelete(card.id); }} aria-label="Eliminar tarjeta"><X size={14} /></button>
+        <button className="board-card-delete" onClick={(event) => { event.stopPropagation(); onDelete(card.id); }} aria-label="Eliminar tarjeta" disabled={card.locked}><X size={14} /></button>
       </div>
       <div className="board-card-color-row" aria-label="Color de tarjeta">
         {colors.map((color) => <button key={color} className={`board-color-swatch ${color} ${card.color === color ? 'current' : ''}`} onClick={() => onPatch(card.id, { color })} aria-label={`Color ${color}`} aria-pressed={card.color === color} />)}
       </div>
       <BoardCardContent card={card} editar={onReplace} />
+      <button
+        type="button"
+        className="board-connector-handle"
+        onPointerDown={(event) => { event.stopPropagation(); event.preventDefault(); onConnectStart(card, event); }}
+        onClick={(event) => event.stopPropagation()}
+        aria-label={`Conectar desde ${card.title || 'tarjeta'}`}
+        title="Arrastra desde aquí hasta otra tarjeta para conectarlas"
+      >
+        <Link2 size={13} />
+      </button>
     </article>
   );
 });

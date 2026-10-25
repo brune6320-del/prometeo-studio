@@ -14,14 +14,19 @@ sin ellas WebKit reduce cualquier error a "Load failed".
 
 import asyncio
 import hmac
+import html as html_lib
+import ipaddress
 import json
 import logging
 import os
 import re
+import socket
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
+from html.parser import HTMLParser
 from typing import Any, Dict, List, Optional
 
 import pymupdf
@@ -306,6 +311,138 @@ def _ocr_available() -> bool:
         except Exception:
             _OCR_AVAILABLE = False
     return _OCR_AVAILABLE
+
+
+URL_PREVIEW_TIMEOUT = 6.0
+URL_PREVIEW_MAX_BYTES = 512 * 1024
+
+
+class _UrlPreviewParser(HTMLParser):
+    """Extrae solo título, descripción e imagen sociales. Nada de scripts ni cuerpo."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.title_parts: List[str] = []
+        self.meta: Dict[str, str] = {}
+        self._in_title = False
+        self._in_body = False
+
+    def handle_starttag(self, tag, attrs):
+        attributes = {str(key).lower(): (value or "") for key, value in attrs}
+        if tag == "title":
+            self._in_title = True
+        elif tag == "body":
+            self._in_body = True
+        elif tag == "meta":
+            key = (attributes.get("property") or attributes.get("name") or "").strip().lower()
+            content = attributes.get("content", "").strip()
+            if key and content and key not in self.meta:
+                self.meta[key] = content
+
+    def handle_endtag(self, tag):
+        if tag == "title":
+            self._in_title = False
+        elif tag == "body":
+            self._in_body = True
+
+    def handle_data(self, data):
+        if self._in_title and not self._in_body:
+            self.title_parts.append(data)
+
+
+def _public_url_host(hostname: str) -> bool:
+    """Rechaza destinos locales, privados o reservados (SSRF) antes de abrir el socket."""
+    try:
+        infos = socket.getaddrinfo(hostname, None)
+    except OSError:
+        return False
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+        except ValueError:
+            return False
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            return False
+    return True
+
+
+def _validar_url_vista_previa(raw: str) -> str:
+    value = (raw or "").strip()
+    if not value or len(value) > 2048:
+        raise E.ApiError(400, "URL_INVALID", "La dirección está vacía o es demasiado larga.", E.STAGE_API)
+    try:
+        parsed = urllib.parse.urlsplit(value)
+    except ValueError as exc:
+        raise E.ApiError(400, "URL_INVALID", "La dirección no es válida.", E.STAGE_API) from exc
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise E.ApiError(400, "URL_INVALID", "Solo se admiten direcciones http:// o https://.", E.STAGE_API)
+    if parsed.username or parsed.password:
+        raise E.ApiError(400, "URL_INVALID", "La dirección no puede llevar credenciales.", E.STAGE_API)
+    if not _public_url_host(parsed.hostname):
+        raise E.ApiError(400, "URL_NOT_PUBLIC", "Esa dirección apunta a la red local o a un host no público.", E.STAGE_API)
+    return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path or "/", parsed.query, ""))
+
+
+def _descargar_vista_previa(url: str) -> Dict[str, str]:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Prometeo-Studio-LinkPreview/1.0 (+local)",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "es,en;q=0.8",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=URL_PREVIEW_TIMEOUT) as response:
+            final_url = response.geturl()
+            final_host = urllib.parse.urlsplit(final_url).hostname or ""
+            # Una redirección no puede saltarse la comprobación de red local.
+            if not final_host or not _public_url_host(final_host):
+                raise E.ApiError(400, "URL_NOT_PUBLIC", "La redirección apunta a la red local.", E.STAGE_API)
+            content_type = (response.headers.get("Content-Type") or "").lower()
+            if content_type and "html" not in content_type and "xml" not in content_type:
+                raise E.ApiError(415, "URL_NOT_HTML", "Esa dirección no devuelve una página HTML.", E.STAGE_API)
+            charset = response.headers.get_content_charset() or "utf-8"
+            body = response.read(URL_PREVIEW_MAX_BYTES + 1)
+            if len(body) > URL_PREVIEW_MAX_BYTES:
+                body = body[:URL_PREVIEW_MAX_BYTES]
+    except E.ApiError:
+        raise
+    except (urllib.error.URLError, TimeoutError, socket.timeout, OSError) as exc:
+        raise E.ApiError(502, "URL_UNREACHABLE", "No se pudo abrir la dirección.", E.STAGE_API, retryable=True,
+                         details={"reason": type(exc).__name__}) from exc
+
+    try:
+        text = body.decode(charset, errors="replace")
+    except LookupError:
+        text = body.decode("utf-8", errors="replace")
+    parser = _UrlPreviewParser()
+    try:
+        parser.feed(text)
+    except Exception:
+        # Un HTML roto no debe romper el pegado: se devuelve lo que se haya leído.
+        pass
+
+    def clean(value: str, limit: int) -> str:
+        return re.sub(r"\s+", " ", html_lib.unescape(value or "")).strip()[:limit]
+
+    title = clean(parser.meta.get("og:title") or parser.meta.get("twitter:title") or "".join(parser.title_parts), 300)
+    description = clean(parser.meta.get("og:description") or parser.meta.get("description") or parser.meta.get("twitter:description"), 600)
+    image = clean(parser.meta.get("og:image") or parser.meta.get("og:image:url") or parser.meta.get("twitter:image"), 2048)
+    if image:
+        image = urllib.parse.urljoin(final_url, image)
+        if urllib.parse.urlsplit(image).scheme not in ("http", "https"):
+            image = ""
+    return {"url": final_url, "titulo": title, "descripcion": description, "imagen": image}
+
+
+@app.get("/api/url-preview")
+def url_preview(url: str = Query(..., max_length=2048)):
+    """Vista previa de una URL pegada: solo og:/title/description, con timeout y sin claves."""
+    safe_url = _validar_url_vista_previa(url)
+    data = _descargar_vista_previa(safe_url)
+    return {"ok": True, **data}
 
 
 @app.get("/api/health")
