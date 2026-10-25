@@ -27,6 +27,7 @@ exports[`registro de herramientas del tablero > un tablero viejo carga igual (sn
     {
       "body": "Comentario",
       "color": "rose",
+      "height": 218,
       "id": "m1",
       "media": {
         "dataUrl": "data:image/png;base64,AAAA",

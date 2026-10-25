@@ -18,6 +18,8 @@ export interface BoardCard {
   x: number;
   y: number;
   width: number;
+  /** Alto libre de una imagen o vídeo; las tarjetas de papel lo calculan solas. */
+  height?: number;
   color: 'paper' | 'sand' | 'sage' | 'rose';
   url?: string;
   media?: BoardMedia;
@@ -165,13 +167,17 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
         : boundedNumber(entry.width, 260, 210, 440),
       color: entry.color === 'sand' || entry.color === 'sage' || entry.color === 'rose' ? entry.color : 'paper',
     };
+    if (type === 'media' && (media?.kind === 'image' || media?.kind === 'video')) {
+      card.width = boundedNumber(entry.width, 420, 120, 1200);
+      card.height = boundedNumber(entry.height, Math.round(card.width * 0.75), 60, 2400);
+    }
     if (type === 'link') card.url = isSafeExternalUrl(url) ? url : '';
     if (media && type === 'media') card.media = media;
     if (!knownType) {
       // Sin herramienta instalada no se interpreta el contenido: se guarda literal.
       if (url) card.url = url;
       if (media) card.media = media;
-      const reserved = new Set(['id', 'type', 'title', 'body', 'x', 'y', 'width', 'color', 'url', 'media', 'datos']);
+      const reserved = new Set(['id', 'type', 'title', 'body', 'x', 'y', 'width', 'height', 'color', 'url', 'media', 'datos']);
       const extras = Object.fromEntries(Object.entries(entry).filter(([key]) => !reserved.has(key)));
       const propios = isRecord(entry.datos) ? { ...entry.datos, ...extras } : extras;
       if (Object.keys(propios).length > 0) card.datos = propios;

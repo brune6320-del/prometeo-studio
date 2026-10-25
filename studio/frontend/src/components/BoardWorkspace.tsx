@@ -37,6 +37,7 @@ import { fitBoardCamera, MAX_BOARD_ZOOM, MIN_BOARD_ZOOM, zoomAtPoint, screenToWo
 import { movimientoReducido, pasoInercia, resortar, seguir, TAU, velocidadDeMuestras, type MuestraInercia } from '../motion/muelle';
 import { alignCards, distributeCards, snapPosition, type Alignment, type CardSize, type DistributionAxis } from '../board/geometry';
 import { imanDeCaja, inclinacionPorVelocidad, type GuiasIman } from '../board/iman';
+import { esMediaLibre, medirMedio } from '../board/medio';
 import {
   cardsInsideFrame,
   detachCardFromFrames,
@@ -88,6 +89,7 @@ import {
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
 import { BoardCardItem } from './BoardCardItem';
+import { BoardFreeMedia, type EsquinaMedia } from './BoardFreeMedia';
 import { TituloEnSitio } from './InlineEdit';
 import { MirarDialog } from './MirarDialog';
 import { ArchivoView } from './ArchivoView';
@@ -155,9 +157,9 @@ interface GestoWebKit extends Event {
 interface CardHandlers {
   select: (cardId: string, event: Modificadores) => void;
   connect: (cardId: string) => void;
-  dragStart: (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => void;
-  dragMove: (event: React.PointerEvent<HTMLDivElement>) => void;
-  dragEnd: (event: React.PointerEvent<HTMLDivElement>) => void;
+  dragStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
+  dragMove: (event: React.PointerEvent<HTMLElement>) => void;
+  dragEnd: (event: React.PointerEvent<HTMLElement>) => void;
   delete: (cardId: string) => void;
   patch: (cardId: string, patch: Partial<BoardCard>) => void;
   replace: (card: BoardCard) => void;
@@ -233,7 +235,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [draggingIds, setDraggingIds] = useState<string[]>([]);
   const [settlingIds, setSettlingIds] = useState<string[]>([]);
   const [dropFrameId, setDropFrameId] = useState<string | null>(null);
-  const frameResize = useRef<{ pointerId: number; cardId: string; startX: number; startY: number; width: number; height: number; startBoard: BoardDocument } | null>(null);
+  const frameResize = useRef<{ pointerId: number; cardId: string; startX: number; startY: number; width: number; height: number; startBoard: BoardDocument; captureEl: HTMLElement | null } | null>(null);
+  const freeResize = useRef<{ pointerId: number; cardId: string; corner: EsquinaMedia; startX: number; startY: number; x: number; y: number; width: number; height: number; ratio: number; startBoard: BoardDocument; captureEl: HTMLElement | null } | null>(null);
   const settleTimer = useRef<number | null>(null);
   const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number }; captureEl: HTMLElement | null } | null>(null);
   const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => {});
@@ -552,7 +555,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const draw = frameDraw.current;
     if (draw) liberarPuntero(draw.captureEl, draw.pointerId);
     const resize = frameResize.current;
-    if (resize) liberarPuntero(viewportRef.current, resize.pointerId);
+    if (resize) liberarPuntero(resize.captureEl, resize.pointerId);
     panDrag.current = null;
     cardDrag.current = null;
     frameDraw.current = null;
@@ -754,11 +757,21 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const dropTool = (event: React.DragEvent<HTMLDivElement>) => {
-    const toolId = event.dataTransfer.getData('application/x-prometeo-tool');
-    if (!toolId || !activeBoard) return;
-    event.preventDefault();
+    if (!activeBoard) return;
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const archivos = Array.from(event.dataTransfer.files ?? []);
+    if (archivos.length) {
+      event.preventDefault();
+      const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
+      archivos.forEach((file, indice) => {
+        void addMedia(file, { x: punto.x + indice * 36, y: punto.y + indice * 28 });
+      });
+      return;
+    }
+    const toolId = event.dataTransfer.getData('application/x-prometeo-tool');
+    if (!toolId) return;
+    event.preventDefault();
     const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
     const tool = getBoardTool(toolId);
     if (tool?.tipo === 'marco') {
@@ -921,7 +934,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const fitBoard = () => centerCamera(activeBoard);
 
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-frame, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
+    if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-frame, .board-free-media, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
     detenerInercia();
     detenerRetornoZoom();
     if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
@@ -972,7 +985,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const startFrameDraw = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !frameToolId) return;
-    if ((event.target as HTMLElement).closest('button, input, select, textarea, a, .board-zoom-controls, .board-empty, .board-controls')) return;
+    if ((event.target as HTMLElement).closest('button, input, select, textarea, a, .board-free-media, .board-zoom-controls, .board-empty, .board-controls')) return;
     detenerInercia();
     detenerRetornoZoom();
     if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
@@ -1026,7 +1039,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     else endPan(event);
   };
 
-  const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => {
+  const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLElement>) => {
     detenerInercia();
     detenerRetornoZoom();
     if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
@@ -1085,7 +1098,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setDropFrameId(null);
   };
 
-  const moveCardDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+  const moveCardDrag = (event: React.PointerEvent<HTMLElement>) => {
     const drag = cardDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const distancia = Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y);
@@ -1174,7 +1187,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }, 280);
   };
 
-  const endCardDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+  const endCardDrag = (event: React.PointerEvent<HTMLElement>) => {
     const drag = cardDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
@@ -1234,6 +1247,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       width: card.width,
       height: readFrameData(card).alto,
       startBoard: activeBoard,
+      captureEl: event.currentTarget,
     };
     setDraggingIds([card.id]);
     setSettlingIds([]);
@@ -1258,7 +1272,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const drag = frameResize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     frameResize.current = null;
-    liberarPuntero(event.currentTarget, event.pointerId);
+    liberarPuntero(drag.captureEl, event.pointerId);
     setDraggingIds([]);
     const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
     const marco = tablero?.cards.find((item) => item.id === drag.cardId);
@@ -1283,6 +1297,97 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     enqueueBoardSave(final);
     asentar([marco.id]);
   };
+
+  /** Redimensionar una imagen o vídeo desde cualquier esquina; Shift libera la proporción. */
+  const startFreeResize = (card: BoardCard, corner: EsquinaMedia, event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !activeBoard) return;
+    event.preventDefault();
+    event.stopPropagation();
+    detenerInercia();
+    detenerRetornoZoom();
+    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
+    if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
+    const elemento = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`);
+    const alto = card.height ?? (elemento ? elemento.getBoundingClientRect().height / cameraRef.current.zoom : Math.round(card.width * 0.75));
+    freeResize.current = {
+      pointerId: event.pointerId,
+      cardId: card.id,
+      corner,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: card.x,
+      y: card.y,
+      width: card.width,
+      height: alto,
+      ratio: card.width / Math.max(1, alto),
+      startBoard: activeBoard,
+      captureEl: event.currentTarget,
+    };
+    setSelectedCardIds([card.id]);
+    setSettlingIds([]);
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
+  };
+
+  const moveFreeResize = (event: React.PointerEvent<HTMLElement>) => {
+    const drag = freeResize.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const escala = cameraRef.current.zoom;
+    const dx = (event.clientX - drag.startX) / escala;
+    const dy = (event.clientY - drag.startY) / escala;
+    const oeste = drag.corner === 'nw' || drag.corner === 'sw';
+    const norte = drag.corner === 'nw' || drag.corner === 'ne';
+    const brutoAncho = oeste ? drag.width - dx : drag.width + dx;
+    const brutoAlto = norte ? drag.height - dy : drag.height + dy;
+    let ancho = Math.max(80, brutoAncho);
+    let alto = Math.max(60, brutoAlto);
+    if (!event.shiftKey) {
+      const mandaAncho = Math.abs(brutoAncho - drag.width) >= Math.abs(brutoAlto - drag.height);
+      if (mandaAncho) {
+        ancho = Math.max(80, brutoAncho);
+        alto = ancho / drag.ratio;
+        if (alto < 60) { alto = 60; ancho = alto * drag.ratio; }
+      } else {
+        alto = Math.max(60, brutoAlto);
+        ancho = alto * drag.ratio;
+        if (ancho < 80) { ancho = 80; alto = ancho / drag.ratio; }
+      }
+    }
+    const x = oeste ? drag.x + (drag.width - ancho) : drag.x;
+    const y = norte ? drag.y + (drag.height - alto) : drag.y;
+    updateBoard((board) => ({
+      ...board,
+      cards: board.cards.map((item) => item.id === drag.cardId
+        ? { ...item, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, width: Math.round(ancho * 10) / 10, height: Math.round(alto * 10) / 10 }
+        : item),
+    }), { recordHistory: false });
+  };
+
+  const endFreeResize = (event: React.PointerEvent<HTMLElement>) => {
+    const drag = freeResize.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    freeResize.current = null;
+    liberarPuntero(drag.captureEl, event.pointerId);
+    const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
+    const card = tablero?.cards.find((item) => item.id === drag.cardId);
+    if (!tablero || !card) return;
+    const final: BoardDocument = { ...tablero, updatedAt: new Date().toISOString() };
+    setBoardHistories((current) => ({
+      ...current,
+      [drag.startBoard.id]: recordBoardChange(current[drag.startBoard.id] ?? emptyBoardHistory(), drag.startBoard, final, newBoardId('resize-media')),
+    }));
+    setBoards((current) => current.map((board) => board.id === final.id ? final : board));
+    enqueueBoardSave(final);
+  };
+
+  const ajustarAlturaNatural = useCallback((cardId: string, anchoNatural: number, altoNatural: number) => {
+    if (!anchoNatural || !altoNatural) return;
+    updateBoard((board) => ({
+      ...board,
+      cards: board.cards.map((item) => item.id === cardId && item.height === undefined
+        ? { ...item, height: Math.round(item.width * (altoNatural / anchoNatural) * 10) / 10 }
+        : item),
+    }), { recordHistory: false });
+  }, [updateBoard]);
 
   const alignSelection = (alignment: Alignment) => {
     if (selectedCardIds.length < 2) return;
@@ -1624,7 +1729,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setLinkError(null);
   };
 
-  const addMedia = async (file?: File) => {
+  const addMedia = useCallback(async (file?: File, at?: { x: number; y: number }) => {
     if (!file || !activeBoard) return;
     if (file.size > MAX_MEDIA_BYTES) {
       setNotice('Este prototipo guarda archivos de hasta 12 MB. Reduce el tamaño y vuelve a intentarlo.');
@@ -1635,16 +1740,32 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       const dataUrl = await readFileAsDataUrl(file);
       const kind = mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'file';
       const media: BoardMedia = { name: file.name, mimeType, dataUrl, kind };
+      const tamano = kind === 'image' || kind === 'video' ? await medirMedio(dataUrl, kind) : null;
+      // addToolCard coloca desde el centro del objeto: se compensa el ancho real al soltar.
+      const destino = at && tamano
+        ? { x: at.x - tamano.width / 2 + 130, y: at.y - tamano.height / 2 + 90 }
+        : at;
       const created = addToolCard('media', (card) => {
         card.title = media.name.replace(/\.[^.]+$/, '') || 'Recurso';
         card.media = media;
-      });
+        if (tamano) {
+          card.width = tamano.width;
+          card.height = tamano.height;
+        }
+      }, destino);
       if (!created) return;
-      setNotice('Recurso añadido y guardado dentro del tablero local.');
+      setNotice(tamano
+        ? `${kind === 'video' ? 'Vídeo' : 'Imagen'} libre añadido a resolución completa.`
+        : 'Recurso añadido y guardado dentro del tablero local.');
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'No se pudo añadir el archivo.');
     }
-  };
+  }, [activeBoard, addToolCard]);
+
+  const addMediaRef = useRef(addMedia);
+  useEffect(() => {
+    addMediaRef.current = addMedia;
+  }, [addMedia]);
 
   const importBoard = async (file?: File) => {
     if (!file) return;
@@ -1929,6 +2050,25 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const handlePaste = (event: ClipboardEvent) => {
       const target = event.target;
       if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const archivos = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/') || file.type.startsWith('video/'));
+      if (!archivos.length) {
+        for (const item of Array.from(event.clipboardData?.items ?? [])) {
+          if (item.kind !== 'file') continue;
+          const file = item.getAsFile();
+          if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) archivos.push(file);
+        }
+      }
+      if (archivos.length && activeBoard) {
+        event.preventDefault();
+        const rect = viewportRef.current?.getBoundingClientRect();
+        const punto = rect
+          ? screenToWorld({ x: rect.width / 2, y: rect.height / 2 }, cameraRef.current)
+          : { x: 0, y: 0 };
+        archivos.forEach((file, indice) => {
+          void addMediaRef.current(file, { x: punto.x + indice * 36, y: punto.y + indice * 28 });
+        });
+        return;
+      }
       const text = event.clipboardData?.getData('text/plain').trim() ?? '';
       if (!text || !isSafeExternalUrl(text)) return;
       const selectedId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
@@ -1989,9 +2129,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const onCardSelect = useCallback((card: BoardCard, event: Modificadores) => cardHandlers.current?.select(card.id, event), []);
   const onCardConnect = useCallback((cardId: string) => cardHandlers.current?.connect(cardId), []);
-  const onCardDragStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => cardHandlers.current?.dragStart(card, event), []);
-  const onCardDragMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => cardHandlers.current?.dragMove(event), []);
-  const onCardDragEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => cardHandlers.current?.dragEnd(event), []);
+  const onCardDragStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragStart(card, event), []);
+  const onCardDragMove = useCallback((event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragMove(event), []);
+  const onCardDragEnd = useCallback((event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragEnd(event), []);
   const onCardDelete = useCallback((cardId: string) => cardHandlers.current?.delete(cardId), []);
   const onCardPatch = useCallback((cardId: string, patch: Partial<BoardCard>) => cardHandlers.current?.patch(cardId, patch), []);
   const onCardReplace = useCallback((card: BoardCard) => cardHandlers.current?.replace(card), []);
@@ -2186,7 +2326,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         onPointerMove={moveViewportGesture}
         onPointerUp={endViewportGesture}
         onPointerCancel={endViewportGesture}
-        onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-prometeo-tool')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+        onDragOver={(event) => {
+          if (event.dataTransfer.types.includes('application/x-prometeo-tool') || event.dataTransfer.types.includes('Files')) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'copy';
+          }
+        }}
         onDrop={dropTool}
         onClickCapture={(event) => {
           if (!suppressViewportClick.current) return;
@@ -2312,6 +2457,27 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             }
             // Los hijos de un marco con vista propia se pintan dentro del marco, no encima.
             if (framedChildIds.has(card.id)) return null;
+            if (esMediaLibre(card)) {
+              return (
+                <BoardFreeMedia
+                  key={card.id}
+                  card={card}
+                  selected={selectedCardIds.includes(card.id)}
+                  dimmed={!matches}
+                  dragging={draggingIds.includes(card.id)}
+                  settling={settlingIds.includes(card.id)}
+                  onSelect={onCardSelect}
+                  onDragStart={onCardDragStart}
+                  onDragMove={onCardDragMove}
+                  onDragEnd={onCardDragEnd}
+                  onDelete={onCardDelete}
+                  onResizeStart={startFreeResize}
+                  onResizeMove={moveFreeResize}
+                  onResizeEnd={endFreeResize}
+                  onNaturalSize={ajustarAlturaNatural}
+                />
+              );
+            }
             return (
               <BoardCardItem
                 key={card.id}

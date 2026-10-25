@@ -2985,6 +2985,215 @@
   box-shadow: var(--shadow-2);
 }
 
+
+/* ── G2 · imagen y vídeo como objetos libres ───────────────────────────── */
+.board-free-media {
+  position: absolute;
+  z-index: 1;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: var(--shadow-1);
+  pointer-events: auto;
+  transform: translate3d(0, calc(-1 * var(--card-lift, 0px)), 0) rotate(var(--card-tilt, 0deg));
+  transform-origin: 55% 60%;
+  transition: box-shadow 120ms var(--ease-standard), opacity 120ms var(--ease-standard), transform 120ms var(--ease-standard);
+}
+
+.board-free-media:hover {
+  --card-lift: 1.5px;
+  box-shadow: var(--shadow-2);
+}
+
+.board-free-media.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  box-shadow: var(--shadow-2);
+}
+
+.board-free-media.dimmed {
+  opacity: 0.28;
+}
+
+.board-free-media.dragging {
+  z-index: 6;
+  --card-tilt: var(--drag-tilt, 0deg);
+  opacity: 0.96;
+  box-shadow: var(--shadow-3);
+  transform: translate3d(0, -2px, 0) rotate(var(--card-tilt));
+  transition: none;
+}
+
+.board-free-media.settling {
+  animation: board-asentar 240ms var(--ease-spring-firm);
+}
+
+.board-free-media-frame {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: color-mix(in oklab, var(--surface-0) 88%, var(--surface-2));
+}
+
+.board-free-media[data-alto='auto'] .board-free-media-frame {
+  height: auto;
+}
+
+.board-free-media-frame img,
+.board-free-media-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+}
+
+.board-free-media[data-alto='auto'] .board-free-media-frame img,
+.board-free-media[data-alto='auto'] .board-free-media-frame video {
+  height: auto;
+}
+
+.board-free-media-caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  gap: 2px;
+  padding: 24px 10px 7px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: linear-gradient(transparent, rgba(10, 10, 12, 0.78));
+  color: var(--surface-paper);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms var(--ease-standard);
+}
+
+.board-free-media:hover .board-free-media-caption,
+.board-free-media:focus-within .board-free-media-caption {
+  opacity: 1;
+}
+
+.board-free-media-caption strong {
+  overflow: hidden;
+  font: var(--type-label);
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.board-free-media-caption span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: color-mix(in oklab, var(--surface-paper) 82%, transparent);
+  font: var(--type-caption);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.board-free-media-play {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  color: var(--surface-paper);
+  background: rgba(10, 10, 12, 0.62);
+  opacity: 0;
+  transition: opacity 120ms var(--ease-standard);
+}
+
+.board-free-media:hover .board-free-media-play,
+.board-free-media.selected .board-free-media-play {
+  opacity: 0.9;
+}
+
+.board-free-media-delete {
+  position: absolute;
+  top: calc(-1 * var(--space-2));
+  right: calc(-1 * var(--space-2));
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-pill);
+  color: var(--surface-paper);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-1);
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity 120ms var(--ease-standard);
+}
+
+.board-free-media:hover .board-free-media-delete,
+.board-free-media:focus-within .board-free-media-delete,
+.board-free-media.selected .board-free-media-delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.board-free-media-delete:hover {
+  color: var(--st-failed);
+}
+
+.board-free-media-handle {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid var(--surface-paper);
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  box-shadow: var(--shadow-1);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.board-free-media:hover .board-free-media-handle,
+.board-free-media:focus-within .board-free-media-handle,
+.board-free-media.selected .board-free-media-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.board-free-media-handle.nw { top: -7px; left: -7px; cursor: nwse-resize; }
+.board-free-media-handle.ne { top: -7px; right: -7px; cursor: nesw-resize; }
+.board-free-media-handle.sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
+.board-free-media-handle.se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+
+.board-stage[data-lod='min'] .board-free-media-caption,
+.board-stage[data-lod='min'] .board-free-media-play,
+.board-stage[data-lod='min'] .board-free-media-delete,
+.board-stage[data-lod='min'] .board-free-media-handle {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-free-media {
+    --card-lift: 0px;
+    transform: none;
+    transition: none;
+  }
+
+  .board-free-media.dragging {
+    transform: none;
+  }
+
+  .board-free-media.settling {
+    animation: none;
+  }
+}
+
+
 /* ── F4 · arrastre, asentado y destino de marco ─────────────────────────── */
 .board-card.dragging {
   z-index: 6;
