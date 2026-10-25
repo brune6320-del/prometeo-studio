@@ -4,9 +4,9 @@
 |---|---|
 | Rama | `studio/collage` |
 | Fecha | 2026-10-25 |
-| Último commit | `4c335d6` (G6) |
-| Fases cerradas | **G0, G1, G2, G3, G4, G5, G6** |
-| Siguiente fase | **G7 · detalles** |
+| Último commit | `f15261f` (G8) |
+| Fases cerradas | **G0, G1, G2, G3, G4, G5, G6, G7, G8** |
+| Siguiente fase | **Ninguna. Campaña cerrada.** |
 | Push | **Nunca desde aquí.** El remoto es `github.com/brune6320-del/prometeo-studio`; Bruno hace el push. |
 
 **Ramas de otros agentes:** `studio/recortador` y `studio/indice-visual`. No tocar `tools/recortador/` ni `tools/indice/` ni mergearlas desde esta rama.
@@ -23,23 +23,24 @@
 | G5 · Open Design | `6f64c7e` | clone y licencias verificadas, estudio de catálogos de skills/sistemas, «+ Más» navegable con búsqueda/categorías/vista previa, selector de sistema por tablero (Forja 2 + Archivo Irene); `PROCEDENCIA.md`, `REPORTES/G5-open-design.md`; 7 tests unitarios y 2 E2E |
 | G6 · Editor PDF | `4c335d6` | reintento de parche idempotente (reutiliza la operación), tabla «Comprobación / Esperado / Obtenido», checks vectoriales y raster, paneles plegables y ventana estrecha; `REPORTES/G6-pdf.md`; 3 tests unittest y 3 E2E con motor real |
 
-## 2. Comprobaciones del último cierre (G6)
+## 2. Comprobaciones del último cierre (G8)
 
 Ejecutadas dentro de `studio/frontend`:
 
 | Comprobación | Resultado |
 |---|---|
 | `npx tsc -b` | limpio |
-| `npx vitest run` | 33 archivos, 191 tests |
-| `npx oxlint` | 0 errores; sin warnings nuevos en los archivos de G6 |
+| `npx vitest run` | 34 archivos, 195 tests |
+| `npx oxlint` | 0 errores; 27 warnings preexistentes |
 | `npx vite build` | correcto (aviso de chunk > 500 kB, ya existente) |
-| `npx playwright test -c playwright.forja3.config.ts` | 23 tests, 23 pasan (G0–G5) |
+| `npx playwright test -c playwright.forja3.config.ts` | 30 tests, 30 pasan (G0–G8; soak de 15 min aparte) |
 | `playwright.config.ts g6-pdf.spec.ts` | 3 tests, 3 pasan con motor real |
 | `unittest tests.studio.test_g6_pdf` | 3 tests, 3 pasan con `case_a` y `case_b_scan` |
+| Soak G8 | 903 s, 691 ciclos, 15 recargas, 0 errores, peor FPS 57 |
 
 Backend sin cambios en G4. El endpoint `GET /api/url-preview` sigue como se cerró en G3. Detalle en `REPORTES/G3-paridad.md`.
 
-Capturas en `REPORTES/capturas-forja3/`: las de G0–G5 más `g6-antes-760.png`, `g6-antes-520.png`, `g6-despues-760.png`, `g6-despues-520.png`, `g6-despues-reintento.png`, `g6-despues-fallo.png`.
+Capturas en `REPORTES/capturas-forja3/`: todas las de G0–G7 más `g8-despues.png`. El cierre completo y la tabla Milanote están en `REPORTES/FORJA3.md`.
 
 ## 3. Lo que quedó verificado (E1)
 
@@ -51,7 +52,9 @@ Capturas en `REPORTES/capturas-forja3/`: las de G0–G5 más `g6-antes-760.png`,
 
 ## 4. Deuda acumulada
 
-- **G7–G8 pendientes.** No se ha tocado código de G7.
+- **Forja 3 cerrada.** El cierre completo está en `REPORTES/FORJA3.md`.
+- **Fuera de alcance:** comentarios, búsqueda global entre tableros, etiquetas de color de Milanote, columnas redimensionables a mano, selector visual de conectores, miniaturas de medios y soak del PDF.
+- **Solo Bruno:** WKWebView empaquetado, 120 Hz reales y trackpad/dedos físicos.
 - **G5 · biblioteca:** el test de G3 que abría «Tablero anidado» se adaptó al nuevo flujo (elegir + «Añadir al tablero»); no cambió la app para complacer al test.
 - **G5 · sistemas:** el sistema Irene cambia tokens, no la geometría interna de cada herramienta. No se copió código de los repos estudiados; ver `PROCEDENCIA.md`.
 - **G3 · rectángulo:** exige `⇧` para no quitarle el pan al fondo (G1). Si se quiere arrastre simple, mover el pan a Espacio+arrastrar (fila 15 de G0, G7).
@@ -63,20 +66,13 @@ Capturas en `REPORTES/capturas-forja3/`: las de G0–G5 más `g6-antes-760.png`,
 - **Medios:** data URL dentro del tablero (límite 12 MB); sin miniaturas.
 - **G0:** la columna «Milanote» se basa en ayuda pública; no se hizo ingeniería inversa ni se copiaron assets.
 
-## 5. Siguiente: G7 · detalles
+## 5. Campaña cerrada
 
-Alcance del encargo de Bruno:
-
-1. Renombrar proyecto con doble clic.
-2. Editar la URL de un enlace con doble clic.
-3. Atajos visibles en un panel «?».
-4. Mover las plantillas guardadas de `localStorage` al proyecto.
-5. Rectángulo de selección sin ⇧ si el pan pasa a Espacio+arrastrar o dos dedos.
-6. Escribir el alcance en `REPORTES/G7-detalles.md` antes de codificar.
+`REPORTES/FORJA3.md` contiene el cierre: hashes, tabla Milanote antes/después, capturas, FPS, los 6 pasos que debe probar Bruno y la deuda que queda. No se hizo push.
 
 ## 6. Cómo retomar
 
-1. Leer este archivo, `G4-irene.md`, `G0-milanote.md`, `G3-paridad.md` y `docs/STUDIO/DESIGN.md`.
-2. Escribir el alcance de G7 en `REPORTES/G7-detalles.md` antes de tocar código.
-3. Cerrar cada fase con las cuatro comprobaciones + Playwright + captura antes/después y commit `studio: G7 …`.
-4. No avanzar a G8 con algo en rojo.
+1. Leer este archivo y `REPORTES/FORJA3.md`.
+2. Repetir las cuatro comprobaciones en `studio/frontend` y, si se toca el tablero, `g8-caza.spec.ts`.
+3. El soak de 15 min se ejecuta solo con `PROMETEO_SOAK=1 npx playwright test -c playwright.forja3.config.ts g8-soak.spec.ts`.
+4. Cualquier fase nueva va en su propio commit y su propio reporte; no se reabre esta campaña.
