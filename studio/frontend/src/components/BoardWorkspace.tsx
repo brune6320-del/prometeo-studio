@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
+  Archive,
   ChevronDown,
   FolderPlus,
+  History,
   Magnet,
   Download,
   LayoutTemplate,
@@ -30,6 +32,7 @@ import {
   markdownToBoard,
   MAX_MEDIA_BYTES,
   newBoardId,
+  normalizeBoard,
   parseBoardImport,
   type BoardCard,
   type BoardDocument,
@@ -84,6 +87,7 @@ import { construirZipObsidian, notasObsidian } from '../board/referentes/histori
 import { aceptarLectura } from '../board/referentes/mirar';
 import { leerReferente, type Lectura } from '../board/referentes/model';
 import { loadBoardWorkspace } from '../board/storage';
+import { guardarHistorial, leerHistoriales, listarBorrados, olvidarBorrado, recordarBorrado, tomarBorrado, type BorradoEntry, type BorradoKind } from '../board/memoria';
 import { BoardToolMenu } from '../board/tools/menu';
 import { DESIGN_SYSTEMS, normalizeDesignSystem, type DesignSystemId } from '../board/diseno';
 import { getBoardTool, listBoardTools } from '../board/tools/registry';
@@ -145,6 +149,12 @@ interface BoardWorkspaceProps {
 const GRID_SIZE = 24;
 const COLORS: Array<BoardCard['color']> = ['paper', 'sand', 'sage', 'rose'];
 const RAIL_TOOLS = ['note', 'link', 'media', 'tareas', 'columna', 'referente', 'marco', 'entropia'];
+const ETIQUETA_BORRADO: Record<BorradoKind, string> = {
+  board: 'Tablero',
+  reference: 'Referencia PDF',
+  cards: 'Tarjetas',
+  project: 'Proyecto',
+};
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -306,6 +316,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   /** El manifiesto semanal espera al motor local; el botón no se dispara dos veces. */
   const [manifesting, setManifesting] = useState(false);
   const [boardHistories, setBoardHistories] = useState<Record<string, BoardHistory>>({});
+  /** «nueva» declara que no había historial que restaurar; «restaurada» que sí. */
+  const [historyStatus, setHistoryStatus] = useState<'nueva' | 'restaurada'>('nueva');
+  const historiesReady = useRef(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [borrados, setBorrados] = useState<BorradoEntry[]>([]);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   /** Un clic que llega después de arrastrar o de un gesto con modificador no debe cambiar la selección otra vez. */
   const suppressCardClick = useRef(false);
   /** El clic posterior a dibujar un marco no debe vaciar la selección recién creada. */
@@ -388,8 +405,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   useEffect(() => {
     let current = true;
-    loadBoardWorkspace()
-      .then((snapshot) => {
+    Promise.all([loadBoardWorkspace(), leerHistoriales()])
+      .then(([snapshot, historiales]) => {
         if (!current) return;
         if (snapshot.boards.length) {
           setBoards(snapshot.boards);
@@ -400,6 +417,17 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           setActiveBoardId(first.id);
           enqueueBoardSave(first, { immediate: true });
         }
+        const ids = new Set(snapshot.boards.map((board) => board.id));
+        const restaurados = Object.fromEntries(
+          Object.entries(historiales).filter(([boardId]) => ids.has(boardId)),
+        );
+        if (Object.keys(restaurados).length > 0) {
+          setBoardHistories(restaurados);
+          setHistoryStatus('restaurada');
+        } else {
+          setHistoryStatus('nueva');
+        }
+        historiesReady.current = true;
         if (snapshot.skipped.length) {
           const count = snapshot.skipped.length;
           setNotice(`${count === 1 ? 'Un tablero no se pudo abrir' : `${count} tableros no se pudieron abrir`} y se conserva sin cambios: ${snapshot.skipped[0].reason}`);
@@ -418,6 +446,18 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       current = false;
     };
   }, []);
+
+  // El historial de deshacer sobrevive a recargar. Se escribe con pausa y por
+  // tablero activo: guardar la copia de los 500 tableros en cada gesto sería peor
+  // que el problema que resuelve.
+  useEffect(() => {
+    if (!loaded || !historiesReady.current || !activeBoardId) return;
+    const timer = window.setTimeout(() => {
+      const history = boardHistories[activeBoardId];
+      if (history) void guardarHistorial(activeBoardId, history);
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [activeBoardId, boardHistories, loaded]);
 
   const projectBoardIds = useMemo(() => boards.map((board) => board.id).sort(), [boards]);
   const projectBoardSignature = JSON.stringify(projectBoardIds);
@@ -2013,8 +2053,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const handleDeletePdfReference = async (reference: PdfReference) => {
     try {
       await deletePdfReference(reference.id);
+      void recordarBorrado({
+        kind: 'reference',
+        label: `Referencia a «${reference.sourceName}» · página ${reference.page}`,
+        payload: { reference },
+      });
       setProjectReferences((current) => current.filter((item) => item.id !== reference.id));
-      mostrarAviso(`Referencia a «${reference.sourceName}» eliminada`, () => {
+      mostrarAviso(`Referencia a «${reference.sourceName}» eliminada · 30 días en Archivo`, () => {
         setProjectReferences((current) => current.some((item) => item.id === reference.id) ? current : [reference, ...current]);
         void savePdfReference(reference).catch((error: unknown) => {
           setProjectError(error instanceof Error ? error.message : 'No se pudo recuperar la referencia PDF.');
@@ -2149,6 +2194,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       setNotice('No se eliminó el tablero porque tiene cambios sin guardar. Reintenta o exporta una copia.');
       return;
     }
+    void recordarBorrado({
+      kind: 'board',
+      label: `Tablero «${board.title || 'Sin título'}»`,
+      payload: { board, ...(projectId ? { projectId } : {}) },
+    });
     try {
       await removeBoardFromStore(board.id);
     } catch (error) {
@@ -2181,7 +2231,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         setNotice(error instanceof Error ? error.message : 'No se pudo crear un tablero de reemplazo.');
       }
     }
-    mostrarAviso(`Tablero «${board.title || 'Sin título'}» eliminado`, () => {
+    mostrarAviso(`Tablero «${board.title || 'Sin título'}» eliminado · 30 días en Archivo`, () => {
       setBoards((current) => current.some((item) => item.id === board.id) ? current : [board, ...current]);
       if (projectId) {
         setProjectIdByBoardId((current) => new Map(current).set(board.id, projectId));
@@ -2195,7 +2245,88 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     });
   };
 
-  /** La vista previa la resuelve el motor local; si falla, el enlace queda igual de válido. */
+  /** «Archivo» no es una papelera visible: es donde se puede recuperar lo que la memoria guardó. */
+  const abrirArchivo = useCallback(async () => {
+    setArchiveError(null);
+    setArchiveOpen(true);
+    setBorrados(await listarBorrados());
+  }, []);
+
+  const refrescarArchivo = useCallback(async () => {
+    setBorrados(await listarBorrados());
+  }, []);
+
+  const restaurarEntrada = async (entry: BorradoEntry) => {
+    setRestoringId(entry.id);
+    setArchiveError(null);
+    try {
+      const tomado = await tomarBorrado(entry.id);
+      if (!tomado) throw new Error('Esa entrada ya no está en la memoria de 30 días.');
+      if (tomado.kind === 'board' && tomado.payload.board) {
+        const board = normalizeBoard(tomado.payload.board);
+        if (!board) throw new Error('El tablero guardado no se pudo leer.');
+        if (tomado.payload.projectId) {
+          try {
+            await assignBoardToProject(board.id, tomado.payload.projectId);
+            setProjectIdByBoardId((current) => new Map(current).set(board.id, tomado.payload.projectId!));
+          } catch {
+            /* El tablero se recupera igual aunque el proyecto ya no exista. */
+          }
+        }
+        setBoards((current) => current.some((item) => item.id === board.id) ? current.map((item) => item.id === board.id ? board : item) : [board, ...current]);
+        setActiveBoardId(board.id);
+        setSelectedCardIds([]);
+        enqueueBoardSave(board, { immediate: true });
+        setNotice(`Tablero «${board.title || 'Sin título'}» recuperado.`);
+      } else if (tomado.kind === 'reference' && tomado.payload.reference) {
+        await savePdfReference(tomado.payload.reference);
+        setProjectReferences((current) => current.some((item) => item.id === tomado.payload.reference!.id)
+          ? current
+          : [tomado.payload.reference!, ...current]);
+        setNotice(`Referencia a «${tomado.payload.reference.sourceName}» recuperada.`);
+      } else if (tomado.kind === 'cards' && tomado.payload.cards) {
+        const { boardId, cards, relations } = tomado.payload.cards;
+        updateBoardById(boardId, (board) => {
+          const cardsById = new Map(cards.map((card) => [card.id, card]));
+          const conMarcos = board.cards.map((item) => {
+            if (item.type !== 'marco') return item;
+            const data = readFrameData(item);
+            const dentro = cards.filter((card) => {
+              const caja = rectDeTarjeta(card);
+              const centroX = caja.x + caja.width / 2;
+              const centroY = caja.y + caja.height / 2;
+              return centroX >= item.x && centroX <= item.x + item.width
+                && centroY >= item.y && centroY <= item.y + readFrameData(item).alto;
+            }).map((card) => card.id);
+            if (!dentro.length) return item;
+            return { ...item, datos: { ...item.datos, ...data, hijos: [...new Set([...data.hijos, ...dentro])] } };
+          });
+          return {
+            ...board,
+            cards: [...conMarcos, ...cardsById.values()],
+            relations: [...board.relations, ...relations.filter((relation) => !board.relations.some((item) => item.id === relation.id))],
+          };
+        });
+        // Las relaciones externas a las tarjetas borradas ya no existen; se conservan solo las internas.
+        setNotice(`${cards.length} ${cards.length === 1 ? 'tarjeta recuperada' : 'tarjetas recuperadas'} en su tablero.`);
+      } else if (tomado.kind === 'project' && tomado.payload.project) {
+        setNotice(`El proyecto «${tomado.payload.project.name}» se recupera desde su menú (H7).`);
+      }
+      setBorrados((current) => current.filter((item) => item.id !== entry.id));
+      await refrescarArchivo();
+    } catch (error) {
+      setArchiveError(error instanceof Error ? error.message : 'No se pudo recuperar la entrada.');
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  const olvidarEntrada = async (id: string) => {
+    await olvidarBorrado(id);
+    setBorrados((current) => current.filter((item) => item.id !== id));
+  };
+
+
   const aplicarVistaPrevia = useCallback(async (cardId: string, url: string) => {
     try {
       const respuesta = await studioApi.vistaPreviaUrl(url);
@@ -2571,13 +2702,25 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
     updateBoard((actual) => borrarTarjetas(actual, eliminables));
     const borradas = new Set(eliminables);
+    const eliminadas = board.cards.filter((card) => borradas.has(card.id));
+    void recordarBorrado({
+      kind: 'cards',
+      label: `${eliminadas.length} ${eliminadas.length === 1 ? 'tarjeta' : 'tarjetas'} de «${board.title || 'Sin título'}»`,
+      payload: {
+        cards: {
+          boardId: board.id,
+          cards: eliminadas,
+          relations: board.relations.filter((relation) => borradas.has(relation.from) || borradas.has(relation.to)),
+        },
+      },
+    });
     setSelectedCardIds((current) => current.filter((id) => !borradas.has(id)));
     const cantidad = eliminables.length;
     const bloqueo = bloqueadas.length
       ? ` · ${bloqueadas.length} ${bloqueadas.length === 1 ? 'bloqueada se queda' : 'bloqueadas se quedan'}`
       : '';
     mostrarAviso(
-      `${cantidad} ${cantidad === 1 ? 'tarjeta eliminada' : 'tarjetas eliminadas'}${bloqueo}`,
+      `${cantidad} ${cantidad === 1 ? 'tarjeta eliminada' : 'tarjetas eliminadas'}${bloqueo} · 30 días en Archivo`,
       undefined,
       true,
     );
@@ -3086,6 +3229,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            className="board-icon-button"
+            onClick={() => void abrirArchivo()}
+            aria-label="Archivo y recientes borrados"
+            title="Archivo · recientes borrados (30 días)"
+          ><Archive size={16} /></button>
         </div>
       </header>
 
@@ -3421,7 +3572,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           />
         )}
 
-        <div className="board-count">{activeBoard.cards.length} {activeBoard.cards.length === 1 ? 'tarjeta' : 'tarjetas'} · arrastra el fondo para seleccionar · Espacio + arrastra para mover · ⌘/Ctrl + rueda para acercar</div>
+        <div className="board-count">
+          {activeBoard.cards.length} {activeBoard.cards.length === 1 ? 'tarjeta' : 'tarjetas'} · arrastra el fondo para seleccionar · Espacio + arrastra para mover · ⌘/Ctrl + rueda para acercar
+          <span data-testid="history-status" className="board-history-status" aria-live="polite">
+            {historyStatus === 'nueva' ? ' · sesión nueva' : ' · historial restaurado'}
+          </span>
+        </div>
       </main>
 
         <input ref={importInput} type="file" accept="application/json,.json,text/markdown,.md" hidden onChange={(event) => { void importBoard(event.target.files?.[0]); event.target.value = ''; }} />
@@ -3467,6 +3623,50 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           onClose={() => setMirarOpen(false)}
           onAceptar={aceptarLecturaEnReferente}
         />
+      )}
+
+      {archiveOpen && (
+        <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setArchiveOpen(false); }}>
+          <div className="board-dialog board-dialog-wide board-archive-dialog" role="dialog" aria-modal="true" aria-labelledby="board-archive-title">
+            <div className="board-dialog-heading">
+              <h2 id="board-archive-title">Archivo</h2>
+              <button type="button" onClick={() => setArchiveOpen(false)} aria-label="Cerrar Archivo"><X size={16} /></button>
+            </div>
+            <p className="board-dialog-hint">Lo que borras no desaparece del todo: queda aquí durante 30 días, sin papelera permanente.</p>
+            <section className="board-archive-section" aria-labelledby="board-archive-recents">
+              <div className="board-archive-section-head">
+                <h3 id="board-archive-recents"><History size={15} aria-hidden="true" /> Recientes borrados</h3>
+                <span>{borrados.length} {borrados.length === 1 ? 'entrada' : 'entradas'}</span>
+              </div>
+              {archiveError && <p className="board-dialog-error" role="alert">{archiveError}</p>}
+              {borrados.length === 0 ? (
+                <p className="board-archive-empty">Todavía no hay nada borrado en los últimos 30 días.</p>
+              ) : (
+                <ul className="board-archive-list" aria-label="Recientes borrados">
+                  {borrados.map((entry) => {
+                    const dias = Math.max(0, Math.ceil((Date.parse(entry.expiresAt) - Date.now()) / (24 * 60 * 60 * 1000)));
+                    return (
+                      <li key={entry.id} className="board-archive-item" data-borrado-kind={entry.kind} data-borrado-id={entry.id}>
+                        <span className="board-archive-kind">{ETIQUETA_BORRADO[entry.kind]}</span>
+                        <div className="board-archive-copy">
+                          <strong>{entry.label}</strong>
+                          <small>{new Date(entry.deletedAt).toLocaleString('es-ES', { dateStyle: 'medium', timeStyle: 'short' })} · quedan {dias} días</small>
+                        </div>
+                        <button type="button" className="board-tool primary" disabled={restoringId === entry.id} onClick={() => void restaurarEntrada(entry)}>
+                          {restoringId === entry.id ? 'Restaurando…' : 'Restaurar'}
+                        </button>
+                        <button type="button" className="board-tool danger" onClick={() => void olvidarEntrada(entry.id)} aria-label={`Olvidar ${entry.label} para siempre`}>Olvidar</button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+            <div className="board-dialog-actions">
+              <button type="button" className="board-tool primary" onClick={() => setArchiveOpen(false)}>Cerrar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {shortcutsOpen && (

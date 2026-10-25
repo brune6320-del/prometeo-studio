@@ -2,7 +2,7 @@
  * Cambios preparados, verificación, copia guardada y página verificada para Comparar.
  * La fuente de verdad es el backend: tras cada operación se usa la lista que devuelve.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { studioApi } from '../api/client';
 import { ApiError, normalizeError } from '../api/errors';
 import type { DocGraphDiffResult, PageRenderData, SavedCopy, StagedOperation, VerifierResult, VerifyAndExportResponse } from '../types';
@@ -26,13 +26,57 @@ function phaseFor(state: string | undefined, ops: StagedOperation[]): TxPhase {
   return ops.length ? 'STAGED' : 'READY';
 }
 
+/** Receta para poder volver a preparar una operación después de deshacerla. */
+type RecetaPdf =
+  | { kind: 'text'; nodeId?: string; targetId?: string; newText: string }
+  | { kind: 'raster'; page: number; observationId: string; newText: string };
+
+interface PdfSnapshot {
+  ops: StagedOperation[];
+  recipes: Record<string, RecetaPdf | undefined>;
+}
+
+const MAX_PDF_HISTORY = 100;
+
+function copiaOps(ops: StagedOperation[]): StagedOperation[] {
+  return ops.map((op) => ({ ...op }));
+}
+
 export function useTransaction(sessionId: string | null) {
   const [tx, setTx] = useState<TransactionState>(EMPTY);
   const [busy, setBusy] = useState<'none' | 'staging' | 'verifying' | 'saving'>('none');
+  const [, setHistoryVersion] = useState(0);
+  const recipes = useRef(new Map<string, RecetaPdf>());
+  const past = useRef<PdfSnapshot[]>([]);
+  const future = useRef<PdfSnapshot[]>([]);
+  const txRef = useRef<TransactionState>(EMPTY);
+
+  useEffect(() => {
+    txRef.current = tx;
+  }, [tx]);
+
+  const snapshot = useCallback((ops: StagedOperation[]): PdfSnapshot => ({
+    ops: copiaOps(ops),
+    recipes: Object.fromEntries(ops.map((op) => [op.op_id, recipes.current.get(op.op_id)])),
+  }), []);
+
+  const apuntar = useCallback((antes: PdfSnapshot) => {
+    past.current = [...past.current, antes].slice(-MAX_PDF_HISTORY);
+    future.current = [];
+    setHistoryVersion((value) => value + 1);
+  }, []);
+
+  const adoptarCesta = useCallback((ops: StagedOperation[], phase: TxPhase = phaseFor(undefined, ops), extra: Partial<TransactionState> = {}) => {
+    setTx((current) => ({ ...current, ops, phase, result: null, diff: null, saved: null, error: null, ...extra }));
+  }, []);
 
   useEffect(() => {
     setTx(EMPTY);
     setBusy('none');
+    past.current = [];
+    future.current = [];
+    recipes.current.clear();
+    setHistoryVersion((value) => value + 1);
     if (!sessionId) return;
     // La cesta vive en el motor: al cambiar de sesión (o recuperarla tras recargar) se lee de ahí.
     let cancelled = false;
@@ -54,14 +98,17 @@ export function useTransaction(sessionId: string | null) {
       if (!sessionId) return;
       setBusy('staging');
       try {
-        await studioApi.stageEdit(sessionId, nodeId, newText);
+        const antes = snapshot(txRef.current.ops);
+        const op = await studioApi.stageEdit(sessionId, nodeId, newText);
+        recipes.current.set(op.op_id, { kind: 'text', nodeId, newText });
         const tray = await studioApi.getTransaction(sessionId);
-        setTx((t) => ({ ...t, ops: tray.staged_operations, phase: phaseFor(tray.transaction_state, tray.staged_operations), result: null, diff: null, saved: null, error: null }));
+        apuntar(antes);
+        adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
       } finally {
         setBusy('none');
       }
     },
-    [sessionId],
+    [adoptarCesta, apuntar, sessionId, snapshot],
   );
 
   const stageRaster = useCallback(
@@ -69,38 +116,112 @@ export function useTransaction(sessionId: string | null) {
       if (!sessionId) return;
       setBusy('staging');
       try {
-        await studioApi.stageRasterEdit(sessionId, page, observationId, newText);
+        const antes = snapshot(txRef.current.ops);
+        const op = await studioApi.stageRasterEdit(sessionId, page, observationId, newText);
+        recipes.current.set(op.op_id, { kind: 'raster', page, observationId, newText });
         const tray = await studioApi.getTransaction(sessionId);
-        setTx((t) => ({ ...t, ops: tray.staged_operations, phase: phaseFor(tray.transaction_state, tray.staged_operations), result: null, diff: null, saved: null, error: null }));
+        apuntar(antes);
+        adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
       } finally {
         setBusy('none');
       }
     },
-    [sessionId],
+    [adoptarCesta, apuntar, sessionId, snapshot],
   );
 
   const remove = useCallback(
     async (opId: string) => {
       if (!sessionId) return;
       try {
+        const antes = snapshot(txRef.current.ops);
         const tray = await studioApi.removeStagedOp(sessionId, opId);
-        setTx((t) => ({ ...t, ops: tray.staged_operations, phase: phaseFor(tray.transaction_state, tray.staged_operations), result: null, diff: null, saved: null, error: null }));
+        apuntar(antes);
+        adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
       } catch (err) {
         setTx((t) => ({ ...t, error: normalizeError(err, 'STAGING') }));
       }
     },
-    [sessionId],
+    [adoptarCesta, apuntar, sessionId, snapshot],
   );
 
   const clear = useCallback(async () => {
     if (!sessionId) return;
     try {
+      const antes = snapshot(txRef.current.ops);
       await studioApi.clearTransaction(sessionId);
-      setTx({ ...EMPTY });
+      apuntar(antes);
+      adoptarCesta([], 'READY');
     } catch (err) {
       setTx((t) => ({ ...t, error: normalizeError(err, 'STAGING') }));
     }
+  }, [adoptarCesta, apuntar, sessionId, snapshot]);
+
+  /** Lleva la cesta del motor al estado de una instantánea: quita, re-prepara o corrige. */
+  const aplicarSnapshot = useCallback(async (target: PdfSnapshot) => {
+    if (!sessionId) throw new Error('No hay sesión PDF abierta.');
+    const actuales = txRef.current.ops;
+    for (const op of actuales) {
+      if (!target.ops.some((item) => item.op_id === op.op_id)) {
+        await studioApi.removeStagedOp(sessionId, op.op_id);
+      }
+    }
+    for (const op of target.ops) {
+      const actual = actuales.find((item) => item.op_id === op.op_id);
+      if (actual && actual.new_text === op.new_text) continue;
+      const receta = target.recipes[op.op_id] ?? recipes.current.get(op.op_id);
+      if (!receta) {
+        throw new Error('Ese cambio se preparó en otra sesión del motor y no se puede volver a preparar. Vuelve a seleccionar el texto.');
+      }
+      const nueva = receta.kind === 'text'
+        ? await studioApi.stageEdit(sessionId, receta.nodeId ?? op.node_id, receta.newText)
+        : await studioApi.stageRasterEdit(sessionId, receta.page, receta.observationId, receta.newText);
+      recipes.current.set(nueva.op_id, receta);
+      target.recipes[nueva.op_id] = receta;
+    }
+    return studioApi.getTransaction(sessionId);
   }, [sessionId]);
+
+  const undo = useCallback(async () => {
+    const target = past.current[past.current.length - 1];
+    if (!target) return false;
+    setBusy('staging');
+    try {
+      const actual = snapshot(txRef.current.ops);
+      await aplicarSnapshot(target);
+      past.current = past.current.slice(0, -1);
+      future.current = [...future.current, actual].slice(-MAX_PDF_HISTORY);
+      const tray = await studioApi.getTransaction(sessionId!);
+      adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
+      setHistoryVersion((value) => value + 1);
+      return true;
+    } catch (err) {
+      setTx((t) => ({ ...t, error: normalizeError(err, 'STAGING') }));
+      return false;
+    } finally {
+      setBusy('none');
+    }
+  }, [adoptarCesta, aplicarSnapshot, sessionId, snapshot]);
+
+  const redo = useCallback(async () => {
+    const target = future.current[future.current.length - 1];
+    if (!target) return false;
+    setBusy('staging');
+    try {
+      const actual = snapshot(txRef.current.ops);
+      await aplicarSnapshot(target);
+      future.current = future.current.slice(0, -1);
+      past.current = [...past.current, actual].slice(-MAX_PDF_HISTORY);
+      const tray = await studioApi.getTransaction(sessionId!);
+      adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
+      setHistoryVersion((value) => value + 1);
+      return true;
+    } catch (err) {
+      setTx((t) => ({ ...t, error: normalizeError(err, 'STAGING') }));
+      return false;
+    } finally {
+      setBusy('none');
+    }
+  }, [adoptarCesta, aplicarSnapshot, sessionId, snapshot]);
 
   const verify = useCallback(async () => {
     if (!sessionId || tx.ops.length === 0) return null;
@@ -168,7 +289,24 @@ export function useTransaction(sessionId: string | null) {
 
   const dismissError = useCallback(() => setTx((t) => ({ ...t, error: null })), []);
 
-  return { tx, busy, stageText, stageRaster, remove, clear, verify, save, markDownloaded, reveal, refresh, dismissError };
+  return {
+    tx,
+    busy,
+    stageText,
+    stageRaster,
+    remove,
+    clear,
+    verify,
+    save,
+    markDownloaded,
+    reveal,
+    refresh,
+    dismissError,
+    undo,
+    redo,
+    canUndo: past.current.length > 0,
+    canRedo: future.current.length > 0,
+  };
 }
 
 /** Página de la copia verificada (Comparar). Solo existe tras un PASS vigente; se cachea por huella de la copia. */

@@ -23,9 +23,24 @@ export interface UnsavedDialogState {
   onSave: () => void;
   onDiscard: () => void;
   onCancel: () => void;
+  /** Copia de rescate cuando el volcado falla: no se cierra y se ofrece exportar. */
+  onExport?: () => void;
 }
 
-export function useUnsavedGuard(tx: TransactionState, saveTarget: string, saveCopy: () => Promise<boolean>, boardWork: UnsavedWork | null = null) {
+export interface UnsavedGuardOptions {
+  /** Cerrar fuerza el volcado real antes de permitir cerrar (regla 19). */
+  flush?: () => Promise<boolean>;
+  /** Exportación de rescate si el volcado falla. */
+  onExport?: () => void;
+}
+
+export function useUnsavedGuard(
+  tx: TransactionState,
+  saveTarget: string,
+  saveCopy: () => Promise<boolean>,
+  boardWork: UnsavedWork | null = null,
+  options: UnsavedGuardOptions = {},
+) {
   // El tablero tiene prioridad: es el trabajo que la persona puede guardar en ese momento.
   const work = useMemo(
     () => boardWork ?? describeUnsaved({ phase: tx.phase, opsCount: tx.ops.length, saved: Boolean(tx.saved) }),
@@ -35,6 +50,14 @@ export function useUnsavedGuard(tx: TransactionState, saveTarget: string, saveCo
   useLayoutEffect(() => {
     workRef.current = work;
   }, [work]);
+  const flushRef = useRef(options.flush);
+  useLayoutEffect(() => {
+    flushRef.current = options.flush;
+  }, [options.flush]);
+  const exportRef = useRef(options.onExport);
+  useLayoutEffect(() => {
+    exportRef.current = options.onExport;
+  }, [options.onExport]);
 
   const [pending, setPendingState] = useState<Pending | null>(null);
   const pendingRef = useRef<Pending | null>(null);
@@ -67,16 +90,25 @@ export function useUnsavedGuard(tx: TransactionState, saveTarget: string, saveCo
   useEffect(() => {
     const w = window as unknown as Record<string, unknown>;
     w[CLOSE_REQUEST_HANDLER] = () => {
-      void acknowledgeCloseDialog();
-      if (!workRef.current) {
-        void confirmClose();
-        return;
-      }
-      // Si ya hay un diálogo abierto (p. ej. «abrir otro documento» o un guardado en curso),
-      // no se sustituye su acción: la persona está decidiendo ahí.
-      if (pendingRef.current) return;
-      setError(null);
-      setPending({ action: 'close', proceed: () => void confirmClose() });
+      void (async () => {
+        await acknowledgeCloseDialog();
+        if (!workRef.current) {
+          await confirmClose();
+          return;
+        }
+        // Cerrar con trabajo del tablero: se fuerza el volcado antes de decidir.
+        if (pendingRef.current) return;
+        if (workRef.current.kind === 'board_unsaved' && flushRef.current) {
+          const ok = await flushRef.current();
+          if (ok) {
+            await confirmClose();
+            return;
+          }
+          setError('El volcado a IndexedDB falló. No se cerró nada: reintenta el guardado o exporta una copia de rescate.');
+        }
+        setError((current) => current ?? null);
+        setPending({ action: 'close', proceed: () => void confirmClose() });
+      })();
     };
     return () => {
       delete w[CLOSE_REQUEST_HANDLER];
@@ -124,7 +156,17 @@ export function useUnsavedGuard(tx: TransactionState, saveTarget: string, saveCo
   }, [work, saving, setPending]);
 
   const dialog: UnsavedDialogState | null =
-    pending && work ? { copy: unsavedCopy(work, pending.action, saveTarget), saving, error, onSave, onDiscard, onCancel } : null;
+    pending && work
+      ? {
+        copy: unsavedCopy(work, pending.action, saveTarget),
+        saving,
+        error,
+        onSave,
+        onDiscard,
+        onCancel,
+        ...(exportRef.current ? { onExport: exportRef.current } : {}),
+      }
+      : null;
 
   return { work, guard, dialog };
 }

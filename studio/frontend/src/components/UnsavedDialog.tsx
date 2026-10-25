@@ -10,6 +10,7 @@ interface UnsavedDialogProps {
   onSave: () => void;
   onDiscard: () => void;
   onCancel: () => void;
+  onExport?: () => void;
 }
 
 /**
@@ -19,7 +20,7 @@ interface UnsavedDialogProps {
  * abierto, ninguna tecla llega a los atajos de la app (⌘F, AvPág…). «Cancelar» sigue activo
  * durante un guardado: cierra el diálogo sin interrumpir el guardado ni ejecutar la acción.
  */
-export const UnsavedDialog: React.FC<UnsavedDialogProps> = ({ copy, saving, error, onSave, onDiscard, onCancel }) => {
+export const UnsavedDialog: React.FC<UnsavedDialogProps> = ({ copy, saving, error, onSave, onDiscard, onCancel, onExport }) => {
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const cancelHandler = useRef(onCancel);
@@ -85,6 +86,11 @@ export const UnsavedDialog: React.FC<UnsavedDialogProps> = ({ copy, saving, erro
           <button className="btn btn-ghost" onClick={onCancel} ref={cancelRef}>
             Cancelar
           </button>
+          {onExport && (
+            <button className="btn btn-ghost" onClick={onExport} disabled={saving} data-testid="unsaved-export">
+              Exportar copia de rescate
+            </button>
+          )}
           <button className="btn btn-danger-ghost" onClick={onDiscard} disabled={saving} data-testid="unsaved-discard">
             {copy.discardLabel}
           </button>

@@ -5360,3 +5360,105 @@
 .board-viewport:focus {
   outline: none;
 }
+
+/* ── H1 · Archivo y memoria de 30 días ──────────────────────────────────── */
+.board-history-status {
+  color: var(--fg-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.board-archive-dialog {
+  max-height: min(680px, 82vh);
+  overflow: auto;
+}
+
+.board-archive-section {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.board-archive-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line-subtle);
+}
+
+.board-archive-section-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-body);
+}
+
+.board-archive-section-head > span {
+  color: var(--fg-3);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.board-archive-list {
+  display: grid;
+  gap: var(--space-1);
+  max-height: 440px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.board-archive-item {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.board-archive-kind {
+  color: var(--fg-3);
+  font-size: var(--font-size-caption);
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.board-archive-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.board-archive-copy strong {
+  overflow: hidden;
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.board-archive-copy small {
+  color: var(--fg-3);
+  font-size: var(--font-size-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.board-archive-empty {
+  margin: 0;
+  padding: var(--space-4) var(--space-2);
+  color: var(--fg-3);
+  font-size: var(--font-size-caption);
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .board-archive-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .board-archive-kind { grid-column: 1 / -1; }
+}

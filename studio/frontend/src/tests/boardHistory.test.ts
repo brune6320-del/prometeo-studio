@@ -34,4 +34,17 @@ describe('historial del tablero: un gesto es un paso (Visual V1 · L1)', () => {
     history = recordBoardChange(history, b1, b2, 'card:x:title:2', 200);
     expect(history.undo).toHaveLength(2);
   });
+
+  it('150 gestos conservan los 100 pasos más recientes (A-1 · Top 1)', () => {
+    let board = createBoard('t');
+    let history = emptyBoardHistory();
+    for (let index = 0; index < 150; index += 1) {
+      const next = { ...board, title: `paso ${index}` };
+      history = recordBoardChange(history, board, next, `gesto-${index}`, index * 1000);
+      board = next;
+    }
+    expect(history.undo).toHaveLength(100);
+    expect(history.undo[0].after.title).toBe('paso 50');
+    expect(history.undo[99].after.title).toBe('paso 149');
+  });
 });

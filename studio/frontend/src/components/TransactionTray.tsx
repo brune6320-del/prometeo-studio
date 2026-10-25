@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, ShieldCheck, Trash2 } from 'lucide-react';
+import { ArrowRight, Redo2, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import type { StagedOperation } from '../types';
 import type { TxPhase } from '../hooks/useTransaction';
 
@@ -11,9 +11,13 @@ interface TrayProps {
   onRemove: (opId: string) => void;
   onClear: () => void;
   onVerify: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
-export const TransactionTray: React.FC<TrayProps> = ({ ops, phase, verifying, uiMode, onRemove, onClear, onVerify }) => {
+export const TransactionTray: React.FC<TrayProps> = ({ ops, phase, verifying, uiMode, onRemove, onClear, onVerify, onUndo, onRedo, canUndo = false, canRedo = false }) => {
   const count = ops.length;
   return (
     <div>
@@ -35,6 +39,12 @@ export const TransactionTray: React.FC<TrayProps> = ({ ops, phase, verifying, ui
           </div>
         </div>
         <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
+          <button className="btn btn-ghost btn-icon btn-sm" onClick={onUndo} disabled={!canUndo || verifying} aria-label="Deshacer el último cambio preparado" title="Deshacer en la bandeja (⌘Z)">
+            <Undo2 size={15} />
+          </button>
+          <button className="btn btn-ghost btn-icon btn-sm" onClick={onRedo} disabled={!canRedo || verifying} aria-label="Rehacer el cambio preparado" title="Rehacer en la bandeja (⌘⇧Z)">
+            <Redo2 size={15} />
+          </button>
           {count > 0 && (
             <button className="btn btn-danger-ghost btn-sm" onClick={onClear} disabled={verifying}>
               Descartar todo

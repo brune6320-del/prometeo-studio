@@ -30,6 +30,7 @@ import { useUnsavedGuard } from './hooks/useUnsavedGuard';
 import { useBoardWrites } from './hooks/useBoardWrites';
 import { describeBoardUnsaved } from './state/unsaved';
 import { flushBoardWrites } from './board/saveQueue';
+import { exportarRescateTableros } from './board/rescate';
 import { useNativeAutoTest } from './testing/useNativeAutoTest';
 import { ErrorNotice, Notice, useResizable } from './components/ui';
 
@@ -63,7 +64,7 @@ const Studio: React.FC<{
   const pdfBackendAvailable = ready || backend.phase === 'DEGRADED';
   const docs = useDocumentSession(pdfBackendAvailable);
   const sessionId = docs.doc?.sessionId ?? null;
-  const { tx, busy, stageText, stageRaster, remove, clear, verify, save, markDownloaded, reveal, refresh, dismissError } = useTransaction(sessionId);
+  const { tx, busy, stageText, stageRaster, remove, clear, verify, save, markDownloaded, reveal, refresh, dismissError, undo, redo, canUndo, canRedo } = useTransaction(sessionId);
 
   const [uiMode, setUiMode] = useState<'user' | 'technical'>('user');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -211,7 +212,10 @@ const Studio: React.FC<{
   const boardWork = useMemo(() => describeBoardUnsaved(boardWrites.pending), [boardWrites.pending]);
   // Con cambios del tablero pendientes, «Guardar» guarda el tablero; si no, la copia PDF como antes.
   const saveAll = useCallback(async () => (boardWork ? flushBoardWrites() : saveCopy()), [boardWork, saveCopy]);
-  const unsaved = useUnsavedGuard(tx, 'Descargas', saveAll, boardWork);
+  const unsaved = useUnsavedGuard(tx, 'Descargas', saveAll, boardWork, {
+    flush: boardWork ? flushBoardWrites : undefined,
+    onExport: boardWork ? () => { void exportarRescateTableros(); } : undefined,
+  });
   const openSampleGuarded = useCallback((key: string) => unsaved.guard('open', () => void docs.openSample(key)), [unsaved, docs]);
   const openFileGuarded = useCallback((file: File) => unsaved.guard('open', () => void docs.openFile(file)), [unsaved, docs]);
 
@@ -270,6 +274,12 @@ const Studio: React.FC<{
         setSearchOpen(true);
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && !isEditable(e.target)) {
+        e.preventDefault();
+        if (e.shiftKey) void redo();
+        else void undo();
+        return;
+      }
       if (isEditable(e.target) || searchOpen) return;
       if (e.key === 'PageDown') docs.stepPage(1);
       else if (e.key === 'PageUp') docs.stepPage(-1);
@@ -281,7 +291,7 @@ const Studio: React.FC<{
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [docs, sessionId, searchOpen, workspaceMode]);
+  }, [docs, redo, searchOpen, sessionId, undo, workspaceMode]);
 
   const workspaceError =
     backend.phase === 'DEGRADED' ? backend.error ?? new ApiError({ code: 'WORKSPACE_UNAVAILABLE', message: 'Motor degradado.' }) : null;
@@ -535,7 +545,7 @@ const Studio: React.FC<{
         {dockOpen && (
           <div className="dock-body" role="tabpanel" id="dock-panel" aria-labelledby={`tab-${dockTab}`}>
             {dockTab === 'changes' && (
-              <TransactionTray ops={tx.ops} phase={tx.phase} verifying={busy === 'verifying'} uiMode={uiMode} onRemove={remove} onClear={clear} onVerify={handleVerify} />
+              <TransactionTray ops={tx.ops} phase={tx.phase} verifying={busy === 'verifying'} uiMode={uiMode} onRemove={remove} onClear={clear} onVerify={handleVerify} onUndo={() => void undo()} onRedo={() => void redo()} canUndo={canUndo} canRedo={canRedo} />
             )}
             {dockTab === 'verification' && (
               <VerifierPanel
