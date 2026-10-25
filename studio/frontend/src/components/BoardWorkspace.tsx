@@ -5,6 +5,7 @@ import {
   ChevronDown,
   FolderPlus,
   History,
+  Hand,
   Magnet,
   Download,
   LayoutTemplate,
@@ -282,6 +283,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [snapEnabled, setSnapEnabled] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
+  /** Modo Mano: un dedo o el ratón mueven el mundo sin dibujar marquesina. */
+  const [handMode, setHandMode] = useState(false);
   const [guias, setGuias] = useState<GuiasIman>({});
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -300,6 +303,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; sizes: Map<string, CardSize>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null; lastX: number; lastY: number; lastT: number; altKey: boolean; duplicated: boolean } | null>(null);
   /** Rectángulo de selección (arrastrar el fondo), en coordenadas de pantalla. */
   const marqueeDrag = useRef<{ pointerId: number; startX: number; startY: number; captureEl: HTMLElement | null; modo: 'reemplazar' | 'sumar' | 'restar' } | null>(null);
+  /** H3 · dedos activos y gesto táctil: un dedo dibuja, dos panean y pellizcan. */
+  const touchPoints = useRef(new Map<number, { x: number; y: number }>());
+  const touchGesture = useRef<{
+    mode: 'marquee' | 'camera';
+    baseCamera?: { pan: { x: number; y: number }; zoom: number };
+    baseDist?: number;
+    baseMid?: { x: number; y: number };
+  } | null>(null);
+  const touchIgnore = useRef(false);
   const connectOrigin = useRef<{ cardId: string; pointerId: number } | null>(null);
   /** Herramienta de marco elegida en el menú: el siguiente arrastre dibuja el rectángulo. */
   const [frameToolId, setFrameToolId] = useState<string | null>(null);
@@ -676,6 +688,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     frameResize.current = null;
     freeResize.current = null;
     marqueeDrag.current = null;
+    touchPoints.current.clear();
+    touchGesture.current = null;
+    touchIgnore.current = false;
     connectOrigin.current = null;
     setConnectDraft(null);
     setIsPanning(false);
@@ -1252,6 +1267,122 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     return screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
   };
 
+  const distanciaEntreToques = (): number => {
+    const puntos = [...touchPoints.current.values()];
+    if (puntos.length < 2) return 0;
+    return Math.hypot(puntos[1].x - puntos[0].x, puntos[1].y - puntos[0].y);
+  };
+
+  const medioDeToques = (): { x: number; y: number } => {
+    const puntos = [...touchPoints.current.values()];
+    if (!puntos.length) return { x: 0, y: 0 };
+    const suma = puntos.reduce((total, punto) => ({ x: total.x + punto.x, y: total.y + punto.y }), { x: 0, y: 0 });
+    return { x: suma.x / puntos.length, y: suma.y / puntos.length };
+  };
+
+  /** Un dedo dibuja marquesina; dos dedos panean y pellizcan hacia el punto medio. */
+  const iniciarToque = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('.board-card, .board-column, .board-frame, .board-free-media, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
+    event.preventDefault();
+    touchPoints.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* puntero sintético */ }
+    if (touchIgnore.current) return;
+
+    const cantidad = touchPoints.current.size;
+    if (cantidad >= 2) {
+      // El segundo dedo cancela la marquesina: dos dedos son cámara, nunca selección.
+      if (marqueeDrag.current) {
+        liberarPuntero(marqueeDrag.current.captureEl, marqueeDrag.current.pointerId);
+        marqueeDrag.current = null;
+      }
+      setMarquee(null);
+      detenerInercia();
+      marcarGestoVisual();
+      touchGesture.current = {
+        mode: 'camera',
+        baseCamera: { pan: { ...cameraRef.current.pan }, zoom: cameraRef.current.zoom },
+        baseDist: Math.max(1, distanciaEntreToques()),
+        baseMid: medioDeToques(),
+      };
+      return;
+    }
+
+    if (cantidad === 1) {
+      if (handMode || spaceHeld.current) {
+        detenerInercia();
+        marcarGestoVisual();
+        touchGesture.current = {
+          mode: 'camera',
+          baseCamera: { pan: { ...cameraRef.current.pan }, zoom: cameraRef.current.zoom },
+          baseMid: { x: event.clientX, y: event.clientY },
+        };
+        return;
+      }
+      touchGesture.current = { mode: 'marquee' };
+      iniciarMarquesina(event);
+    }
+  };
+
+  const moverToque = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!touchPoints.current.has(event.pointerId)) return;
+    touchPoints.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const gesto = touchGesture.current;
+    if (!gesto) return;
+    if (gesto.mode === 'marquee') {
+      moverMarquesina(event);
+      return;
+    }
+    if (!gesto.baseCamera) return;
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cantidad = touchPoints.current.size;
+    const medio = medioDeToques();
+    if (cantidad >= 2 && gesto.baseDist) {
+      // Paneo del punto medio + zoom focal en el mismo frame, sin inercia propia.
+      const panned = {
+        zoom: gesto.baseCamera.zoom,
+        pan: {
+          x: gesto.baseCamera.pan.x + (medio.x - (gesto.baseMid?.x ?? medio.x)),
+          y: gesto.baseCamera.pan.y + (medio.y - (gesto.baseMid?.y ?? medio.y)),
+        },
+      };
+      const escala = distanciaEntreToques() / gesto.baseDist;
+      cameraRef.current = zoomAtPoint(panned, gesto.baseCamera.zoom * escala, { x: medio.x - rect.left, y: medio.y - rect.top });
+    } else {
+      cameraRef.current = {
+        zoom: gesto.baseCamera.zoom,
+        pan: {
+          x: gesto.baseCamera.pan.x + (event.clientX - (gesto.baseMid?.x ?? event.clientX)),
+          y: gesto.baseCamera.pan.y + (event.clientY - (gesto.baseMid?.y ?? event.clientY)),
+        },
+      };
+    }
+    aplicarCamara();
+  };
+
+  const terminarToque = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!touchPoints.current.has(event.pointerId)) return;
+    touchPoints.current.delete(event.pointerId);
+    const gesto = touchGesture.current;
+    if (gesto?.mode === 'marquee' && marqueeDrag.current?.pointerId === event.pointerId) {
+      terminarMarquesina(event);
+    }
+    if (touchPoints.current.size < 2 && gesto?.mode === 'camera') {
+      touchGesture.current = null;
+      // El dedo que queda no debe convertirse en marquesina sin levantar del todo.
+      touchIgnore.current = touchPoints.current.size > 0;
+      terminarGestoVisual();
+      programarSincronizacion();
+    }
+    if (touchPoints.current.size === 0) {
+      touchGesture.current = null;
+      touchIgnore.current = false;
+      terminarGestoVisual();
+      programarSincronizacion();
+    }
+  };
+
   const startFrameDraw = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || !frameToolId) return;
     if ((event.target as HTMLElement).closest('button, input, select, textarea, a, .board-free-media, .board-zoom-controls, .board-empty, .board-controls')) return;
@@ -1291,6 +1422,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const beginViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') {
+      iniciarToque(event);
+      return;
+    }
     const target = event.target as HTMLElement;
     if (!target.closest('input, textarea, select, [contenteditable="true"]')) {
       viewportRef.current?.focus({ preventScroll: true });
@@ -1301,6 +1436,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
     if (frameToolId) {
       startFrameDraw(event);
+      return;
+    }
+    if (handMode && event.button === 0) {
+      beginPan(event);
       return;
     }
     if (event.button === 0) {
@@ -1314,12 +1453,20 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const moveViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') {
+      moverToque(event);
+      return;
+    }
     if (marqueeDrag.current) moverMarquesina(event);
     else if (frameDraw.current) moveFrameDraw(event);
     else movePan(event);
   };
 
   const endViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch') {
+      terminarToque(event);
+      return;
+    }
     if (marqueeDrag.current) terminarMarquesina(event);
     else if (frameDraw.current) endFrameDraw(event);
     else endPan(event);
@@ -3274,6 +3421,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           <button className="board-icon-button" onClick={undo} disabled={!canUndo} title="Deshacer (⌘/Ctrl + Z)" aria-label="Deshacer"><Undo2 size={16} /></button>
           <button className="board-icon-button" onClick={redo} disabled={!canRedo} title="Rehacer (⌘/Ctrl + Shift + Z)" aria-label="Rehacer"><Redo2 size={16} /></button>
           <span className="board-tool-divider" aria-hidden="true" />
+          <button
+            type="button"
+            className={`board-icon-button ${handMode ? 'active' : ''}`}
+            onClick={() => setHandMode((value) => !value)}
+            aria-pressed={handMode}
+            aria-label={handMode ? 'Mano activa: mover el lienzo' : 'Mano: mover el lienzo con un dedo'}
+            title={handMode ? 'Mano activa · un dedo mueve el lienzo' : 'Mano · un dedo mueve el lienzo'}
+          ><Hand size={16} /></button>
           <button className={`board-icon-button ${connectMode ? 'active' : ''}`} onClick={() => { setConnectMode((value) => !value); setConnectFromId(null); setNotice(connectMode ? null : 'Elige una tarjeta y luego otra para conectarlas.'); }} aria-pressed={connectMode} title="Relacionar tarjetas" aria-label="Relacionar tarjetas"><Link2 size={16} /></button>
           <button className={`board-icon-button ${snapEnabled ? 'active' : ''}`} onClick={() => setSnapEnabled((enabled) => !enabled)} aria-pressed={snapEnabled} title="Ajustar a la cuadrícula" aria-label="Ajustar a la cuadrícula"><Magnet size={16} /></button>
           <span className="board-tool-divider" aria-hidden="true" />
@@ -3407,7 +3562,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       <main
         ref={viewportRef}
         tabIndex={-1}
-        className={`board-viewport ${isPanning ? 'panning' : ''} ${spacePanActive ? 'space-pan' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
+        className={`board-viewport ${isPanning ? 'panning' : ''} ${spacePanActive ? 'space-pan' : ''} ${handMode ? 'hand-mode' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
         onPointerDown={beginViewportGesture}
         onPointerMove={moveViewportGesture}
         onPointerUp={endViewportGesture}

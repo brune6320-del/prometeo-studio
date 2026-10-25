@@ -5486,3 +5486,53 @@
 .board-frame.is-locked {
   border-style: dashed;
 }
+
+/* ── H3 · táctil: cuerpo, mano y objetivos de 24 px / 44 px ───────────── */
+.board-viewport.hand-mode { cursor: grab; }
+.board-viewport.hand-mode.panning { cursor: grabbing; }
+
+@media (pointer: coarse) {
+  .board-icon-button,
+  .board-back,
+  .board-rail-tool,
+  .board-bar-button,
+  .board-card-lock,
+  .board-connect-button,
+  .board-card-delete,
+  .board-column-lock,
+  .board-column-delete,
+  .board-column-fold,
+  .board-frame-lock,
+  .board-frame-delete,
+  .board-free-media-lock,
+  .board-free-media-delete,
+  .board-selection-button {
+    min-width: 24px;
+    min-height: 24px;
+  }
+
+  .board-color-swatch {
+    width: 24px;
+    height: 24px;
+    margin: 4px;
+  }
+
+  .board-card-color-row { gap: 0; }
+
+  /* Asas táctiles de 44 px: se pueden agarrar con el dedo sin apuntar. */
+  .board-free-media-handle,
+  .board-frame-resize {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .board-free-media-handle.nw,
+  .board-free-media-handle.ne,
+  .board-free-media-handle.sw,
+  .board-free-media-handle.se {
+    width: 44px;
+    height: 44px;
+  }
+}

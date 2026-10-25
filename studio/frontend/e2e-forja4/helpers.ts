@@ -69,6 +69,7 @@ export interface SeedCard {
   url?: string;
   locked?: boolean;
   datos?: Record<string, unknown>;
+  media?: Record<string, unknown>;
 }
 
 export interface SeedBoard {
