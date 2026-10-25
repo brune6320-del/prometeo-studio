@@ -1,4 +1,10 @@
 import React from 'react';
+
+interface Modificadores {
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+}
 import { Link2, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
 import { BoardCardContent } from '../board/tools/CardView';
@@ -14,7 +20,7 @@ export interface BoardCardItemProps {
   connectionSource: boolean;
   connectMode: boolean;
   colors: Array<BoardCard['color']>;
-  onSelect: (card: BoardCard, event: React.MouseEvent<HTMLElement>) => void;
+  onSelect: (card: BoardCard, modifiers: Modificadores) => void;
   onConnect: (cardId: string) => void;
   onDragStart: (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => void;
   onDragMove: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -65,6 +71,13 @@ export const BoardCardItem = React.memo(function BoardCardItem({
       onPointerEnter={card.type === 'referente' ? () => onHover(card.id, true) : undefined}
       onPointerLeave={card.type === 'referente' ? () => onHover(card.id, false) : undefined}
       onBlurCapture={onBlurCapture}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect(card, event);
+        }
+      }}
     >
       <div className="board-card-head" onPointerDown={(event) => onDragStart(card, event)} onPointerMove={onDragMove} onPointerUp={onDragEnd} onPointerCancel={onDragEnd} title="Arrastra para mover la tarjeta">
         <span className="board-drag-grip" aria-hidden="true">⠿</span>

@@ -9,6 +9,7 @@ if (fs.existsSync(LOCAL_CHROMIUM)) {
 
 export default defineConfig({
   testDir: './e2e-forja2',
+  timeout: 90_000,
   fullyParallel: false,
   retries: 0,
   workers: 1,

@@ -90,10 +90,11 @@ interface TextoEnSitioProps {
   placeholder: string;
   ariaLabel: string;
   className?: string;
+  maxLength?: number;
 }
 
 /** Cuerpo de tarjeta: texto en reposo, textarea solo al doble clic. */
-export const TextoEnSitio: React.FC<TextoEnSitioProps> = ({ value, onCommit, placeholder, ariaLabel, className = '' }) => {
+export const TextoEnSitio: React.FC<TextoEnSitioProps> = ({ value, onCommit, placeholder, ariaLabel, className = '', maxLength = 12000 }) => {
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState(value);
   const areaRef = useRef<HTMLTextAreaElement>(null);
@@ -132,7 +133,7 @@ export const TextoEnSitio: React.FC<TextoEnSitioProps> = ({ value, onCommit, pla
         ref={areaRef}
         className={`board-card-text-editor ${className}`}
         value={borrador}
-        maxLength={12000}
+        maxLength={maxLength}
         aria-label={ariaLabel}
         onChange={(event) => setBorrador(event.target.value)}
         onBlur={guardar}

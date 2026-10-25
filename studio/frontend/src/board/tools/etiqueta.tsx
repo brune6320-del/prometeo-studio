@@ -19,6 +19,7 @@ export const etiquetaTool: BoardTool<BoardCard> = {
       placeholder="ETIQUETA"
       ariaLabel="Texto de la etiqueta"
       className="board-card-etiqueta"
+      maxLength={120}
     />
   ),
 };

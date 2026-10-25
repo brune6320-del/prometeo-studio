@@ -2,7 +2,7 @@
 
 > Category: Creative Tools / Visual Board
 > Referencia de tono: Apple Human Interface Guidelines, Monument Grotesk + Diatype Mono (ireneguerra.xyz), Milanote.
-> Estado: especificación P-D (2026-10-24). **No implementada en la app en este encargo**; este documento es la fuente de verdad para implementarla.
+> Estado: **implementada** en `studio/frontend` (Forja 2, 2026-10-24). Los tokens viven en `src/styles/tokens.css`; este documento sigue siendo la fuente de verdad.
 
 ## 1. Tesis visual
 
@@ -224,7 +224,7 @@ Reglas:
 | `--board-zoom-min` | 0.25 | Zoom mínimo |
 | `--board-zoom-max` | 2 | Zoom máximo |
 | `--board-fit-padding` | 48 px | Aire al ajustar todo |
-| `--board-lod-zoom` | 0.6 | Por debajo, se oculta el cuerpo y se muestra título + media |
+| `--board-lod-zoom` | 0.35 | Por debajo, se oculta el cuerpo y se muestra título + media |
 | `--board-card-w` | 320 px | Ancho base de tarjeta |
 | `--board-card-media-ratio` | `4 / 3` | Media primero, sin placeholders gigantes |
 | `--board-card-pad` | 12 px | Padding interno |
@@ -235,7 +235,7 @@ Reglas:
 | `--board-frame-line` | `--line-subtle` | Marco en reposo; ascua solo al seleccionar |
 | `--board-frame-fill` | `transparent` | Sin velo naranja permanente |
 
-**LOD (nivel de detalle):** a menos de `0.6`, la tarjeta muestra solo título, miniatura y color. El cuerpo, las etiquetas y las lecturas se ocultan. A `0.25` la biblioteca debe seguir siendo reconocible por miniaturas y títulos, no por texto de 9 px.
+**LOD (nivel de detalle):** a menos de `0.35`, la tarjeta muestra solo título, miniatura y color. El cuerpo, las etiquetas y las lecturas se ocultan. A `0.25` la biblioteca debe seguir siendo reconocible por miniaturas y títulos, no por texto de 9 px.
 
 ### 10.2 Jerarquía del tablero
 
@@ -368,7 +368,7 @@ Reglas:
   --board-zoom-min: 0.25;
   --board-zoom-max: 2;
   --board-fit-padding: 48px;
-  --board-lod-zoom: 0.6;
+  --board-lod-zoom: 0.35;
   --board-card-w: 320px;
   --board-card-media-ratio: 4 / 3;
   --board-card-pad: 12px;
@@ -462,8 +462,8 @@ Reglas de convivencia:
 
 ## 15. Deuda declarada
 
-- **No implementado:** este encargo no toca código de app. Los tokens existen solo en este documento.
-- **Tema claro:** especificado y medido, sin implementar ni probar en pantalla.
+- **Implementado:** tokens en `src/styles/tokens.css`, barra y rail en `BoardWorkspace.tsx`, física en `src/motion/muelle.ts`, LOD a 0.35, edición en el sitio y pulido de estados.
+- **Tema claro:** tokens definidos en `[data-theme='light']`; no se probó en pantalla ni con contraste real en dispositivo.
 - **Fuentes:** Monument Grotesk y Diatype Mono son comerciales; no se han comprado ni empaquetado. La app usa SF Pro del sistema y caerá a JetBrains Mono / IBM Plex Mono.
 - **Física:** implementada en `.agents/skills/prometeo-fisica/SKILL.md` y `studio/frontend/src/motion/muelle.ts`, con valores medidos en Sala Oscura (`archivo:línea`). Los muelles de Prometeo son una derivación sobreamortiguada de esa ley, no una copia literal.
-- **Medición:** los contrastes son cálculo sRGB/WCAG (E1), no medición con colorímetro. El LOD y las duraciones son H1 hasta que se prueben con usuarios.
+- **Medición:** los contrastes son cálculo sRGB/WCAG (E1), no medición con colorímetro. El LOD y las duraciones son E1 en Playwright; falta validación con usuarios.

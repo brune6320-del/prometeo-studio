@@ -8,7 +8,7 @@ const CARDS = [
 ];
 
 test('F2 · la barra fina, el rail y los menús conservan todas las acciones', async ({ page }) => {
-  await abrirTableroCon(page, CARDS);
+    await abrirTableroCon(page, CARDS);
 
   const topbar = page.getByTestId('board-topbar');
   await expect(topbar.getByLabel('Elegir proyecto')).toBeVisible();
@@ -19,6 +19,7 @@ test('F2 · la barra fina, el rail y los menús conservan todas las acciones', a
   await expect(topbar.getByRole('button', { name: /Zoom/ })).toBeVisible();
   await expect(topbar.getByRole('button', { name: 'Crear proyecto' })).toBeVisible();
   await expect(topbar.getByRole('button', { name: 'Crear tablero' })).toBeVisible();
+  await expect(topbar.getByRole('button', { name: 'Importar tablero' })).toBeVisible();
   await expect(topbar.getByRole('button', { name: 'Renombrar tablero' })).toBeVisible();
   await expect(topbar.getByRole('button', { name: 'Eliminar tablero' })).toBeVisible();
 

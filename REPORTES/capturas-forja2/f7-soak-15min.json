@@ -1,0 +1,13 @@
+{
+  "nota": "Resumen del primer soak de 15 minutos. El JSON completo se sobrescribió con el soak limpio posterior; se conservan aquí las cifras observadas.",
+  "duracionRealMin": 16.0,
+  "ciclos": 19,
+  "erroresConsola": 0,
+  "erroresPagina": 0,
+  "longTasks": 513,
+  "longTaskMaxMs": 1055,
+  "fallosDeCiclo": 27,
+  "fallosPorAccion": { "borrar-y-deshacer": 14, "editar": 13 },
+  "causaDeFallos": "El guion buscaba tarjetas que el apilado del centro había dejado fuera de la vista. Se corrigió la colocación (hueco acotado a la vista) y el guion usa teclado.",
+  "memoriaMB": { "primeros": [34, 81, 50, 55, 43], "ultimos": [46, 71, 48, 44, 44] }
+}

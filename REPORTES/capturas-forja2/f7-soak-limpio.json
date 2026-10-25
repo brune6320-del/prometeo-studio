@@ -1,0 +1,4534 @@
+{
+  "inicio": "2026-10-25T03:59:14.002Z",
+  "duracionObjetivoMs": 300000,
+  "ciclos": 17,
+  "erroresConsola": [],
+  "erroresPagina": [],
+  "longTasks": [
+    {
+      "ms": 156,
+      "accion": "inicio",
+      "cuando": 1792900767872
+    },
+    {
+      "ms": 115,
+      "accion": "inicio",
+      "cuando": 1792900768214
+    },
+    {
+      "ms": 118,
+      "accion": "inicio",
+      "cuando": 1792900768469
+    },
+    {
+      "ms": 56,
+      "accion": "inicio",
+      "cuando": 1792900768592
+    },
+    {
+      "ms": 55,
+      "accion": "editar",
+      "cuando": 1792900770531
+    },
+    {
+      "ms": 58,
+      "accion": "mover",
+      "cuando": 1792900770641
+    },
+    {
+      "ms": 101,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900771090
+    },
+    {
+      "ms": 58,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900771193
+    },
+    {
+      "ms": 54,
+      "accion": "ver-como",
+      "cuando": 1792900771557
+    },
+    {
+      "ms": 51,
+      "accion": "publicar",
+      "cuando": 1792900771652
+    },
+    {
+      "ms": 60,
+      "accion": "recargar",
+      "cuando": 1792900771801
+    },
+    {
+      "ms": 218,
+      "accion": "recargar",
+      "cuando": 1792900776897
+    },
+    {
+      "ms": 60,
+      "accion": "espera",
+      "cuando": 1792900779295
+    },
+    {
+      "ms": 87,
+      "accion": "espera",
+      "cuando": 1792900779526
+    },
+    {
+      "ms": 132,
+      "accion": "espera",
+      "cuando": 1792900779949
+    },
+    {
+      "ms": 57,
+      "accion": "nota",
+      "cuando": 1792900780538
+    },
+    {
+      "ms": 50,
+      "accion": "enlace",
+      "cuando": 1792900780646
+    },
+    {
+      "ms": 85,
+      "accion": "mas",
+      "cuando": 1792900781169
+    },
+    {
+      "ms": 54,
+      "accion": "mas",
+      "cuando": 1792900781464
+    },
+    {
+      "ms": 59,
+      "accion": "mas",
+      "cuando": 1792900781693
+    },
+    {
+      "ms": 63,
+      "accion": "entropia",
+      "cuando": 1792900781982
+    },
+    {
+      "ms": 55,
+      "accion": "marco",
+      "cuando": 1792900782149
+    },
+    {
+      "ms": 63,
+      "accion": "marco",
+      "cuando": 1792900782962
+    },
+    {
+      "ms": 52,
+      "accion": "marco",
+      "cuando": 1792900783054
+    },
+    {
+      "ms": 52,
+      "accion": "marco",
+      "cuando": 1792900786369
+    },
+    {
+      "ms": 62,
+      "accion": "marco",
+      "cuando": 1792900786566
+    },
+    {
+      "ms": 52,
+      "accion": "marco",
+      "cuando": 1792900786943
+    },
+    {
+      "ms": 82,
+      "accion": "editar",
+      "cuando": 1792900787171
+    },
+    {
+      "ms": 53,
+      "accion": "editar",
+      "cuando": 1792900787320
+    },
+    {
+      "ms": 51,
+      "accion": "mover",
+      "cuando": 1792900787422
+    },
+    {
+      "ms": 51,
+      "accion": "mover",
+      "cuando": 1792900787697
+    },
+    {
+      "ms": 50,
+      "accion": "mover",
+      "cuando": 1792900787805
+    },
+    {
+      "ms": 51,
+      "accion": "mover",
+      "cuando": 1792900787956
+    },
+    {
+      "ms": 52,
+      "accion": "mover",
+      "cuando": 1792900788070
+    },
+    {
+      "ms": 56,
+      "accion": "mover",
+      "cuando": 1792900788149
+    },
+    {
+      "ms": 62,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900788248
+    },
+    {
+      "ms": 55,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900788344
+    },
+    {
+      "ms": 298,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900788670
+    },
+    {
+      "ms": 57,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900788894
+    },
+    {
+      "ms": 62,
+      "accion": "ver-como",
+      "cuando": 1792900789091
+    },
+    {
+      "ms": 61,
+      "accion": "ver-como",
+      "cuando": 1792900789197
+    },
+    {
+      "ms": 64,
+      "accion": "ver-como",
+      "cuando": 1792900789280
+    },
+    {
+      "ms": 62,
+      "accion": "publicar",
+      "cuando": 1792900789359
+    },
+    {
+      "ms": 70,
+      "accion": "recargar",
+      "cuando": 1792900789553
+    },
+    {
+      "ms": 50,
+      "accion": "recargar",
+      "cuando": 1792900789554
+    },
+    {
+      "ms": 53,
+      "accion": "recargar",
+      "cuando": 1792900789758
+    },
+    {
+      "ms": 51,
+      "accion": "recargar",
+      "cuando": 1792900793358
+    },
+    {
+      "ms": 314,
+      "accion": "recargar",
+      "cuando": 1792900795665
+    },
+    {
+      "ms": 90,
+      "accion": "recargar",
+      "cuando": 1792900795671
+    },
+    {
+      "ms": 70,
+      "accion": "recargar",
+      "cuando": 1792900795694
+    },
+    {
+      "ms": 61,
+      "accion": "espera",
+      "cuando": 1792900801223
+    },
+    {
+      "ms": 67,
+      "accion": "espera",
+      "cuando": 1792900811087
+    },
+    {
+      "ms": 254,
+      "accion": "espera",
+      "cuando": 1792900811936
+    },
+    {
+      "ms": 96,
+      "accion": "espera",
+      "cuando": 1792900811945
+    },
+    {
+      "ms": 57,
+      "accion": "espera",
+      "cuando": 1792900811976
+    },
+    {
+      "ms": 70,
+      "accion": "nota",
+      "cuando": 1792900812705
+    },
+    {
+      "ms": 58,
+      "accion": "nota",
+      "cuando": 1792900815148
+    },
+    {
+      "ms": 181,
+      "accion": "enlace",
+      "cuando": 1792900815931
+    },
+    {
+      "ms": 76,
+      "accion": "enlace",
+      "cuando": 1792900816131
+    },
+    {
+      "ms": 57,
+      "accion": "enlace",
+      "cuando": 1792900816259
+    },
+    {
+      "ms": 108,
+      "accion": "enlace",
+      "cuando": 1792900816488
+    },
+    {
+      "ms": 117,
+      "accion": "referente",
+      "cuando": 1792900816752
+    },
+    {
+      "ms": 58,
+      "accion": "referente",
+      "cuando": 1792900816756
+    },
+    {
+      "ms": 70,
+      "accion": "referente",
+      "cuando": 1792900816915
+    },
+    {
+      "ms": 75,
+      "accion": "mas",
+      "cuando": 1792900817069
+    },
+    {
+      "ms": 50,
+      "accion": "mas",
+      "cuando": 1792900817297
+    },
+    {
+      "ms": 71,
+      "accion": "entropia",
+      "cuando": 1792900817623
+    },
+    {
+      "ms": 83,
+      "accion": "marco",
+      "cuando": 1792900817775
+    },
+    {
+      "ms": 92,
+      "accion": "marco",
+      "cuando": 1792900818036
+    },
+    {
+      "ms": 80,
+      "accion": "marco",
+      "cuando": 1792900818213
+    },
+    {
+      "ms": 59,
+      "accion": "marco",
+      "cuando": 1792900818214
+    },
+    {
+      "ms": 53,
+      "accion": "marco",
+      "cuando": 1792900818291
+    },
+    {
+      "ms": 71,
+      "accion": "editar",
+      "cuando": 1792900818851
+    },
+    {
+      "ms": 66,
+      "accion": "editar",
+      "cuando": 1792900819323
+    },
+    {
+      "ms": 92,
+      "accion": "editar",
+      "cuando": 1792900819324
+    },
+    {
+      "ms": 63,
+      "accion": "mover",
+      "cuando": 1792900819744
+    },
+    {
+      "ms": 93,
+      "accion": "mover",
+      "cuando": 1792900819863
+    },
+    {
+      "ms": 86,
+      "accion": "mover",
+      "cuando": 1792900819998
+    },
+    {
+      "ms": 83,
+      "accion": "mover",
+      "cuando": 1792900820145
+    },
+    {
+      "ms": 74,
+      "accion": "mover",
+      "cuando": 1792900820278
+    },
+    {
+      "ms": 50,
+      "accion": "mover",
+      "cuando": 1792900820494
+    },
+    {
+      "ms": 65,
+      "accion": "mover",
+      "cuando": 1792900820616
+    },
+    {
+      "ms": 149,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900820835
+    },
+    {
+      "ms": 124,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900821136
+    },
+    {
+      "ms": 85,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900821653
+    },
+    {
+      "ms": 77,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900821788
+    },
+    {
+      "ms": 78,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900821991
+    },
+    {
+      "ms": 773,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900823035
+    },
+    {
+      "ms": 95,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900823144
+    },
+    {
+      "ms": 98,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900823442
+    },
+    {
+      "ms": 74,
+      "accion": "ver-como",
+      "cuando": 1792900823809
+    },
+    {
+      "ms": 78,
+      "accion": "ver-como",
+      "cuando": 1792900824008
+    },
+    {
+      "ms": 103,
+      "accion": "ver-como",
+      "cuando": 1792900824450
+    },
+    {
+      "ms": 96,
+      "accion": "ver-como",
+      "cuando": 1792900824651
+    },
+    {
+      "ms": 78,
+      "accion": "publicar",
+      "cuando": 1792900824827
+    },
+    {
+      "ms": 91,
+      "accion": "publicar",
+      "cuando": 1792900825033
+    },
+    {
+      "ms": 61,
+      "accion": "publicar",
+      "cuando": 1792900825035
+    },
+    {
+      "ms": 62,
+      "accion": "recargar",
+      "cuando": 1792900825167
+    },
+    {
+      "ms": 76,
+      "accion": "recargar",
+      "cuando": 1792900826567
+    },
+    {
+      "ms": 70,
+      "accion": "recargar",
+      "cuando": 1792900827236
+    },
+    {
+      "ms": 225,
+      "accion": "recargar",
+      "cuando": 1792900827759
+    },
+    {
+      "ms": 58,
+      "accion": "recargar",
+      "cuando": 1792900827759
+    },
+    {
+      "ms": 240,
+      "accion": "espera",
+      "cuando": 1792900831915
+    },
+    {
+      "ms": 57,
+      "accion": "espera",
+      "cuando": 1792900831916
+    },
+    {
+      "ms": 53,
+      "accion": "nota",
+      "cuando": 1792900832413
+    },
+    {
+      "ms": 65,
+      "accion": "enlace",
+      "cuando": 1792900832548
+    },
+    {
+      "ms": 58,
+      "accion": "enlace",
+      "cuando": 1792900832628
+    },
+    {
+      "ms": 65,
+      "accion": "enlace",
+      "cuando": 1792900832708
+    },
+    {
+      "ms": 52,
+      "accion": "enlace",
+      "cuando": 1792900832815
+    },
+    {
+      "ms": 55,
+      "accion": "enlace",
+      "cuando": 1792900832880
+    },
+    {
+      "ms": 63,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900834336
+    },
+    {
+      "ms": 127,
+      "accion": "recargar",
+      "cuando": 1792900834836
+    },
+    {
+      "ms": 136,
+      "accion": "recargar",
+      "cuando": 1792900835430
+    },
+    {
+      "ms": 152,
+      "accion": "espera",
+      "cuando": 1792900837038
+    },
+    {
+      "ms": 90,
+      "accion": "nota",
+      "cuando": 1792900837560
+    },
+    {
+      "ms": 65,
+      "accion": "enlace",
+      "cuando": 1792900837718
+    },
+    {
+      "ms": 52,
+      "accion": "enlace",
+      "cuando": 1792900837790
+    },
+    {
+      "ms": 52,
+      "accion": "enlace",
+      "cuando": 1792900837850
+    },
+    {
+      "ms": 54,
+      "accion": "enlace",
+      "cuando": 1792900838002
+    },
+    {
+      "ms": 51,
+      "accion": "referente",
+      "cuando": 1792900838071
+    },
+    {
+      "ms": 61,
+      "accion": "referente",
+      "cuando": 1792900838175
+    },
+    {
+      "ms": 56,
+      "accion": "mas",
+      "cuando": 1792900838288
+    },
+    {
+      "ms": 63,
+      "accion": "marco",
+      "cuando": 1792900839045
+    },
+    {
+      "ms": 100,
+      "accion": "marco",
+      "cuando": 1792900839240
+    },
+    {
+      "ms": 77,
+      "accion": "marco",
+      "cuando": 1792900839240
+    },
+    {
+      "ms": 50,
+      "accion": "marco",
+      "cuando": 1792900839305
+    },
+    {
+      "ms": 60,
+      "accion": "mover",
+      "cuando": 1792900839591
+    },
+    {
+      "ms": 54,
+      "accion": "mover",
+      "cuando": 1792900839667
+    },
+    {
+      "ms": 72,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900840003
+    },
+    {
+      "ms": 215,
+      "accion": "recargar",
+      "cuando": 1792900841261
+    },
+    {
+      "ms": 61,
+      "accion": "recargar",
+      "cuando": 1792900841261
+    },
+    {
+      "ms": 240,
+      "accion": "espera",
+      "cuando": 1792900842979
+    },
+    {
+      "ms": 56,
+      "accion": "espera",
+      "cuando": 1792900842980
+    },
+    {
+      "ms": 60,
+      "accion": "marco",
+      "cuando": 1792900844862
+    },
+    {
+      "ms": 70,
+      "accion": "marco",
+      "cuando": 1792900844865
+    },
+    {
+      "ms": 71,
+      "accion": "marco",
+      "cuando": 1792900844961
+    },
+    {
+      "ms": 62,
+      "accion": "marco",
+      "cuando": 1792900845042
+    },
+    {
+      "ms": 52,
+      "accion": "marco",
+      "cuando": 1792900845116
+    },
+    {
+      "ms": 90,
+      "accion": "editar",
+      "cuando": 1792900846212
+    },
+    {
+      "ms": 88,
+      "accion": "editar",
+      "cuando": 1792900846486
+    },
+    {
+      "ms": 95,
+      "accion": "mover",
+      "cuando": 1792900846649
+    },
+    {
+      "ms": 75,
+      "accion": "mover",
+      "cuando": 1792900846765
+    },
+    {
+      "ms": 85,
+      "accion": "mover",
+      "cuando": 1792900846896
+    },
+    {
+      "ms": 76,
+      "accion": "mover",
+      "cuando": 1792900847005
+    },
+    {
+      "ms": 66,
+      "accion": "mover",
+      "cuando": 1792900847093
+    },
+    {
+      "ms": 56,
+      "accion": "mover",
+      "cuando": 1792900847199
+    },
+    {
+      "ms": 64,
+      "accion": "mover",
+      "cuando": 1792900847288
+    },
+    {
+      "ms": 75,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900847370
+    },
+    {
+      "ms": 112,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900847510
+    },
+    {
+      "ms": 180,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900847694
+    },
+    {
+      "ms": 62,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900847762
+    },
+    {
+      "ms": 51,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900847816
+    },
+    {
+      "ms": 53,
+      "accion": "recargar",
+      "cuando": 1792900848007
+    },
+    {
+      "ms": 53,
+      "accion": "recargar",
+      "cuando": 1792900848007
+    },
+    {
+      "ms": 80,
+      "accion": "recargar",
+      "cuando": 1792900848428
+    },
+    {
+      "ms": 111,
+      "accion": "recargar",
+      "cuando": 1792900848446
+    },
+    {
+      "ms": 479,
+      "accion": "recargar",
+      "cuando": 1792900852163
+    },
+    {
+      "ms": 91,
+      "accion": "recargar",
+      "cuando": 1792900852167
+    },
+    {
+      "ms": 95,
+      "accion": "recargar",
+      "cuando": 1792900852271
+    },
+    {
+      "ms": 340,
+      "accion": "espera",
+      "cuando": 1792900856540
+    },
+    {
+      "ms": 83,
+      "accion": "espera",
+      "cuando": 1792900856543
+    },
+    {
+      "ms": 80,
+      "accion": "espera",
+      "cuando": 1792900856636
+    },
+    {
+      "ms": 51,
+      "accion": "nota",
+      "cuando": 1792900856972
+    },
+    {
+      "ms": 50,
+      "accion": "enlace",
+      "cuando": 1792900857072
+    },
+    {
+      "ms": 51,
+      "accion": "enlace",
+      "cuando": 1792900857190
+    },
+    {
+      "ms": 56,
+      "accion": "enlace",
+      "cuando": 1792900857364
+    },
+    {
+      "ms": 73,
+      "accion": "referente",
+      "cuando": 1792900857476
+    },
+    {
+      "ms": 108,
+      "accion": "referente",
+      "cuando": 1792900857625
+    },
+    {
+      "ms": 81,
+      "accion": "mas",
+      "cuando": 1792900857775
+    },
+    {
+      "ms": 54,
+      "accion": "mas",
+      "cuando": 1792900858094
+    },
+    {
+      "ms": 53,
+      "accion": "entropia",
+      "cuando": 1792900858197
+    },
+    {
+      "ms": 55,
+      "accion": "marco",
+      "cuando": 1792900858299
+    },
+    {
+      "ms": 59,
+      "accion": "marco",
+      "cuando": 1792900858406
+    },
+    {
+      "ms": 100,
+      "accion": "marco",
+      "cuando": 1792900858569
+    },
+    {
+      "ms": 113,
+      "accion": "marco",
+      "cuando": 1792900858696
+    },
+    {
+      "ms": 79,
+      "accion": "marco",
+      "cuando": 1792900858788
+    },
+    {
+      "ms": 65,
+      "accion": "marco",
+      "cuando": 1792900858874
+    },
+    {
+      "ms": 60,
+      "accion": "marco",
+      "cuando": 1792900859117
+    },
+    {
+      "ms": 76,
+      "accion": "editar",
+      "cuando": 1792900859230
+    },
+    {
+      "ms": 74,
+      "accion": "editar",
+      "cuando": 1792900859337
+    },
+    {
+      "ms": 87,
+      "accion": "mover",
+      "cuando": 1792900859467
+    },
+    {
+      "ms": 75,
+      "accion": "mover",
+      "cuando": 1792900859573
+    },
+    {
+      "ms": 59,
+      "accion": "mover",
+      "cuando": 1792900859651
+    },
+    {
+      "ms": 52,
+      "accion": "mover",
+      "cuando": 1792900859723
+    },
+    {
+      "ms": 50,
+      "accion": "mover",
+      "cuando": 1792900859788
+    },
+    {
+      "ms": 68,
+      "accion": "recargar",
+      "cuando": 1792900860211
+    },
+    {
+      "ms": 60,
+      "accion": "recargar",
+      "cuando": 1792900860212
+    },
+    {
+      "ms": 65,
+      "accion": "recargar",
+      "cuando": 1792900860283
+    },
+    {
+      "ms": 93,
+      "accion": "recargar",
+      "cuando": 1792900860520
+    },
+    {
+      "ms": 322,
+      "accion": "recargar",
+      "cuando": 1792900861528
+    },
+    {
+      "ms": 81,
+      "accion": "recargar",
+      "cuando": 1792900861529
+    },
+    {
+      "ms": 70,
+      "accion": "recargar",
+      "cuando": 1792900861621
+    },
+    {
+      "ms": 199,
+      "accion": "espera",
+      "cuando": 1792900863149
+    },
+    {
+      "ms": 56,
+      "accion": "espera",
+      "cuando": 1792900863150
+    },
+    {
+      "ms": 81,
+      "accion": "espera",
+      "cuando": 1792900863258
+    },
+    {
+      "ms": 61,
+      "accion": "nota",
+      "cuando": 1792900863600
+    },
+    {
+      "ms": 55,
+      "accion": "enlace",
+      "cuando": 1792900863693
+    },
+    {
+      "ms": 63,
+      "accion": "enlace",
+      "cuando": 1792900863769
+    },
+    {
+      "ms": 51,
+      "accion": "enlace",
+      "cuando": 1792900863829
+    },
+    {
+      "ms": 58,
+      "accion": "enlace",
+      "cuando": 1792900863978
+    },
+    {
+      "ms": 53,
+      "accion": "referente",
+      "cuando": 1792900864143
+    },
+    {
+      "ms": 80,
+      "accion": "mas",
+      "cuando": 1792900864638
+    },
+    {
+      "ms": 74,
+      "accion": "entropia",
+      "cuando": 1792900864777
+    },
+    {
+      "ms": 66,
+      "accion": "marco",
+      "cuando": 1792900864909
+    },
+    {
+      "ms": 77,
+      "accion": "marco",
+      "cuando": 1792900865047
+    },
+    {
+      "ms": 68,
+      "accion": "marco",
+      "cuando": 1792900865228
+    },
+    {
+      "ms": 79,
+      "accion": "marco",
+      "cuando": 1792900865228
+    },
+    {
+      "ms": 80,
+      "accion": "marco",
+      "cuando": 1792900865318
+    },
+    {
+      "ms": 93,
+      "accion": "marco",
+      "cuando": 1792900865858
+    },
+    {
+      "ms": 140,
+      "accion": "marco",
+      "cuando": 1792900866570
+    },
+    {
+      "ms": 147,
+      "accion": "marco",
+      "cuando": 1792900867009
+    },
+    {
+      "ms": 96,
+      "accion": "marco",
+      "cuando": 1792900867160
+    },
+    {
+      "ms": 91,
+      "accion": "marco",
+      "cuando": 1792900867299
+    },
+    {
+      "ms": 116,
+      "accion": "marco",
+      "cuando": 1792900867453
+    },
+    {
+      "ms": 110,
+      "accion": "marco",
+      "cuando": 1792900867579
+    },
+    {
+      "ms": 111,
+      "accion": "editar",
+      "cuando": 1792900867716
+    },
+    {
+      "ms": 162,
+      "accion": "editar",
+      "cuando": 1792900868076
+    },
+    {
+      "ms": 149,
+      "accion": "editar",
+      "cuando": 1792900868220
+    },
+    {
+      "ms": 142,
+      "accion": "editar",
+      "cuando": 1792900868395
+    },
+    {
+      "ms": 126,
+      "accion": "mover",
+      "cuando": 1792900868559
+    },
+    {
+      "ms": 95,
+      "accion": "mover",
+      "cuando": 1792900868703
+    },
+    {
+      "ms": 94,
+      "accion": "mover",
+      "cuando": 1792900868838
+    },
+    {
+      "ms": 94,
+      "accion": "mover",
+      "cuando": 1792900868960
+    },
+    {
+      "ms": 83,
+      "accion": "mover",
+      "cuando": 1792900869057
+    },
+    {
+      "ms": 66,
+      "accion": "mover",
+      "cuando": 1792900869139
+    },
+    {
+      "ms": 61,
+      "accion": "mover",
+      "cuando": 1792900869218
+    },
+    {
+      "ms": 64,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900869287
+    },
+    {
+      "ms": 65,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900869364
+    },
+    {
+      "ms": 143,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900869512
+    },
+    {
+      "ms": 73,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900869592
+    },
+    {
+      "ms": 104,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900869734
+    },
+    {
+      "ms": 139,
+      "accion": "recargar",
+      "cuando": 1792900870341
+    },
+    {
+      "ms": 101,
+      "accion": "recargar",
+      "cuando": 1792900870341
+    },
+    {
+      "ms": 78,
+      "accion": "recargar",
+      "cuando": 1792900870550
+    },
+    {
+      "ms": 504,
+      "accion": "recargar",
+      "cuando": 1792900872523
+    },
+    {
+      "ms": 109,
+      "accion": "recargar",
+      "cuando": 1792900872524
+    },
+    {
+      "ms": 124,
+      "accion": "recargar",
+      "cuando": 1792900872676
+    },
+    {
+      "ms": 383,
+      "accion": "espera",
+      "cuando": 1792900874926
+    },
+    {
+      "ms": 122,
+      "accion": "espera",
+      "cuando": 1792900874927
+    },
+    {
+      "ms": 134,
+      "accion": "espera",
+      "cuando": 1792900875085
+    },
+    {
+      "ms": 108,
+      "accion": "nota",
+      "cuando": 1792900875437
+    },
+    {
+      "ms": 117,
+      "accion": "enlace",
+      "cuando": 1792900875629
+    },
+    {
+      "ms": 135,
+      "accion": "enlace",
+      "cuando": 1792900875809
+    },
+    {
+      "ms": 106,
+      "accion": "enlace",
+      "cuando": 1792900875920
+    },
+    {
+      "ms": 94,
+      "accion": "enlace",
+      "cuando": 1792900876025
+    },
+    {
+      "ms": 97,
+      "accion": "enlace",
+      "cuando": 1792900876157
+    },
+    {
+      "ms": 78,
+      "accion": "referente",
+      "cuando": 1792900876270
+    },
+    {
+      "ms": 113,
+      "accion": "referente",
+      "cuando": 1792900876436
+    },
+    {
+      "ms": 104,
+      "accion": "mas",
+      "cuando": 1792900876686
+    },
+    {
+      "ms": 89,
+      "accion": "mas",
+      "cuando": 1792900876805
+    },
+    {
+      "ms": 69,
+      "accion": "mas",
+      "cuando": 1792900876982
+    },
+    {
+      "ms": 65,
+      "accion": "entropia",
+      "cuando": 1792900877094
+    },
+    {
+      "ms": 59,
+      "accion": "marco",
+      "cuando": 1792900877199
+    },
+    {
+      "ms": 58,
+      "accion": "marco",
+      "cuando": 1792900877298
+    },
+    {
+      "ms": 61,
+      "accion": "marco",
+      "cuando": 1792900877408
+    },
+    {
+      "ms": 59,
+      "accion": "marco",
+      "cuando": 1792900877493
+    },
+    {
+      "ms": 137,
+      "accion": "mover",
+      "cuando": 1792900877919
+    },
+    {
+      "ms": 100,
+      "accion": "mover",
+      "cuando": 1792900878063
+    },
+    {
+      "ms": 109,
+      "accion": "mover",
+      "cuando": 1792900878213
+    },
+    {
+      "ms": 113,
+      "accion": "mover",
+      "cuando": 1792900878361
+    },
+    {
+      "ms": 129,
+      "accion": "mover",
+      "cuando": 1792900878531
+    },
+    {
+      "ms": 103,
+      "accion": "mover",
+      "cuando": 1792900878667
+    },
+    {
+      "ms": 82,
+      "accion": "mover",
+      "cuando": 1792900878794
+    },
+    {
+      "ms": 107,
+      "accion": "mover",
+      "cuando": 1792900878935
+    },
+    {
+      "ms": 112,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900879059
+    },
+    {
+      "ms": 113,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900879214
+    },
+    {
+      "ms": 177,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900879401
+    },
+    {
+      "ms": 121,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900879576
+    },
+    {
+      "ms": 103,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900879643
+    },
+    {
+      "ms": 100,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900879806
+    },
+    {
+      "ms": 137,
+      "accion": "ver-como",
+      "cuando": 1792900880072
+    },
+    {
+      "ms": 122,
+      "accion": "ver-como",
+      "cuando": 1792900880219
+    },
+    {
+      "ms": 97,
+      "accion": "ver-como",
+      "cuando": 1792900880330
+    },
+    {
+      "ms": 113,
+      "accion": "publicar",
+      "cuando": 1792900880462
+    },
+    {
+      "ms": 118,
+      "accion": "publicar",
+      "cuando": 1792900880768
+    },
+    {
+      "ms": 110,
+      "accion": "publicar",
+      "cuando": 1792900880771
+    },
+    {
+      "ms": 95,
+      "accion": "recargar",
+      "cuando": 1792900880846
+    },
+    {
+      "ms": 510,
+      "accion": "recargar",
+      "cuando": 1792900882609
+    },
+    {
+      "ms": 167,
+      "accion": "recargar",
+      "cuando": 1792900882612
+    },
+    {
+      "ms": 125,
+      "accion": "recargar",
+      "cuando": 1792900882759
+    },
+    {
+      "ms": 383,
+      "accion": "espera",
+      "cuando": 1792900884737
+    },
+    {
+      "ms": 116,
+      "accion": "espera",
+      "cuando": 1792900884740
+    },
+    {
+      "ms": 98,
+      "accion": "espera",
+      "cuando": 1792900884843
+    },
+    {
+      "ms": 103,
+      "accion": "nota",
+      "cuando": 1792900885245
+    },
+    {
+      "ms": 96,
+      "accion": "enlace",
+      "cuando": 1792900885423
+    },
+    {
+      "ms": 125,
+      "accion": "enlace",
+      "cuando": 1792900885587
+    },
+    {
+      "ms": 109,
+      "accion": "enlace",
+      "cuando": 1792900885729
+    },
+    {
+      "ms": 102,
+      "accion": "enlace",
+      "cuando": 1792900885842
+    },
+    {
+      "ms": 147,
+      "accion": "enlace",
+      "cuando": 1792900886069
+    },
+    {
+      "ms": 135,
+      "accion": "referente",
+      "cuando": 1792900886315
+    },
+    {
+      "ms": 163,
+      "accion": "referente",
+      "cuando": 1792900886608
+    },
+    {
+      "ms": 140,
+      "accion": "mas",
+      "cuando": 1792900886846
+    },
+    {
+      "ms": 147,
+      "accion": "mas",
+      "cuando": 1792900887003
+    },
+    {
+      "ms": 107,
+      "accion": "mas",
+      "cuando": 1792900887157
+    },
+    {
+      "ms": 81,
+      "accion": "entropia",
+      "cuando": 1792900887289
+    },
+    {
+      "ms": 91,
+      "accion": "marco",
+      "cuando": 1792900887435
+    },
+    {
+      "ms": 116,
+      "accion": "marco",
+      "cuando": 1792900887628
+    },
+    {
+      "ms": 108,
+      "accion": "marco",
+      "cuando": 1792900887814
+    },
+    {
+      "ms": 90,
+      "accion": "marco",
+      "cuando": 1792900887952
+    },
+    {
+      "ms": 75,
+      "accion": "marco",
+      "cuando": 1792900888047
+    },
+    {
+      "ms": 71,
+      "accion": "marco",
+      "cuando": 1792900888146
+    },
+    {
+      "ms": 64,
+      "accion": "marco",
+      "cuando": 1792900888235
+    },
+    {
+      "ms": 65,
+      "accion": "marco",
+      "cuando": 1792900888318
+    },
+    {
+      "ms": 67,
+      "accion": "marco",
+      "cuando": 1792900888412
+    },
+    {
+      "ms": 112,
+      "accion": "editar",
+      "cuando": 1792900888576
+    },
+    {
+      "ms": 135,
+      "accion": "editar",
+      "cuando": 1792900889140
+    },
+    {
+      "ms": 116,
+      "accion": "editar",
+      "cuando": 1792900889290
+    },
+    {
+      "ms": 111,
+      "accion": "editar",
+      "cuando": 1792900889417
+    },
+    {
+      "ms": 126,
+      "accion": "mover",
+      "cuando": 1792900889578
+    },
+    {
+      "ms": 133,
+      "accion": "mover",
+      "cuando": 1792900889770
+    },
+    {
+      "ms": 116,
+      "accion": "mover",
+      "cuando": 1792900889906
+    },
+    {
+      "ms": 115,
+      "accion": "mover",
+      "cuando": 1792900890126
+    },
+    {
+      "ms": 120,
+      "accion": "mover",
+      "cuando": 1792900890262
+    },
+    {
+      "ms": 154,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900890424
+    },
+    {
+      "ms": 138,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900890586
+    },
+    {
+      "ms": 186,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900890793
+    },
+    {
+      "ms": 133,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900890929
+    },
+    {
+      "ms": 121,
+      "accion": "ver-como",
+      "cuando": 1792900891162
+    },
+    {
+      "ms": 117,
+      "accion": "ver-como",
+      "cuando": 1792900891300
+    },
+    {
+      "ms": 122,
+      "accion": "ver-como",
+      "cuando": 1792900891445
+    },
+    {
+      "ms": 155,
+      "accion": "publicar",
+      "cuando": 1792900891641
+    },
+    {
+      "ms": 137,
+      "accion": "recargar",
+      "cuando": 1792900891910
+    },
+    {
+      "ms": 119,
+      "accion": "recargar",
+      "cuando": 1792900891910
+    },
+    {
+      "ms": 591,
+      "accion": "recargar",
+      "cuando": 1792900893800
+    },
+    {
+      "ms": 174,
+      "accion": "recargar",
+      "cuando": 1792900893800
+    },
+    {
+      "ms": 136,
+      "accion": "recargar",
+      "cuando": 1792900893966
+    },
+    {
+      "ms": 398,
+      "accion": "espera",
+      "cuando": 1792900896559
+    },
+    {
+      "ms": 167,
+      "accion": "espera",
+      "cuando": 1792900896560
+    },
+    {
+      "ms": 135,
+      "accion": "espera",
+      "cuando": 1792900896706
+    },
+    {
+      "ms": 88,
+      "accion": "nota",
+      "cuando": 1792900897045
+    },
+    {
+      "ms": 91,
+      "accion": "enlace",
+      "cuando": 1792900897199
+    },
+    {
+      "ms": 105,
+      "accion": "enlace",
+      "cuando": 1792900897334
+    },
+    {
+      "ms": 143,
+      "accion": "enlace",
+      "cuando": 1792900897516
+    },
+    {
+      "ms": 171,
+      "accion": "enlace",
+      "cuando": 1792900897705
+    },
+    {
+      "ms": 116,
+      "accion": "enlace",
+      "cuando": 1792900897860
+    },
+    {
+      "ms": 103,
+      "accion": "mas",
+      "cuando": 1792900898117
+    },
+    {
+      "ms": 158,
+      "accion": "mas",
+      "cuando": 1792900898521
+    },
+    {
+      "ms": 155,
+      "accion": "mas",
+      "cuando": 1792900898720
+    },
+    {
+      "ms": 157,
+      "accion": "entropia",
+      "cuando": 1792900898959
+    },
+    {
+      "ms": 154,
+      "accion": "marco",
+      "cuando": 1792900899220
+    },
+    {
+      "ms": 123,
+      "accion": "marco",
+      "cuando": 1792900899352
+    },
+    {
+      "ms": 116,
+      "accion": "marco",
+      "cuando": 1792900899542
+    },
+    {
+      "ms": 55,
+      "accion": "marco",
+      "cuando": 1792900899779
+    },
+    {
+      "ms": 137,
+      "accion": "marco",
+      "cuando": 1792900899785
+    },
+    {
+      "ms": 144,
+      "accion": "marco",
+      "cuando": 1792900899961
+    },
+    {
+      "ms": 117,
+      "accion": "marco",
+      "cuando": 1792900900108
+    },
+    {
+      "ms": 126,
+      "accion": "marco",
+      "cuando": 1792900900251
+    },
+    {
+      "ms": 115,
+      "accion": "marco",
+      "cuando": 1792900900395
+    },
+    {
+      "ms": 129,
+      "accion": "marco",
+      "cuando": 1792900900541
+    },
+    {
+      "ms": 118,
+      "accion": "marco",
+      "cuando": 1792900900678
+    },
+    {
+      "ms": 102,
+      "accion": "marco",
+      "cuando": 1792900900791
+    },
+    {
+      "ms": 95,
+      "accion": "editar",
+      "cuando": 1792900900895
+    },
+    {
+      "ms": 112,
+      "accion": "mover",
+      "cuando": 1792900901254
+    },
+    {
+      "ms": 139,
+      "accion": "mover",
+      "cuando": 1792900901431
+    },
+    {
+      "ms": 118,
+      "accion": "mover",
+      "cuando": 1792900901584
+    },
+    {
+      "ms": 113,
+      "accion": "mover",
+      "cuando": 1792900901725
+    },
+    {
+      "ms": 121,
+      "accion": "mover",
+      "cuando": 1792900901864
+    },
+    {
+      "ms": 100,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900901970
+    },
+    {
+      "ms": 66,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900902068
+    },
+    {
+      "ms": 112,
+      "accion": "ver-como",
+      "cuando": 1792900902268
+    },
+    {
+      "ms": 153,
+      "accion": "ver-como",
+      "cuando": 1792900902506
+    },
+    {
+      "ms": 150,
+      "accion": "ver-como",
+      "cuando": 1792900902673
+    },
+    {
+      "ms": 133,
+      "accion": "ver-como",
+      "cuando": 1792900902820
+    },
+    {
+      "ms": 112,
+      "accion": "publicar",
+      "cuando": 1792900902946
+    },
+    {
+      "ms": 97,
+      "accion": "recargar",
+      "cuando": 1792900903063
+    },
+    {
+      "ms": 99,
+      "accion": "recargar",
+      "cuando": 1792900903343
+    },
+    {
+      "ms": 611,
+      "accion": "recargar",
+      "cuando": 1792900905042
+    },
+    {
+      "ms": 140,
+      "accion": "recargar",
+      "cuando": 1792900905043
+    },
+    {
+      "ms": 132,
+      "accion": "recargar",
+      "cuando": 1792900905186
+    },
+    {
+      "ms": 107,
+      "accion": "espera",
+      "cuando": 1792900907923
+    },
+    {
+      "ms": 148,
+      "accion": "espera",
+      "cuando": 1792900908410
+    },
+    {
+      "ms": 866,
+      "accion": "espera",
+      "cuando": 1792900910463
+    },
+    {
+      "ms": 51,
+      "accion": "espera",
+      "cuando": 1792900910488
+    },
+    {
+      "ms": 227,
+      "accion": "espera",
+      "cuando": 1792900910497
+    },
+    {
+      "ms": 155,
+      "accion": "espera",
+      "cuando": 1792900910501
+    },
+    {
+      "ms": 125,
+      "accion": "nota",
+      "cuando": 1792900911351
+    },
+    {
+      "ms": 132,
+      "accion": "enlace",
+      "cuando": 1792900911642
+    },
+    {
+      "ms": 139,
+      "accion": "enlace",
+      "cuando": 1792900911827
+    },
+    {
+      "ms": 137,
+      "accion": "enlace",
+      "cuando": 1792900912070
+    },
+    {
+      "ms": 118,
+      "accion": "enlace",
+      "cuando": 1792900912238
+    },
+    {
+      "ms": 140,
+      "accion": "enlace",
+      "cuando": 1792900912515
+    },
+    {
+      "ms": 150,
+      "accion": "enlace",
+      "cuando": 1792900913236
+    },
+    {
+      "ms": 200,
+      "accion": "referente",
+      "cuando": 1792900916808
+    },
+    {
+      "ms": 135,
+      "accion": "referente",
+      "cuando": 1792900916942
+    },
+    {
+      "ms": 202,
+      "accion": "referente",
+      "cuando": 1792900917191
+    },
+    {
+      "ms": 247,
+      "accion": "mas",
+      "cuando": 1792900917663
+    },
+    {
+      "ms": 225,
+      "accion": "mas",
+      "cuando": 1792900917897
+    },
+    {
+      "ms": 154,
+      "accion": "mas",
+      "cuando": 1792900918118
+    },
+    {
+      "ms": 121,
+      "accion": "entropia",
+      "cuando": 1792900918304
+    },
+    {
+      "ms": 170,
+      "accion": "marco",
+      "cuando": 1792900918604
+    },
+    {
+      "ms": 177,
+      "accion": "marco",
+      "cuando": 1792900918987
+    },
+    {
+      "ms": 152,
+      "accion": "marco",
+      "cuando": 1792900919786
+    },
+    {
+      "ms": 83,
+      "accion": "marco",
+      "cuando": 1792900920066
+    },
+    {
+      "ms": 131,
+      "accion": "marco",
+      "cuando": 1792900920069
+    },
+    {
+      "ms": 149,
+      "accion": "marco",
+      "cuando": 1792900920303
+    },
+    {
+      "ms": 162,
+      "accion": "marco",
+      "cuando": 1792900920530
+    },
+    {
+      "ms": 169,
+      "accion": "marco",
+      "cuando": 1792900920764
+    },
+    {
+      "ms": 168,
+      "accion": "marco",
+      "cuando": 1792900921196
+    },
+    {
+      "ms": 178,
+      "accion": "marco",
+      "cuando": 1792900921821
+    },
+    {
+      "ms": 289,
+      "accion": "marco",
+      "cuando": 1792900922044
+    },
+    {
+      "ms": 177,
+      "accion": "marco",
+      "cuando": 1792900922283
+    },
+    {
+      "ms": 182,
+      "accion": "marco",
+      "cuando": 1792900922575
+    },
+    {
+      "ms": 362,
+      "accion": "editar",
+      "cuando": 1792900923435
+    },
+    {
+      "ms": 233,
+      "accion": "editar",
+      "cuando": 1792900923533
+    },
+    {
+      "ms": 226,
+      "accion": "editar",
+      "cuando": 1792900924325
+    },
+    {
+      "ms": 140,
+      "accion": "editar",
+      "cuando": 1792900924461
+    },
+    {
+      "ms": 175,
+      "accion": "mover",
+      "cuando": 1792900927311
+    },
+    {
+      "ms": 164,
+      "accion": "mover",
+      "cuando": 1792900927337
+    },
+    {
+      "ms": 205,
+      "accion": "mover",
+      "cuando": 1792900927647
+    },
+    {
+      "ms": 208,
+      "accion": "mover",
+      "cuando": 1792900927940
+    },
+    {
+      "ms": 172,
+      "accion": "mover",
+      "cuando": 1792900928159
+    },
+    {
+      "ms": 171,
+      "accion": "mover",
+      "cuando": 1792900928375
+    },
+    {
+      "ms": 113,
+      "accion": "mover",
+      "cuando": 1792900928519
+    },
+    {
+      "ms": 126,
+      "accion": "mover",
+      "cuando": 1792900928704
+    },
+    {
+      "ms": 120,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900928845
+    },
+    {
+      "ms": 104,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900928978
+    },
+    {
+      "ms": 442,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900929527
+    },
+    {
+      "ms": 215,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900929736
+    },
+    {
+      "ms": 157,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900929944
+    },
+    {
+      "ms": 287,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900930410
+    },
+    {
+      "ms": 221,
+      "accion": "ver-como",
+      "cuando": 1792900930715
+    },
+    {
+      "ms": 154,
+      "accion": "ver-como",
+      "cuando": 1792900930950
+    },
+    {
+      "ms": 145,
+      "accion": "ver-como",
+      "cuando": 1792900931120
+    },
+    {
+      "ms": 169,
+      "accion": "ver-como",
+      "cuando": 1792900931308
+    },
+    {
+      "ms": 155,
+      "accion": "publicar",
+      "cuando": 1792900931500
+    },
+    {
+      "ms": 196,
+      "accion": "publicar",
+      "cuando": 1792900931793
+    },
+    {
+      "ms": 77,
+      "accion": "publicar",
+      "cuando": 1792900931795
+    },
+    {
+      "ms": 151,
+      "accion": "recargar",
+      "cuando": 1792900932029
+    },
+    {
+      "ms": 161,
+      "accion": "recargar",
+      "cuando": 1792900932323
+    },
+    {
+      "ms": 76,
+      "accion": "recargar",
+      "cuando": 1792900933511
+    },
+    {
+      "ms": 83,
+      "accion": "recargar",
+      "cuando": 1792900934141
+    },
+    {
+      "ms": 965,
+      "accion": "recargar",
+      "cuando": 1792900935920
+    },
+    {
+      "ms": 99,
+      "accion": "recargar",
+      "cuando": 1792900935944
+    },
+    {
+      "ms": 196,
+      "accion": "recargar",
+      "cuando": 1792900935947
+    },
+    {
+      "ms": 95,
+      "accion": "recargar",
+      "cuando": 1792900936272
+    },
+    {
+      "ms": 497,
+      "accion": "espera",
+      "cuando": 1792900936836
+    },
+    {
+      "ms": 83,
+      "accion": "espera",
+      "cuando": 1792900944715
+    },
+    {
+      "ms": 796,
+      "accion": "espera",
+      "cuando": 1792900946120
+    },
+    {
+      "ms": 256,
+      "accion": "espera",
+      "cuando": 1792900946120
+    },
+    {
+      "ms": 244,
+      "accion": "espera",
+      "cuando": 1792900946398
+    },
+    {
+      "ms": 233,
+      "accion": "nota",
+      "cuando": 1792900946941
+    },
+    {
+      "ms": 94,
+      "accion": "enlace",
+      "cuando": 1792900947167
+    },
+    {
+      "ms": 80,
+      "accion": "enlace",
+      "cuando": 1792900947262
+    },
+    {
+      "ms": 92,
+      "accion": "enlace",
+      "cuando": 1792900947374
+    },
+    {
+      "ms": 97,
+      "accion": "enlace",
+      "cuando": 1792900947489
+    },
+    {
+      "ms": 137,
+      "accion": "enlace",
+      "cuando": 1792900947673
+    },
+    {
+      "ms": 50,
+      "accion": "referente",
+      "cuando": 1792900947980
+    },
+    {
+      "ms": 175,
+      "accion": "mas",
+      "cuando": 1792900948395
+    },
+    {
+      "ms": 160,
+      "accion": "mas",
+      "cuando": 1792900948564
+    },
+    {
+      "ms": 94,
+      "accion": "mas",
+      "cuando": 1792900948721
+    },
+    {
+      "ms": 88,
+      "accion": "entropia",
+      "cuando": 1792900948921
+    },
+    {
+      "ms": 99,
+      "accion": "marco",
+      "cuando": 1792900949079
+    },
+    {
+      "ms": 67,
+      "accion": "marco",
+      "cuando": 1792900949714
+    },
+    {
+      "ms": 166,
+      "accion": "marco",
+      "cuando": 1792900949718
+    },
+    {
+      "ms": 143,
+      "accion": "marco",
+      "cuando": 1792900949919
+    },
+    {
+      "ms": 205,
+      "accion": "marco",
+      "cuando": 1792900951188
+    },
+    {
+      "ms": 298,
+      "accion": "marco",
+      "cuando": 1792900951337
+    },
+    {
+      "ms": 192,
+      "accion": "marco",
+      "cuando": 1792900954612
+    },
+    {
+      "ms": 187,
+      "accion": "marco",
+      "cuando": 1792900955779
+    },
+    {
+      "ms": 172,
+      "accion": "marco",
+      "cuando": 1792900955881
+    },
+    {
+      "ms": 146,
+      "accion": "marco",
+      "cuando": 1792900956121
+    },
+    {
+      "ms": 164,
+      "accion": "marco",
+      "cuando": 1792900956412
+    },
+    {
+      "ms": 154,
+      "accion": "marco",
+      "cuando": 1792900956780
+    },
+    {
+      "ms": 241,
+      "accion": "editar",
+      "cuando": 1792900957588
+    },
+    {
+      "ms": 150,
+      "accion": "editar",
+      "cuando": 1792900957686
+    },
+    {
+      "ms": 209,
+      "accion": "editar",
+      "cuando": 1792900958287
+    },
+    {
+      "ms": 221,
+      "accion": "mover",
+      "cuando": 1792900959160
+    },
+    {
+      "ms": 182,
+      "accion": "mover",
+      "cuando": 1792900959163
+    },
+    {
+      "ms": 207,
+      "accion": "mover",
+      "cuando": 1792900959480
+    },
+    {
+      "ms": 173,
+      "accion": "mover",
+      "cuando": 1792900959988
+    },
+    {
+      "ms": 197,
+      "accion": "mover",
+      "cuando": 1792900960001
+    },
+    {
+      "ms": 168,
+      "accion": "mover",
+      "cuando": 1792900960448
+    },
+    {
+      "ms": 159,
+      "accion": "mover",
+      "cuando": 1792900960839
+    },
+    {
+      "ms": 174,
+      "accion": "mover",
+      "cuando": 1792900961054
+    },
+    {
+      "ms": 164,
+      "accion": "mover",
+      "cuando": 1792900961832
+    },
+    {
+      "ms": 191,
+      "accion": "mover",
+      "cuando": 1792900961835
+    },
+    {
+      "ms": 183,
+      "accion": "mover",
+      "cuando": 1792900962036
+    },
+    {
+      "ms": 187,
+      "accion": "mover",
+      "cuando": 1792900962701
+    },
+    {
+      "ms": 182,
+      "accion": "mover",
+      "cuando": 1792900962874
+    },
+    {
+      "ms": 189,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900963578
+    },
+    {
+      "ms": 170,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900963579
+    },
+    {
+      "ms": 159,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900963826
+    },
+    {
+      "ms": 187,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900965321
+    },
+    {
+      "ms": 513,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900967007
+    },
+    {
+      "ms": 168,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900967097
+    },
+    {
+      "ms": 147,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900967262
+    },
+    {
+      "ms": 159,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900967539
+    },
+    {
+      "ms": 211,
+      "accion": "ver-como",
+      "cuando": 1792900967992
+    },
+    {
+      "ms": 151,
+      "accion": "ver-como",
+      "cuando": 1792900968174
+    },
+    {
+      "ms": 137,
+      "accion": "ver-como",
+      "cuando": 1792900968330
+    },
+    {
+      "ms": 125,
+      "accion": "publicar",
+      "cuando": 1792900968476
+    },
+    {
+      "ms": 137,
+      "accion": "publicar",
+      "cuando": 1792900968645
+    },
+    {
+      "ms": 126,
+      "accion": "recargar",
+      "cuando": 1792900968880
+    },
+    {
+      "ms": 68,
+      "accion": "recargar",
+      "cuando": 1792900970030
+    },
+    {
+      "ms": 699,
+      "accion": "recargar",
+      "cuando": 1792900971807
+    },
+    {
+      "ms": 146,
+      "accion": "recargar",
+      "cuando": 1792900971810
+    },
+    {
+      "ms": 186,
+      "accion": "recargar",
+      "cuando": 1792900972001
+    },
+    {
+      "ms": 52,
+      "accion": "espera",
+      "cuando": 1792900974349
+    },
+    {
+      "ms": 105,
+      "accion": "espera",
+      "cuando": 1792900982739
+    },
+    {
+      "ms": 52,
+      "accion": "espera",
+      "cuando": 1792900982905
+    },
+    {
+      "ms": 1152,
+      "accion": "espera",
+      "cuando": 1792900984923
+    },
+    {
+      "ms": 107,
+      "accion": "espera",
+      "cuando": 1792900984925
+    },
+    {
+      "ms": 229,
+      "accion": "espera",
+      "cuando": 1792900984926
+    },
+    {
+      "ms": 191,
+      "accion": "espera",
+      "cuando": 1792900985073
+    },
+    {
+      "ms": 104,
+      "accion": "nota",
+      "cuando": 1792900985632
+    },
+    {
+      "ms": 108,
+      "accion": "enlace",
+      "cuando": 1792900985815
+    },
+    {
+      "ms": 112,
+      "accion": "enlace",
+      "cuando": 1792900985975
+    },
+    {
+      "ms": 147,
+      "accion": "enlace",
+      "cuando": 1792900986165
+    },
+    {
+      "ms": 140,
+      "accion": "enlace",
+      "cuando": 1792900986334
+    },
+    {
+      "ms": 162,
+      "accion": "referente",
+      "cuando": 1792900986738
+    },
+    {
+      "ms": 167,
+      "accion": "mas",
+      "cuando": 1792900987007
+    },
+    {
+      "ms": 102,
+      "accion": "mas",
+      "cuando": 1792900987132
+    },
+    {
+      "ms": 92,
+      "accion": "mas",
+      "cuando": 1792900987364
+    },
+    {
+      "ms": 165,
+      "accion": "entropia",
+      "cuando": 1792900987949
+    },
+    {
+      "ms": 97,
+      "accion": "entropia",
+      "cuando": 1792900988049
+    },
+    {
+      "ms": 86,
+      "accion": "entropia",
+      "cuando": 1792900988175
+    },
+    {
+      "ms": 87,
+      "accion": "marco",
+      "cuando": 1792900988329
+    },
+    {
+      "ms": 81,
+      "accion": "marco",
+      "cuando": 1792900988490
+    },
+    {
+      "ms": 259,
+      "accion": "mover",
+      "cuando": 1792900989148
+    },
+    {
+      "ms": 198,
+      "accion": "mover",
+      "cuando": 1792900990548
+    },
+    {
+      "ms": 244,
+      "accion": "mover",
+      "cuando": 1792900990550
+    },
+    {
+      "ms": 195,
+      "accion": "mover",
+      "cuando": 1792900990566
+    },
+    {
+      "ms": 197,
+      "accion": "mover",
+      "cuando": 1792900990801
+    },
+    {
+      "ms": 215,
+      "accion": "mover",
+      "cuando": 1792900991072
+    },
+    {
+      "ms": 155,
+      "accion": "mover",
+      "cuando": 1792900991255
+    },
+    {
+      "ms": 166,
+      "accion": "mover",
+      "cuando": 1792900991450
+    },
+    {
+      "ms": 195,
+      "accion": "mover",
+      "cuando": 1792900991702
+    },
+    {
+      "ms": 157,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900991904
+    },
+    {
+      "ms": 214,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900993507
+    },
+    {
+      "ms": 309,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900993576
+    },
+    {
+      "ms": 54,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900993576
+    },
+    {
+      "ms": 178,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900993841
+    },
+    {
+      "ms": 439,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900994374
+    },
+    {
+      "ms": 198,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900994545
+    },
+    {
+      "ms": 141,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900994722
+    },
+    {
+      "ms": 140,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792900994929
+    },
+    {
+      "ms": 189,
+      "accion": "ver-como",
+      "cuando": 1792900995206
+    },
+    {
+      "ms": 190,
+      "accion": "ver-como",
+      "cuando": 1792900995420
+    },
+    {
+      "ms": 106,
+      "accion": "ver-como",
+      "cuando": 1792900995538
+    },
+    {
+      "ms": 107,
+      "accion": "recargar",
+      "cuando": 1792900995788
+    },
+    {
+      "ms": 104,
+      "accion": "recargar",
+      "cuando": 1792900995789
+    },
+    {
+      "ms": 99,
+      "accion": "recargar",
+      "cuando": 1792900996065
+    },
+    {
+      "ms": 69,
+      "accion": "recargar",
+      "cuando": 1792900996416
+    },
+    {
+      "ms": 505,
+      "accion": "recargar",
+      "cuando": 1792900997554
+    },
+    {
+      "ms": 156,
+      "accion": "recargar",
+      "cuando": 1792900997555
+    },
+    {
+      "ms": 150,
+      "accion": "recargar",
+      "cuando": 1792900997731
+    },
+    {
+      "ms": 358,
+      "accion": "espera",
+      "cuando": 1792900999477
+    },
+    {
+      "ms": 100,
+      "accion": "nota",
+      "cuando": 1792900999971
+    },
+    {
+      "ms": 91,
+      "accion": "enlace",
+      "cuando": 1792901000113
+    },
+    {
+      "ms": 90,
+      "accion": "enlace",
+      "cuando": 1792901000225
+    },
+    {
+      "ms": 86,
+      "accion": "enlace",
+      "cuando": 1792901000324
+    },
+    {
+      "ms": 62,
+      "accion": "enlace",
+      "cuando": 1792901000410
+    },
+    {
+      "ms": 153,
+      "accion": "entropia",
+      "cuando": 1792901001076
+    },
+    {
+      "ms": 150,
+      "accion": "marco",
+      "cuando": 1792901001295
+    },
+    {
+      "ms": 80,
+      "accion": "marco",
+      "cuando": 1792901001507
+    },
+    {
+      "ms": 84,
+      "accion": "marco",
+      "cuando": 1792901001508
+    },
+    {
+      "ms": 61,
+      "accion": "marco",
+      "cuando": 1792901001613
+    },
+    {
+      "ms": 115,
+      "accion": "mover",
+      "cuando": 1792901002061
+    },
+    {
+      "ms": 116,
+      "accion": "mover",
+      "cuando": 1792901002191
+    },
+    {
+      "ms": 93,
+      "accion": "mover",
+      "cuando": 1792901002296
+    },
+    {
+      "ms": 91,
+      "accion": "mover",
+      "cuando": 1792901002415
+    },
+    {
+      "ms": 179,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901002733
+    },
+    {
+      "ms": 122,
+      "accion": "publicar",
+      "cuando": 1792901003238
+    },
+    {
+      "ms": 88,
+      "accion": "publicar",
+      "cuando": 1792901003238
+    },
+    {
+      "ms": 94,
+      "accion": "recargar",
+      "cuando": 1792901003394
+    },
+    {
+      "ms": 641,
+      "accion": "recargar",
+      "cuando": 1792901007406
+    },
+    {
+      "ms": 820,
+      "accion": "espera",
+      "cuando": 1792901009902
+    },
+    {
+      "ms": 155,
+      "accion": "espera",
+      "cuando": 1792901009903
+    },
+    {
+      "ms": 116,
+      "accion": "espera",
+      "cuando": 1792901010030
+    },
+    {
+      "ms": 106,
+      "accion": "nota",
+      "cuando": 1792901010410
+    },
+    {
+      "ms": 110,
+      "accion": "enlace",
+      "cuando": 1792901010596
+    },
+    {
+      "ms": 115,
+      "accion": "enlace",
+      "cuando": 1792901010727
+    },
+    {
+      "ms": 100,
+      "accion": "enlace",
+      "cuando": 1792901010853
+    },
+    {
+      "ms": 118,
+      "accion": "enlace",
+      "cuando": 1792901010978
+    },
+    {
+      "ms": 58,
+      "accion": "enlace",
+      "cuando": 1792901011082
+    },
+    {
+      "ms": 192,
+      "accion": "marco",
+      "cuando": 1792901011703
+    },
+    {
+      "ms": 108,
+      "accion": "marco",
+      "cuando": 1792901011885
+    },
+    {
+      "ms": 91,
+      "accion": "marco",
+      "cuando": 1792901012095
+    },
+    {
+      "ms": 83,
+      "accion": "marco",
+      "cuando": 1792901012095
+    },
+    {
+      "ms": 204,
+      "accion": "mover",
+      "cuando": 1792901012726
+    },
+    {
+      "ms": 193,
+      "accion": "mover",
+      "cuando": 1792901012966
+    },
+    {
+      "ms": 216,
+      "accion": "mover",
+      "cuando": 1792901013286
+    },
+    {
+      "ms": 184,
+      "accion": "mover",
+      "cuando": 1792901013525
+    },
+    {
+      "ms": 247,
+      "accion": "mover",
+      "cuando": 1792901013839
+    },
+    {
+      "ms": 194,
+      "accion": "mover",
+      "cuando": 1792901014076
+    },
+    {
+      "ms": 277,
+      "accion": "mover",
+      "cuando": 1792901014586
+    },
+    {
+      "ms": 159,
+      "accion": "mover",
+      "cuando": 1792901014965
+    },
+    {
+      "ms": 197,
+      "accion": "mover",
+      "cuando": 1792901014966
+    },
+    {
+      "ms": 164,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901015156
+    },
+    {
+      "ms": 145,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901015335
+    },
+    {
+      "ms": 165,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901015657
+    },
+    {
+      "ms": 173,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901015893
+    },
+    {
+      "ms": 252,
+      "accion": "ver-como",
+      "cuando": 1792901016362
+    },
+    {
+      "ms": 193,
+      "accion": "ver-como",
+      "cuando": 1792901016692
+    },
+    {
+      "ms": 284,
+      "accion": "ver-como",
+      "cuando": 1792901018433
+    },
+    {
+      "ms": 104,
+      "accion": "ver-como",
+      "cuando": 1792901018434
+    },
+    {
+      "ms": 246,
+      "accion": "ver-como",
+      "cuando": 1792901018454
+    },
+    {
+      "ms": 168,
+      "accion": "publicar",
+      "cuando": 1792901018713
+    },
+    {
+      "ms": 164,
+      "accion": "recargar",
+      "cuando": 1792901019109
+    },
+    {
+      "ms": 199,
+      "accion": "recargar",
+      "cuando": 1792901019110
+    },
+    {
+      "ms": 754,
+      "accion": "recargar",
+      "cuando": 1792901021639
+    },
+    {
+      "ms": 199,
+      "accion": "recargar",
+      "cuando": 1792901021640
+    },
+    {
+      "ms": 196,
+      "accion": "recargar",
+      "cuando": 1792901021871
+    },
+    {
+      "ms": 628,
+      "accion": "espera",
+      "cuando": 1792901024300
+    },
+    {
+      "ms": 123,
+      "accion": "espera",
+      "cuando": 1792901024306
+    },
+    {
+      "ms": 106,
+      "accion": "espera",
+      "cuando": 1792901024420
+    },
+    {
+      "ms": 101,
+      "accion": "nota",
+      "cuando": 1792901024805
+    },
+    {
+      "ms": 61,
+      "accion": "enlace",
+      "cuando": 1792901024935
+    },
+    {
+      "ms": 253,
+      "accion": "enlace",
+      "cuando": 1792901025277
+    },
+    {
+      "ms": 173,
+      "accion": "enlace",
+      "cuando": 1792901025480
+    },
+    {
+      "ms": 242,
+      "accion": "enlace",
+      "cuando": 1792901025858
+    },
+    {
+      "ms": 296,
+      "accion": "enlace",
+      "cuando": 1792901026273
+    },
+    {
+      "ms": 262,
+      "accion": "referente",
+      "cuando": 1792901027216
+    },
+    {
+      "ms": 52,
+      "accion": "referente",
+      "cuando": 1792901027219
+    },
+    {
+      "ms": 218,
+      "accion": "referente",
+      "cuando": 1792901027613
+    },
+    {
+      "ms": 196,
+      "accion": "referente",
+      "cuando": 1792901027627
+    },
+    {
+      "ms": 272,
+      "accion": "referente",
+      "cuando": 1792901028238
+    },
+    {
+      "ms": 206,
+      "accion": "referente",
+      "cuando": 1792901028584
+    },
+    {
+      "ms": 167,
+      "accion": "mas",
+      "cuando": 1792901028910
+    },
+    {
+      "ms": 195,
+      "accion": "mas",
+      "cuando": 1792901029194
+    },
+    {
+      "ms": 188,
+      "accion": "mas",
+      "cuando": 1792901029701
+    },
+    {
+      "ms": 199,
+      "accion": "entropia",
+      "cuando": 1792901030066
+    },
+    {
+      "ms": 249,
+      "accion": "marco",
+      "cuando": 1792901032590
+    },
+    {
+      "ms": 266,
+      "accion": "marco",
+      "cuando": 1792901032606
+    },
+    {
+      "ms": 274,
+      "accion": "marco",
+      "cuando": 1792901035371
+    },
+    {
+      "ms": 149,
+      "accion": "marco",
+      "cuando": 1792901036345
+    },
+    {
+      "ms": 304,
+      "accion": "marco",
+      "cuando": 1792901036349
+    },
+    {
+      "ms": 261,
+      "accion": "marco",
+      "cuando": 1792901036361
+    },
+    {
+      "ms": 243,
+      "accion": "marco",
+      "cuando": 1792901036671
+    },
+    {
+      "ms": 235,
+      "accion": "marco",
+      "cuando": 1792901037020
+    },
+    {
+      "ms": 190,
+      "accion": "marco",
+      "cuando": 1792901037561
+    },
+    {
+      "ms": 221,
+      "accion": "marco",
+      "cuando": 1792901037857
+    },
+    {
+      "ms": 248,
+      "accion": "marco",
+      "cuando": 1792901038186
+    },
+    {
+      "ms": 184,
+      "accion": "marco",
+      "cuando": 1792901038447
+    },
+    {
+      "ms": 271,
+      "accion": "marco",
+      "cuando": 1792901038791
+    },
+    {
+      "ms": 264,
+      "accion": "editar",
+      "cuando": 1792901039319
+    },
+    {
+      "ms": 251,
+      "accion": "editar",
+      "cuando": 1792901039589
+    },
+    {
+      "ms": 248,
+      "accion": "editar",
+      "cuando": 1792901040070
+    },
+    {
+      "ms": 235,
+      "accion": "mover",
+      "cuando": 1792901040486
+    },
+    {
+      "ms": 250,
+      "accion": "mover",
+      "cuando": 1792901040753
+    },
+    {
+      "ms": 283,
+      "accion": "mover",
+      "cuando": 1792901041171
+    },
+    {
+      "ms": 232,
+      "accion": "mover",
+      "cuando": 1792901041448
+    },
+    {
+      "ms": 205,
+      "accion": "mover",
+      "cuando": 1792901041905
+    },
+    {
+      "ms": 252,
+      "accion": "mover",
+      "cuando": 1792901041909
+    },
+    {
+      "ms": 224,
+      "accion": "mover",
+      "cuando": 1792901042213
+    },
+    {
+      "ms": 201,
+      "accion": "mover",
+      "cuando": 1792901042506
+    },
+    {
+      "ms": 238,
+      "accion": "mover",
+      "cuando": 1792901042843
+    },
+    {
+      "ms": 254,
+      "accion": "mover",
+      "cuando": 1792901043167
+    },
+    {
+      "ms": 279,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901043498
+    },
+    {
+      "ms": 192,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901043693
+    },
+    {
+      "ms": 199,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901043917
+    },
+    {
+      "ms": 237,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901044187
+    },
+    {
+      "ms": 334,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901044533
+    },
+    {
+      "ms": 169,
+      "accion": "borrar-y-deshacer",
+      "cuando": 1792901044819
+    },
+    {
+      "ms": 219,
+      "accion": "ver-como",
+      "cuando": 1792901045119
+    },
+    {
+      "ms": 207,
+      "accion": "ver-como",
+      "cuando": 1792901045391
+    },
+    {
+      "ms": 156,
+      "accion": "ver-como",
+      "cuando": 1792901045582
+    },
+    {
+      "ms": 185,
+      "accion": "publicar",
+      "cuando": 1792901045784
+    },
+    {
+      "ms": 118,
+      "accion": "recargar",
+      "cuando": 1792901046148
+    },
+    {
+      "ms": 93,
+      "accion": "recargar",
+      "cuando": 1792901052123
+    },
+    {
+      "ms": 74,
+      "accion": "recargar",
+      "cuando": 1792901057288
+    },
+    {
+      "ms": 157,
+      "accion": "recargar",
+      "cuando": 1792901061651
+    },
+    {
+      "ms": 78,
+      "accion": "recargar",
+      "cuando": 1792901062328
+    },
+    {
+      "ms": 123,
+      "accion": "recargar",
+      "cuando": 1792901062329
+    },
+    {
+      "ms": 171,
+      "accion": "recargar",
+      "cuando": 1792901062734
+    },
+    {
+      "ms": 1065,
+      "accion": "recargar",
+      "cuando": 1792901064560
+    },
+    {
+      "ms": 89,
+      "accion": "recargar",
+      "cuando": 1792901064574
+    },
+    {
+      "ms": 195,
+      "accion": "recargar",
+      "cuando": 1792901064575
+    },
+    {
+      "ms": 257,
+      "accion": "recargar",
+      "cuando": 1792901064779
+    }
+  ],
+  "latencias": [
+    {
+      "ciclo": 1,
+      "accion": "nota",
+      "ms": 79
+    },
+    {
+      "ciclo": 1,
+      "accion": "enlace",
+      "ms": 433
+    },
+    {
+      "ciclo": 1,
+      "accion": "imagen",
+      "ms": 10
+    },
+    {
+      "ciclo": 1,
+      "accion": "referente",
+      "ms": 88
+    },
+    {
+      "ciclo": 1,
+      "accion": "mas",
+      "ms": 325
+    },
+    {
+      "ciclo": 1,
+      "accion": "entropia",
+      "ms": 65
+    },
+    {
+      "ciclo": 1,
+      "accion": "marco",
+      "ms": 424
+    },
+    {
+      "ciclo": 1,
+      "accion": "editar",
+      "ms": 122
+    },
+    {
+      "ciclo": 1,
+      "accion": "mover",
+      "ms": 427
+    },
+    {
+      "ciclo": 1,
+      "accion": "borrar-y-deshacer",
+      "ms": 231
+    },
+    {
+      "ciclo": 1,
+      "accion": "ver-como",
+      "ms": 445
+    },
+    {
+      "ciclo": 1,
+      "accion": "publicar",
+      "ms": 137
+    },
+    {
+      "ciclo": 1,
+      "accion": "recargar",
+      "ms": 5503
+    },
+    {
+      "ciclo": 2,
+      "accion": "nota",
+      "ms": 171
+    },
+    {
+      "ciclo": 2,
+      "accion": "enlace",
+      "ms": 333
+    },
+    {
+      "ciclo": 2,
+      "accion": "imagen",
+      "ms": 10
+    },
+    {
+      "ciclo": 2,
+      "accion": "referente",
+      "ms": 111
+    },
+    {
+      "ciclo": 2,
+      "accion": "mas",
+      "ms": 699
+    },
+    {
+      "ciclo": 2,
+      "accion": "entropia",
+      "ms": 296
+    },
+    {
+      "ciclo": 2,
+      "accion": "marco",
+      "ms": 5147
+    },
+    {
+      "ciclo": 2,
+      "accion": "editar",
+      "ms": 177
+    },
+    {
+      "ciclo": 2,
+      "accion": "mover",
+      "ms": 895
+    },
+    {
+      "ciclo": 2,
+      "accion": "borrar-y-deshacer",
+      "ms": 682
+    },
+    {
+      "ciclo": 2,
+      "accion": "ver-como",
+      "ms": 450
+    },
+    {
+      "ciclo": 2,
+      "accion": "publicar",
+      "ms": 189
+    },
+    {
+      "ciclo": 2,
+      "accion": "recargar",
+      "ms": 6815
+    },
+    {
+      "ciclo": 3,
+      "accion": "nota",
+      "ms": 3072
+    },
+    {
+      "ciclo": 3,
+      "accion": "enlace",
+      "ms": 1076
+    },
+    {
+      "ciclo": 3,
+      "accion": "imagen",
+      "ms": 50
+    },
+    {
+      "ciclo": 3,
+      "accion": "referente",
+      "ms": 375
+    },
+    {
+      "ciclo": 3,
+      "accion": "mas",
+      "ms": 511
+    },
+    {
+      "ciclo": 3,
+      "accion": "entropia",
+      "ms": 195
+    },
+    {
+      "ciclo": 3,
+      "accion": "marco",
+      "ms": 1182
+    },
+    {
+      "ciclo": 3,
+      "accion": "editar",
+      "ms": 532
+    },
+    {
+      "ciclo": 3,
+      "accion": "mover",
+      "ms": 1462
+    },
+    {
+      "ciclo": 3,
+      "accion": "borrar-y-deshacer",
+      "ms": 2654
+    },
+    {
+      "ciclo": 3,
+      "accion": "ver-como",
+      "ms": 1305
+    },
+    {
+      "ciclo": 3,
+      "accion": "publicar",
+      "ms": 374
+    },
+    {
+      "ciclo": 3,
+      "accion": "recargar",
+      "ms": 3000
+    },
+    {
+      "ciclo": 4,
+      "accion": "nota",
+      "ms": 96
+    },
+    {
+      "ciclo": 4,
+      "accion": "enlace",
+      "ms": 457
+    },
+    {
+      "ciclo": 4,
+      "accion": "imagen",
+      "ms": 10
+    },
+    {
+      "ciclo": 4,
+      "accion": "referente",
+      "ms": 124
+    },
+    {
+      "ciclo": 4,
+      "accion": "mas",
+      "ms": 366
+    },
+    {
+      "ciclo": 4,
+      "accion": "entropia",
+      "ms": 78
+    },
+    {
+      "ciclo": 4,
+      "accion": "marco",
+      "ms": 609
+    },
+    {
+      "ciclo": 4,
+      "accion": "editar",
+      "ms": 41
+    },
+    {
+      "ciclo": 4,
+      "accion": "mover",
+      "ms": 139
+    },
+    {
+      "ciclo": 4,
+      "accion": "borrar-y-deshacer",
+      "ms": 130
+    },
+    {
+      "ciclo": 4,
+      "accion": "ver-como",
+      "ms": 46
+    },
+    {
+      "ciclo": 4,
+      "accion": "publicar",
+      "ms": 22
+    },
+    {
+      "ciclo": 4,
+      "accion": "recargar",
+      "ms": 1345
+    },
+    {
+      "ciclo": 5,
+      "accion": "nota",
+      "ms": 177
+    },
+    {
+      "ciclo": 5,
+      "accion": "enlace",
+      "ms": 409
+    },
+    {
+      "ciclo": 5,
+      "accion": "imagen",
+      "ms": 7
+    },
+    {
+      "ciclo": 5,
+      "accion": "referente",
+      "ms": 167
+    },
+    {
+      "ciclo": 5,
+      "accion": "mas",
+      "ms": 426
+    },
+    {
+      "ciclo": 5,
+      "accion": "entropia",
+      "ms": 82
+    },
+    {
+      "ciclo": 5,
+      "accion": "marco",
+      "ms": 708
+    },
+    {
+      "ciclo": 5,
+      "accion": "editar",
+      "ms": 52
+    },
+    {
+      "ciclo": 5,
+      "accion": "mover",
+      "ms": 431
+    },
+    {
+      "ciclo": 5,
+      "accion": "borrar-y-deshacer",
+      "ms": 262
+    },
+    {
+      "ciclo": 5,
+      "accion": "ver-como",
+      "ms": 57
+    },
+    {
+      "ciclo": 5,
+      "accion": "publicar",
+      "ms": 19
+    },
+    {
+      "ciclo": 5,
+      "accion": "recargar",
+      "ms": 1408
+    },
+    {
+      "ciclo": 6,
+      "accion": "nota",
+      "ms": 62
+    },
+    {
+      "ciclo": 6,
+      "accion": "enlace",
+      "ms": 370
+    },
+    {
+      "ciclo": 6,
+      "accion": "imagen",
+      "ms": 5
+    },
+    {
+      "ciclo": 6,
+      "accion": "referente",
+      "ms": 127
+    },
+    {
+      "ciclo": 6,
+      "accion": "mas",
+      "ms": 363
+    },
+    {
+      "ciclo": 6,
+      "accion": "entropia",
+      "ms": 64
+    },
+    {
+      "ciclo": 6,
+      "accion": "marco",
+      "ms": 1063
+    },
+    {
+      "ciclo": 6,
+      "accion": "editar",
+      "ms": 1111
+    },
+    {
+      "ciclo": 6,
+      "accion": "mover",
+      "ms": 861
+    },
+    {
+      "ciclo": 6,
+      "accion": "borrar-y-deshacer",
+      "ms": 468
+    },
+    {
+      "ciclo": 6,
+      "accion": "ver-como",
+      "ms": 61
+    },
+    {
+      "ciclo": 6,
+      "accion": "publicar",
+      "ms": 62
+    },
+    {
+      "ciclo": 6,
+      "accion": "recargar",
+      "ms": 4578
+    },
+    {
+      "ciclo": 7,
+      "accion": "nota",
+      "ms": 73
+    },
+    {
+      "ciclo": 7,
+      "accion": "enlace",
+      "ms": 393
+    },
+    {
+      "ciclo": 7,
+      "accion": "imagen",
+      "ms": 9
+    },
+    {
+      "ciclo": 7,
+      "accion": "referente",
+      "ms": 255
+    },
+    {
+      "ciclo": 7,
+      "accion": "mas",
+      "ms": 460
+    },
+    {
+      "ciclo": 7,
+      "accion": "entropia",
+      "ms": 106
+    },
+    {
+      "ciclo": 7,
+      "accion": "marco",
+      "ms": 996
+    },
+    {
+      "ciclo": 7,
+      "accion": "editar",
+      "ms": 142
+    },
+    {
+      "ciclo": 7,
+      "accion": "mover",
+      "ms": 495
+    },
+    {
+      "ciclo": 7,
+      "accion": "borrar-y-deshacer",
+      "ms": 111
+    },
+    {
+      "ciclo": 7,
+      "accion": "ver-como",
+      "ms": 113
+    },
+    {
+      "ciclo": 7,
+      "accion": "publicar",
+      "ms": 113
+    },
+    {
+      "ciclo": 7,
+      "accion": "recargar",
+      "ms": 1720
+    },
+    {
+      "ciclo": 8,
+      "accion": "nota",
+      "ms": 98
+    },
+    {
+      "ciclo": 8,
+      "accion": "enlace",
+      "ms": 371
+    },
+    {
+      "ciclo": 8,
+      "accion": "imagen",
+      "ms": 13
+    },
+    {
+      "ciclo": 8,
+      "accion": "referente",
+      "ms": 152
+    },
+    {
+      "ciclo": 8,
+      "accion": "mas",
+      "ms": 497
+    },
+    {
+      "ciclo": 8,
+      "accion": "entropia",
+      "ms": 153
+    },
+    {
+      "ciclo": 8,
+      "accion": "marco",
+      "ms": 2899
+    },
+    {
+      "ciclo": 8,
+      "accion": "editar",
+      "ms": 705
+    },
+    {
+      "ciclo": 8,
+      "accion": "mover",
+      "ms": 886
+    },
+    {
+      "ciclo": 8,
+      "accion": "borrar-y-deshacer",
+      "ms": 457
+    },
+    {
+      "ciclo": 8,
+      "accion": "ver-como",
+      "ms": 314
+    },
+    {
+      "ciclo": 8,
+      "accion": "publicar",
+      "ms": 213
+    },
+    {
+      "ciclo": 8,
+      "accion": "recargar",
+      "ms": 2616
+    },
+    {
+      "ciclo": 9,
+      "accion": "nota",
+      "ms": 166
+    },
+    {
+      "ciclo": 9,
+      "accion": "enlace",
+      "ms": 700
+    },
+    {
+      "ciclo": 9,
+      "accion": "imagen",
+      "ms": 9
+    },
+    {
+      "ciclo": 9,
+      "accion": "referente",
+      "ms": 286
+    },
+    {
+      "ciclo": 9,
+      "accion": "mas",
+      "ms": 531
+    },
+    {
+      "ciclo": 9,
+      "accion": "entropia",
+      "ms": 111
+    },
+    {
+      "ciclo": 9,
+      "accion": "marco",
+      "ms": 594
+    },
+    {
+      "ciclo": 9,
+      "accion": "editar",
+      "ms": 219
+    },
+    {
+      "ciclo": 9,
+      "accion": "mover",
+      "ms": 1142
+    },
+    {
+      "ciclo": 9,
+      "accion": "borrar-y-deshacer",
+      "ms": 762
+    },
+    {
+      "ciclo": 9,
+      "accion": "ver-como",
+      "ms": 646
+    },
+    {
+      "ciclo": 9,
+      "accion": "publicar",
+      "ms": 321
+    },
+    {
+      "ciclo": 9,
+      "accion": "recargar",
+      "ms": 2209
+    },
+    {
+      "ciclo": 10,
+      "accion": "nota",
+      "ms": 170
+    },
+    {
+      "ciclo": 10,
+      "accion": "enlace",
+      "ms": 845
+    },
+    {
+      "ciclo": 10,
+      "accion": "imagen",
+      "ms": 30
+    },
+    {
+      "ciclo": 10,
+      "accion": "referente",
+      "ms": 461
+    },
+    {
+      "ciclo": 10,
+      "accion": "mas",
+      "ms": 550
+    },
+    {
+      "ciclo": 10,
+      "accion": "entropia",
+      "ms": 130
+    },
+    {
+      "ciclo": 10,
+      "accion": "marco",
+      "ms": 1244
+    },
+    {
+      "ciclo": 10,
+      "accion": "editar",
+      "ms": 883
+    },
+    {
+      "ciclo": 10,
+      "accion": "mover",
+      "ms": 999
+    },
+    {
+      "ciclo": 10,
+      "accion": "borrar-y-deshacer",
+      "ms": 592
+    },
+    {
+      "ciclo": 10,
+      "accion": "ver-como",
+      "ms": 610
+    },
+    {
+      "ciclo": 10,
+      "accion": "publicar",
+      "ms": 167
+    },
+    {
+      "ciclo": 10,
+      "accion": "recargar",
+      "ms": 2390
+    },
+    {
+      "ciclo": 11,
+      "accion": "nota",
+      "ms": 130
+    },
+    {
+      "ciclo": 11,
+      "accion": "enlace",
+      "ms": 810
+    },
+    {
+      "ciclo": 11,
+      "accion": "imagen",
+      "ms": 14
+    },
+    {
+      "ciclo": 11,
+      "accion": "referente",
+      "ms": 80
+    },
+    {
+      "ciclo": 11,
+      "accion": "mas",
+      "ms": 767
+    },
+    {
+      "ciclo": 11,
+      "accion": "entropia",
+      "ms": 254
+    },
+    {
+      "ciclo": 11,
+      "accion": "marco",
+      "ms": 1910
+    },
+    {
+      "ciclo": 11,
+      "accion": "editar",
+      "ms": 96
+    },
+    {
+      "ciclo": 11,
+      "accion": "mover",
+      "ms": 982
+    },
+    {
+      "ciclo": 11,
+      "accion": "borrar-y-deshacer",
+      "ms": 302
+    },
+    {
+      "ciclo": 11,
+      "accion": "ver-como",
+      "ms": 672
+    },
+    {
+      "ciclo": 11,
+      "accion": "publicar",
+      "ms": 115
+    },
+    {
+      "ciclo": 11,
+      "accion": "recargar",
+      "ms": 2359
+    },
+    {
+      "ciclo": 12,
+      "accion": "nota",
+      "ms": 502
+    },
+    {
+      "ciclo": 12,
+      "accion": "enlace",
+      "ms": 1844
+    },
+    {
+      "ciclo": 12,
+      "accion": "imagen",
+      "ms": 3087
+    },
+    {
+      "ciclo": 12,
+      "accion": "referente",
+      "ms": 844
+    },
+    {
+      "ciclo": 12,
+      "accion": "mas",
+      "ms": 909
+    },
+    {
+      "ciclo": 12,
+      "accion": "entropia",
+      "ms": 208
+    },
+    {
+      "ciclo": 12,
+      "accion": "marco",
+      "ms": 4833
+    },
+    {
+      "ciclo": 12,
+      "accion": "editar",
+      "ms": 1410
+    },
+    {
+      "ciclo": 12,
+      "accion": "mover",
+      "ms": 4251
+    },
+    {
+      "ciclo": 12,
+      "accion": "borrar-y-deshacer",
+      "ms": 1635
+    },
+    {
+      "ciclo": 12,
+      "accion": "ver-como",
+      "ms": 1019
+    },
+    {
+      "ciclo": 12,
+      "accion": "publicar",
+      "ms": 344
+    },
+    {
+      "ciclo": 12,
+      "accion": "recargar",
+      "ms": 4936
+    },
+    {
+      "ciclo": 13,
+      "accion": "nota",
+      "ms": 482
+    },
+    {
+      "ciclo": 13,
+      "accion": "enlace",
+      "ms": 707
+    },
+    {
+      "ciclo": 13,
+      "accion": "imagen",
+      "ms": 92
+    },
+    {
+      "ciclo": 13,
+      "accion": "referente",
+      "ms": 219
+    },
+    {
+      "ciclo": 13,
+      "accion": "mas",
+      "ms": 728
+    },
+    {
+      "ciclo": 13,
+      "accion": "entropia",
+      "ms": 200
+    },
+    {
+      "ciclo": 13,
+      "accion": "marco",
+      "ms": 8326
+    },
+    {
+      "ciclo": 13,
+      "accion": "editar",
+      "ms": 1062
+    },
+    {
+      "ciclo": 13,
+      "accion": "mover",
+      "ms": 5194
+    },
+    {
+      "ciclo": 13,
+      "accion": "borrar-y-deshacer",
+      "ms": 4053
+    },
+    {
+      "ciclo": 13,
+      "accion": "ver-como",
+      "ms": 906
+    },
+    {
+      "ciclo": 13,
+      "accion": "publicar",
+      "ms": 195
+    },
+    {
+      "ciclo": 13,
+      "accion": "recargar",
+      "ms": 3721
+    },
+    {
+      "ciclo": 14,
+      "accion": "nota",
+      "ms": 190
+    },
+    {
+      "ciclo": 14,
+      "accion": "enlace",
+      "ms": 790
+    },
+    {
+      "ciclo": 14,
+      "accion": "imagen",
+      "ms": 28
+    },
+    {
+      "ciclo": 14,
+      "accion": "referente",
+      "ms": 286
+    },
+    {
+      "ciclo": 14,
+      "accion": "mas",
+      "ms": 987
+    },
+    {
+      "ciclo": 14,
+      "accion": "entropia",
+      "ms": 448
+    },
+    {
+      "ciclo": 14,
+      "accion": "marco",
+      "ms": 533
+    },
+    {
+      "ciclo": 14,
+      "accion": "editar",
+      "ms": 45
+    },
+    {
+      "ciclo": 14,
+      "accion": "mover",
+      "ms": 3134
+    },
+    {
+      "ciclo": 14,
+      "accion": "borrar-y-deshacer",
+      "ms": 3048
+    },
+    {
+      "ciclo": 14,
+      "accion": "ver-como",
+      "ms": 617
+    },
+    {
+      "ciclo": 14,
+      "accion": "publicar",
+      "ms": 140
+    },
+    {
+      "ciclo": 14,
+      "accion": "recargar",
+      "ms": 2238
+    },
+    {
+      "ciclo": 15,
+      "accion": "nota",
+      "ms": 143
+    },
+    {
+      "ciclo": 15,
+      "accion": "enlace",
+      "ms": 569
+    },
+    {
+      "ciclo": 15,
+      "accion": "imagen",
+      "ms": 49
+    },
+    {
+      "ciclo": 15,
+      "accion": "referente",
+      "ms": 92
+    },
+    {
+      "ciclo": 15,
+      "accion": "mas",
+      "ms": 151
+    },
+    {
+      "ciclo": 15,
+      "accion": "entropia",
+      "ms": 233
+    },
+    {
+      "ciclo": 15,
+      "accion": "marco",
+      "ms": 696
+    },
+    {
+      "ciclo": 15,
+      "accion": "editar",
+      "ms": 52
+    },
+    {
+      "ciclo": 15,
+      "accion": "mover",
+      "ms": 661
+    },
+    {
+      "ciclo": 15,
+      "accion": "borrar-y-deshacer",
+      "ms": 321
+    },
+    {
+      "ciclo": 15,
+      "accion": "ver-como",
+      "ms": 181
+    },
+    {
+      "ciclo": 15,
+      "accion": "publicar",
+      "ms": 249
+    },
+    {
+      "ciclo": 15,
+      "accion": "recargar",
+      "ms": 4534
+    },
+    {
+      "ciclo": 16,
+      "accion": "nota",
+      "ms": 146
+    },
+    {
+      "ciclo": 16,
+      "accion": "enlace",
+      "ms": 663
+    },
+    {
+      "ciclo": 16,
+      "accion": "imagen",
+      "ms": 7
+    },
+    {
+      "ciclo": 16,
+      "accion": "referente",
+      "ms": 85
+    },
+    {
+      "ciclo": 16,
+      "accion": "mas",
+      "ms": 145
+    },
+    {
+      "ciclo": 16,
+      "accion": "entropia",
+      "ms": 80
+    },
+    {
+      "ciclo": 16,
+      "accion": "marco",
+      "ms": 909
+    },
+    {
+      "ciclo": 16,
+      "accion": "editar",
+      "ms": 70
+    },
+    {
+      "ciclo": 16,
+      "accion": "mover",
+      "ms": 2761
+    },
+    {
+      "ciclo": 16,
+      "accion": "borrar-y-deshacer",
+      "ms": 776
+    },
+    {
+      "ciclo": 16,
+      "accion": "ver-como",
+      "ms": 2781
+    },
+    {
+      "ciclo": 16,
+      "accion": "publicar",
+      "ms": 229
+    },
+    {
+      "ciclo": 16,
+      "accion": "recargar",
+      "ms": 3092
+    },
+    {
+      "ciclo": 17,
+      "accion": "nota",
+      "ms": 151
+    },
+    {
+      "ciclo": 17,
+      "accion": "enlace",
+      "ms": 1498
+    },
+    {
+      "ciclo": 17,
+      "accion": "imagen",
+      "ms": 812
+    },
+    {
+      "ciclo": 17,
+      "accion": "referente",
+      "ms": 1454
+    },
+    {
+      "ciclo": 17,
+      "accion": "mas",
+      "ms": 1121
+    },
+    {
+      "ciclo": 17,
+      "accion": "entropia",
+      "ms": 393
+    },
+    {
+      "ciclo": 17,
+      "accion": "marco",
+      "ms": 8966
+    },
+    {
+      "ciclo": 17,
+      "accion": "editar",
+      "ms": 1006
+    },
+    {
+      "ciclo": 17,
+      "accion": "mover",
+      "ms": 3398
+    },
+    {
+      "ciclo": 17,
+      "accion": "borrar-y-deshacer",
+      "ms": 1349
+    },
+    {
+      "ciclo": 17,
+      "accion": "ver-como",
+      "ms": 949
+    },
+    {
+      "ciclo": 17,
+      "accion": "publicar",
+      "ms": 80
+    },
+    {
+      "ciclo": 17,
+      "accion": "recargar",
+      "ms": 19135
+    }
+  ],
+  "memoria": [
+    {
+      "ciclo": 1,
+      "mb": 37
+    },
+    {
+      "ciclo": 2,
+      "mb": 54
+    },
+    {
+      "ciclo": 3,
+      "mb": 57
+    },
+    {
+      "ciclo": 4,
+      "mb": 73
+    },
+    {
+      "ciclo": 5,
+      "mb": 66
+    },
+    {
+      "ciclo": 6,
+      "mb": 114
+    },
+    {
+      "ciclo": 7,
+      "mb": 69
+    },
+    {
+      "ciclo": 8,
+      "mb": 97
+    },
+    {
+      "ciclo": 9,
+      "mb": 85
+    },
+    {
+      "ciclo": 10,
+      "mb": 63
+    },
+    {
+      "ciclo": 11,
+      "mb": 124
+    },
+    {
+      "ciclo": 12,
+      "mb": 104
+    },
+    {
+      "ciclo": 13,
+      "mb": 108
+    },
+    {
+      "ciclo": 14,
+      "mb": 73
+    },
+    {
+      "ciclo": 15,
+      "mb": 125
+    },
+    {
+      "ciclo": 16,
+      "mb": 179
+    },
+    {
+      "ciclo": 17,
+      "mb": 53
+    }
+  ],
+  "fallosDeCiclo": [],
+  "fin": "2026-10-25T04:04:25.594Z",
+  "duracionRealMs": 311592
+}

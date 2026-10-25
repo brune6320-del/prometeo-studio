@@ -12,6 +12,7 @@ import {
   Search,
   Trash2,
   Undo2,
+  Upload,
   Redo2,
   X,
   ZoomIn,
@@ -129,8 +130,14 @@ function cardCenter(card: BoardCard): { x: number; y: number } {
   return { x: card.x + card.width / 2, y: card.y + 100 };
 }
 
+interface Modificadores {
+  metaKey: boolean;
+  ctrlKey: boolean;
+  shiftKey: boolean;
+}
+
 interface CardHandlers {
-  select: (cardId: string, event: React.MouseEvent<HTMLElement>) => void;
+  select: (cardId: string, event: Modificadores) => void;
   connect: (cardId: string) => void;
   dragStart: (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => void;
   dragMove: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -564,7 +571,36 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       return null;
     }
     const destino = at ?? screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, cameraRef.current);
-    const card = tool.crear(destino.x - 130, destino.y - 90) as BoardCard;
+    let x = destino.x - 130;
+    let y = destino.y - 90;
+    const prototipo = tool.crear(0, 0) as BoardCard;
+    const ancho = prototipo.width || 260;
+    const alto = prototipo.type === 'marco' ? readFrameData(prototipo).alto : 200;
+    if (!at) {
+      // Una tarjeta nueva nunca tapa a otra ni cae fuera de la vista:
+      // busca un rectángulo libre y, al llegar al borde, vuelve a la esquina visible.
+      const visible = {
+        izquierda: screenToWorld({ x: 72, y: 72 }, cameraRef.current).x,
+        arriba: screenToWorld({ x: 72, y: 72 }, cameraRef.current).y,
+        derecha: screenToWorld({ x: Math.max(72, viewportSize.width - 72), y: 72 }, cameraRef.current).x,
+        abajo: screenToWorld({ x: 72, y: Math.max(72, viewportSize.height - 72) }, cameraRef.current).y,
+      };
+      const libre = (candidatoX: number, candidatoY: number) => !activeBoard.cards.some((item) => {
+        const altoItem = item.type === 'marco' ? readFrameData(item).alto : 200;
+        return candidatoX < item.x + item.width && candidatoX + ancho > item.x
+          && candidatoY < item.y + altoItem && candidatoY + alto > item.y;
+      });
+      for (let intento = 0; intento < 60; intento += 1) {
+        if (libre(x, y)) break;
+        x += 40;
+        y += 40;
+        if (x > visible.derecha - ancho - 24) x = visible.izquierda + 24;
+        if (y > visible.abajo - alto - 24) y = visible.arriba + 24;
+      }
+      x = Math.max(visible.izquierda, Math.min(visible.derecha - ancho - 24, x));
+      y = Math.max(visible.arriba, Math.min(visible.abajo - alto - 24, y));
+    }
+    const card = tool.crear(x, y) as BoardCard;
     configure?.(card);
     updateBoard((board) => ({ ...board, cards: [...board.cards, card] }));
     setSelectedCardIds([card.id]);
@@ -573,8 +609,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const chooseTool = useCallback((toolId: string) => {
     setAddMenuOpen(false);
-    const tool = getBoardTool(toolId);
-    if (tool?.tipo === 'marco') {
+    if (toolId === 'marco') {
       setFrameToolId(toolId);
       setNotice('Arrastra en la pizarra para dibujar el marco. Escape para cancelar.');
       return;
@@ -582,6 +617,19 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setFrameToolId(null);
     addToolCard(toolId);
   }, [addToolCard]);
+
+  const activarHerramienta = (toolId: string) => {
+    if (toolId === 'link') {
+      setLinkDialog(true);
+      setLinkError(null);
+      return;
+    }
+    if (toolId === 'media') {
+      mediaInput.current?.click();
+      return;
+    }
+    chooseTool(toolId);
+  };
 
   const startToolDrag = (toolId: string) => (event: React.DragEvent<HTMLButtonElement>) => {
     event.dataTransfer.setData('application/x-prometeo-tool', toolId);
@@ -688,6 +736,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-frame, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
     detenerInercia();
+    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
     const posicion = cameraRef.current.pan;
     panDrag.current = {
       pointerId: event.pointerId,
@@ -780,6 +829,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => {
+    detenerInercia();
+    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
     if (event.button !== 0 || event.detail > 1 || frameToolId || connectMode || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
     suppressCardClick.current = false;
     const hasModifier = event.shiftKey || event.metaKey || event.ctrlKey;
@@ -923,6 +974,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (event.button !== 0 || !activeBoard) return;
     event.preventDefault();
     event.stopPropagation();
+    detenerInercia();
     frameResize.current = {
       pointerId: event.pointerId,
       cardId: card.id,
@@ -1088,7 +1140,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     };
   }, [exportMenuOpen, libraryMenuOpen]);
 
-  const handleCardSelection = (cardId: string, event: React.MouseEvent<HTMLElement>) => {
+  const handleCardSelection = (cardId: string, event: Modificadores) => {
     if (suppressCardClick.current) {
       suppressCardClick.current = false;
       return;
@@ -1683,7 +1735,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setSelectedCardIds([]);
   };
 
-  const onCardSelect = useCallback((card: BoardCard, event: React.MouseEvent<HTMLElement>) => cardHandlers.current?.select(card.id, event), []);
+  const onCardSelect = useCallback((card: BoardCard, event: Modificadores) => cardHandlers.current?.select(card.id, event), []);
   const onCardConnect = useCallback((cardId: string) => cardHandlers.current?.connect(cardId), []);
   const onCardDragStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLDivElement>) => cardHandlers.current?.dragStart(card, event), []);
   const onCardDragMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => cardHandlers.current?.dragMove(event), []);
@@ -1756,6 +1808,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           <button className="board-icon-button" onClick={() => { const nombre = window.prompt('Nombre del tablero', activeBoard.title); if (nombre !== null) renameBoard(nombre.trim() || activeBoard.title); }} aria-label="Renombrar tablero" title="Renombrar tablero"><Pencil size={15} /></button>
           <button className="board-icon-button" onClick={() => { setProjectName(''); setProjectDialog(true); }} aria-label="Crear proyecto" title="Crear proyecto"><FolderPlus size={16} /></button>
           <button className="board-icon-button" onClick={() => void addNewBoard()} aria-label="Crear tablero" title="Crear tablero"><Plus size={16} /></button>
+          <button className="board-icon-button" onClick={() => importInput.current?.click()} aria-label="Importar tablero" title="Importar tablero desde JSON o Markdown"><Upload size={15} /></button>
           <button className="board-icon-button danger" onClick={() => void removeCurrentBoard()} aria-label="Eliminar tablero" title="Eliminar tablero"><Trash2 size={15} /></button>
           <span className={`board-save-state ${saveState}`} aria-live="polite">
             {saveState === 'saving' ? 'Guardando…' : saveState === 'error' ? 'Sin guardar' : 'Guardado'}
@@ -1852,7 +1905,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                 key={toolId}
                 type="button"
                 className={`board-rail-tool ${toolId === 'note' ? 'primary' : ''} ${frameToolId === toolId ? 'active' : ''}`}
-                onClick={() => chooseTool(toolId)}
+                onClick={() => activarHerramienta(toolId)}
                 draggable
                 onDragStart={startToolDrag(toolId)}
                 aria-label={aria[toolId] ?? tool.nombre}

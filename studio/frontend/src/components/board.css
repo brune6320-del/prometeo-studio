@@ -3383,3 +3383,21 @@
   color: var(--on-accent);
   background: var(--accent);
 }
+
+/* La esquina de redimensión también es chrome: aparece al hover/selección. */
+.board-frame-resize {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.board-frame:hover .board-frame-resize,
+.board-frame:focus-within .board-frame-resize,
+.board-frame.selected .board-frame-resize {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-frame-resize { transition: none; }
+}
