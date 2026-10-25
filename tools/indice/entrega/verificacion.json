@@ -1,11 +1,11 @@
 {
   "zip": "D2-indice-visual-master.zip",
-  "commit_fuente": "338236c2ed84029079799de9b1a51e3ea7a41433",
+  "commit_fuente": "253aaba9179826fa3bf23b9f8b45c2ed1792e5fe",
   "crc_zip_miembros_ok": true,
   "sha256_todos_miembros_ok": true,
-  "bytes": 81161,
-  "sha256": "db12ce9e2800e2f38c3cb9ec901e7940c299137eafbd17112bcdd1a7f5a976eb",
-  "crc32": "f5e26e8e",
+  "bytes": 82522,
+  "sha256": "a710fbeaa6e5356d5466515fed92a666ec3b7e9a43a786f2c6af118c88f2e091",
+  "crc32": "0ade07fe",
   "miembros": {
     "FULL/tools/indice/.gitignore": {
       "bytes": 168,
@@ -48,14 +48,14 @@
       "crc32": "00000000"
     },
     "FULL/tools/indice/evidencias/licencia_modelo.json": {
-      "bytes": 477,
-      "sha256": "0cdcabfbd351d3ca6d0834f2e64e800f288798be0d9bd4d96f24caf69adbf8ff",
-      "crc32": "540bcce7"
+      "bytes": 537,
+      "sha256": "faf9e193fde8696e9ea723909146cea92a1ba2451bd75c8ac2eabb1b7dac5f50",
+      "crc32": "9b304879"
     },
     "FULL/tools/indice/evidencias/modelo-card.md": {
-      "bytes": 4116,
-      "sha256": "86c231c4a7bf0ee2435295413ad5c7cf567c9426f00b79711ce8eda884b7a8d3",
-      "crc32": "6aa66692"
+      "bytes": 4115,
+      "sha256": "1b523726d725fa2d8ee8167376611b819add22911a13e052442a7b622397924c",
+      "crc32": "3de54539"
     },
     "FULL/tools/indice/evidencias/primer_ensayo_fallo_recorte.txt": {
       "bytes": 788,
@@ -104,13 +104,13 @@
     },
     "LEEME.txt": {
       "bytes": 674,
-      "sha256": "1aade2f9e2c7511730aa0f2bb32d75e6bcbe86adec72b0cdaff75db9cff2b935",
-      "crc32": "38d806ea"
+      "sha256": "0e4436926ef690221bd754bf08c39391e1fedae42c509fe0586e166654d61a23",
+      "crc32": "dacbb875"
     },
     "MANIFEST.json": {
-      "bytes": 5866,
-      "sha256": "6370841fbc188433e4cc9fbcb39d83dfd91a420087803f67b73fac6b1ff4d3f4",
-      "crc32": "6189f968"
+      "bytes": 6049,
+      "sha256": "e24df25d4cd35789a87e539b5d21f6f7f91d635703dd3cc3b2cb69e508da9288",
+      "crc32": "d281f09a"
     },
     "RECUPERACION/001-de9e0bd31308.patch": {
       "bytes": 6765,
@@ -162,10 +162,15 @@
       "sha256": "75a766c653f899b57b512581ce9b2d3262d67b3e371aa163b75e31ab35dd26a8",
       "crc32": "6b17b24d"
     },
+    "RECUPERACION/011-253aaba91798.patch": {
+      "bytes": 2254,
+      "sha256": "b9faa81aa0d232cfa9c52271ad4f077883be98fba41a6ca2f0287a902facb583",
+      "crc32": "576ee701"
+    },
     "RECUPERACION/verificacion.json": {
-      "bytes": 582,
-      "sha256": "b33ca8c07cc3944cbbf3ebcf963d98a594d7ecd51623af158833db0daa00d54a",
-      "crc32": "d4ac1bcc"
+      "bytes": 630,
+      "sha256": "2e0fa350bebe4b7ef9c400112df4d21b3b9cd8aada5fdee7c17fa3b758419169",
+      "crc32": "f955adec"
     }
   }
 }
