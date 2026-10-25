@@ -1,4 +1,4 @@
-"""Indexa imágenes y muestras de video con SigLIP; no copia medios ni pesos."""
+"""Indexa imágenes, páginas PDF y muestras de video; no copia medios ni pesos."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from modelo import MODEL_ID, ModeloVisual, sha256_archivo
 IMAGENES = {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
 VIDEOS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 VERSION = 1
+RECORTADOR = Path(__file__).resolve().parents[1] / "recortador"
 
 
 def dhash(imagen: Image.Image) -> str:
@@ -66,12 +67,34 @@ def _fotogramas(path: Path, cada_segundos: float, max_fotogramas: int) -> Iterat
         captura.release()
 
 
-def _entradas(raiz: Path, cada_segundos: float, max_fotogramas: int):
+def _paginas_pdf(path: Path, lado_max: int):
+    try:
+        import pymupdf
+    except ImportError as exc:
+        raise RuntimeError("Hay PDF; instala PyMuPDF de requirements.txt") from exc
+    with pymupdf.open(path) as documento:
+        if documento.needs_pass:
+            raise ValueError(f"PDF protegido con contraseña: {path}")
+        for numero, pagina in enumerate(documento, start=1):
+            rect = pagina.rect
+            if rect.is_empty or rect.is_infinite:
+                raise ValueError(f"Tamaño de página PDF inválido: {path}, página {numero}")
+            escala = lado_max / max(rect.width, rect.height)
+            pix = pagina.get_pixmap(matrix=pymupdf.Matrix(escala, escala),
+                                   colorspace=pymupdf.csRGB, alpha=False)
+            yield Image.frombytes("RGB", (pix.width, pix.height), pix.samples), numero
+
+
+def _entradas(raiz: Path, cada_segundos: float, max_fotogramas: int,
+              pdf_lado_max: int = 1024, excluir: Path | None = None):
     for path in sorted(raiz.rglob("*")):
-        if not path.is_file() or path.is_symlink():
+        relativo_path = path.relative_to(raiz)
+        if (not path.is_file() or path.is_symlink()
+                or any(parte.startswith(".") for parte in relativo_path.parts)
+                or (excluir is not None and (path == excluir or excluir in path.parents))):
             continue
         sufijo = path.suffix.lower()
-        if sufijo not in IMAGENES | VIDEOS:
+        if sufijo not in IMAGENES | VIDEOS | {".pdf"}:
             continue
         sha_archivo = sha256_archivo(path)
         relativo = path.relative_to(raiz).as_posix()
@@ -87,6 +110,17 @@ def _entradas(raiz: Path, cada_segundos: float, max_fotogramas: int):
                 "dhash": dhash(imagen),
             }
             yield imagen, metadata
+        elif sufijo == ".pdf":
+            for imagen, pagina in _paginas_pdf(path, pdf_lado_max):
+                yield imagen, {
+                    "id": f"{sha_archivo}:pagina:{pagina}",
+                    "ruta": relativo,
+                    "tipo": "pagina_pdf",
+                    "pagina": pagina,
+                    "sha256_archivo": sha_archivo,
+                    "sha256_visual": sha_visual(imagen),
+                    "dhash": dhash(imagen),
+                }
         else:
             for imagen, numero, segundo in _fotogramas(path, cada_segundos, max_fotogramas):
                 visual = sha_visual(imagen)
@@ -110,13 +144,26 @@ def construir_indice(
     lote: int = 2,
     cada_segundos: float = 5,
     max_fotogramas: int = 24,
+    pdf_lado_max: int = 1024,
+    recortes: Path | None = RECORTADOR,
 ) -> dict:
     raiz = raiz.expanduser().resolve()
     destino = destino.expanduser().resolve()
     if not raiz.is_dir():
         raise ValueError(f"No existe la carpeta de imágenes: {raiz}")
-    if lote < 1 or lote > 8 or cada_segundos <= 0 or max_fotogramas < 1:
+    if lote < 1 or lote > 8 or not np.isfinite(cada_segundos) or cada_segundos <= 0 or max_fotogramas < 1:
         raise ValueError("lote 1–8, cada_segundos > 0 y max_fotogramas >= 1")
+    if not 224 <= pdf_lado_max <= 2048:
+        raise ValueError("pdf_lado_max debe estar entre 224 y 2048")
+    if raiz == destino:
+        raise ValueError("La salida debe ser distinta de la carpeta de entrada")
+    raices = {"carpeta": raiz}
+    if recortes is not None:
+        recortes = recortes.expanduser().resolve()
+        if recortes.is_dir() and recortes != raiz and raiz not in recortes.parents:
+            if recortes in raiz.parents:
+                raise ValueError("La carpeta de recortes no puede contener la entrada principal")
+            raices["recortador"] = recortes
     destino.mkdir(parents=True, exist_ok=True)
     vectores: list[np.ndarray] = []
     items: list[dict] = []
@@ -139,17 +186,23 @@ def construir_indice(
         metas.clear()
 
     try:
-        for imagen, meta in _entradas(raiz, cada_segundos, max_fotogramas):
-            pendientes.append(imagen)
-            metas.append(meta)
-            if len(pendientes) >= lote:
-                vaciar()
+        for origen, carpeta in raices.items():
+            for imagen, meta in _entradas(carpeta, cada_segundos, max_fotogramas,
+                                          pdf_lado_max, destino):
+                meta["origen"] = origen
+                meta["ruta_fuente"] = meta["ruta"]
+                if origen != "carpeta":
+                    meta["ruta"] = f"{origen}/{meta['ruta']}"
+                pendientes.append(imagen)
+                metas.append(meta)
+                if len(pendientes) >= lote:
+                    vaciar()
         vaciar()
     finally:
         for imagen in pendientes:
             imagen.close()
     if not vectores:
-        raise ValueError("No se encontraron imágenes ni fotogramas indexables")
+        raise ValueError("No se encontraron imágenes, páginas PDF ni fotogramas indexables")
     matriz = np.stack(vectores).astype(np.float32, copy=False)
     normas = np.linalg.norm(matriz, axis=1)
     if not np.all(np.isfinite(matriz)) or np.any(normas < 1e-8):
@@ -159,6 +212,9 @@ def construir_indice(
         "version": VERSION,
         "creado_utc": datetime.now(timezone.utc).isoformat(),
         "raiz": str(raiz),
+        "raices": {k: str(v) for k, v in raices.items()},
+        "muestreo": {"cada_segundos": cada_segundos, "max_fotogramas": max_fotogramas,
+                     "pdf_lado_max": pdf_lado_max},
         "modelo": MODEL_ID,
         "sha256_pesos": modelo.pesos_sha256,
         "dimensiones": int(matriz.shape[1]),
@@ -198,10 +254,15 @@ def main() -> None:
     parser.add_argument("--lote", type=int, default=2)
     parser.add_argument("--cada-segundos", type=float, default=5)
     parser.add_argument("--max-fotogramas", type=int, default=24)
+    parser.add_argument("--pdf-lado-max", type=int, default=1024)
+    parser.add_argument("--recortes", type=Path, default=RECORTADOR,
+                        help="Carpeta de piezas; por defecto tools/recortador si existe")
+    parser.add_argument("--sin-recortes", action="store_true")
     args = parser.parse_args()
     modelo = ModeloVisual(args.dispositivo)
     documento = construir_indice(
-        args.carpeta, args.salida, modelo, args.lote, args.cada_segundos, args.max_fotogramas
+        args.carpeta, args.salida, modelo, args.lote, args.cada_segundos, args.max_fotogramas,
+        args.pdf_lado_max, None if args.sin_recortes else args.recortes,
     )
     print(json.dumps({"salida": str(args.salida.resolve()), "elementos": len(documento["items"])}))
 

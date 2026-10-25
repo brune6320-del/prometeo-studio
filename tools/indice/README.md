@@ -30,6 +30,12 @@ nice -n 15 .venv/bin/python indexar.py /ruta/a/referentes --salida salidas/mi-in
 
 Se recorren imágenes de forma recursiva; si hay videos, se muestrea un fotograma cada 5 segundos, hasta 24 por archivo. `--cada-segundos` y `--max-fotogramas` cambian esos límites. El directorio de salida contiene `vectores.npz` (vectores normalizados, IDs y SHA-256 de archivos fuente) e `indice.json` (rutas relativas, SHA-256, huella visual, tiempos de fotogramas, modelo y revisión). La carpeta de origen se lee sin modificarla.
 
+También se rasteriza cada página PDF con PyMuPDF, una por vez, con el lado mayor limitado a 1024 px (`--pdf-lado-max`, 224–2048). Cada página conserva número de página (desde 1), SHA-256 del PDF y hash de píxeles. Los PDF cifrados que necesitan contraseña se rechazan. No se guardan las rasterizaciones.
+
+Si existe `tools/recortador/`, se incluyen sus medios recursivamente. `--recortes /ruta/a/piezas` permite indicar otra salida y `--sin-recortes` desactiva esta entrada. Se evitan raíces solapadas, enlaces simbólicos, carpetas ocultas y el directorio de salida. `raices`, `origen` y `ruta_fuente` permiten resolver las rutas de cada entrada; `recortador/` prefija las rutas de la segunda raíz. En la revisión base no existe el recortador: la integración se prueba con piezas sintéticas.
+
+PyMuPDF 1.26.5 soporta el Python 3.9 de esta Mac. Su licencia es AGPL-3.0 o comercial, distinta de la licencia de SigLIP: [distribución oficial y licencia](https://pypi.org/project/PyMuPDF/1.26.5/). La instalación queda en `.venv`, dentro de `tools/indice/`.
+
 ## Buscar
 
 ```sh

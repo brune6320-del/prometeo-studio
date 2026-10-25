@@ -82,8 +82,10 @@ def duplicados(vectores: np.ndarray, indice: dict, distancia_hash: int = 6,
             if mismo_archivo or mismo_visual or cercano:
                 clase = "mismo_archivo" if mismo_archivo else "mismo_visual" if mismo_visual else "casi_exacto"
                 pares.append({
-                    "a": {"fila": i, "ruta": primero["ruta"], "fotograma": primero.get("fotograma")},
-                    "b": {"fila": j, "ruta": segundo["ruta"], "fotograma": segundo.get("fotograma")},
+                    "a": {"fila": i, "ruta": primero["ruta"], "fotograma": primero.get("fotograma"),
+                          "pagina": primero.get("pagina")},
+                    "b": {"fila": j, "ruta": segundo["ruta"], "fotograma": segundo.get("fotograma"),
+                          "pagina": segundo.get("pagina")},
                     "clase": clase,
                     "distancia_dhash": distancia,
                     "similitud": round(similitud, 6),
@@ -129,8 +131,8 @@ def grupos(vectores: np.ndarray, indice: dict, k: int | None = None, semilla: in
         representante = int(filas[np.argmax(vectores[filas] @ centros[numero])])
         resultado.append({
             "grupo": numero,
-            "representante": {"fila": representante, "ruta": indice["items"][representante]["ruta"]},
-            "elementos": [{"fila": int(i), "ruta": indice["items"][int(i)]["ruta"]} for i in filas],
+            "representante": dict(indice["items"][representante]),
+            "elementos": [dict(indice["items"][int(i)]) for i in filas],
         })
     return sorted(resultado, key=lambda x: (-len(x["elementos"]), x["grupo"]))
 

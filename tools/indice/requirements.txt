@@ -4,6 +4,7 @@ torch==2.8.0
 transformers==4.57.6
 huggingface-hub==0.36.2
 safetensors==0.7.0
+PyMuPDF==1.26.5
 urllib3>=1.26,<2
 
 # Para indexar fotogramas de video: pip install opencv-python-headless==4.11.0.86

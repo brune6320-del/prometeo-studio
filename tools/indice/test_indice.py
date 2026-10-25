@@ -14,6 +14,7 @@ from buscar import cargar_indice, duplicados, grupos, parecidos
 from exportar import exportar
 from indexar import construir_indice
 from medir import crear_pares_sinteticos, evaluar
+from modelo import sha256_archivo
 
 
 class CodificadorFalso:
@@ -28,6 +29,48 @@ class CodificadorFalso:
 
 
 class IndiceSinteticoTest(unittest.TestCase):
+    def test_pdf_y_recortador_sinteticos(self):
+        import pymupdf
+        from unittest.mock import patch
+        cache = Path(__file__).parent / ".cache"
+        cache.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=cache) as temporal:
+            base = Path(temporal)
+            origen, recortes = base / "medios", base / "piezas"
+            origen.mkdir()
+            recortes.mkdir()
+            pdf = origen / "referentes.pdf"
+            with pymupdf.open() as documento:
+                for color in ((1, 0, 0), (0, 0, 1)):
+                    pagina = documento.new_page(width=8000, height=4000)
+                    pagina.draw_rect(pagina.rect, fill=color)
+                documento.save(pdf)
+            sha_pdf = sha256_archivo(pdf)
+            Image.new("RGB", (32, 32), "green").save(recortes / "pieza.png")
+            destino = origen / "indice"
+            destino.mkdir()
+            Image.new("RGB", (32, 32), "yellow").save(destino / "no-indexar.png")
+            from indexar import _paginas_pdf
+            with patch("indexar._paginas_pdf", wraps=_paginas_pdf) as render:
+                indice = construir_indice(origen, destino, CodificadorFalso(),
+                                          pdf_lado_max=512, recortes=recortes, lote=1)
+                render.assert_called_once_with(pdf, 512)
+            self.assertEqual(len(indice["items"]), 3)
+            self.assertEqual([x["pagina"] for x in indice["items"][:2]], [1, 2])
+            self.assertEqual({x["sha256_archivo"] for x in indice["items"][:2]}, {sha_pdf})
+            self.assertEqual(indice["items"][2]["ruta"], "recortador/pieza.png")
+            self.assertEqual(indice["items"][2]["ruta_fuente"], "pieza.png")
+            self.assertEqual(sha256_archivo(pdf), sha_pdf)
+            self.assertEqual(cargar_indice(destino)[0].shape[0], 3)
+            paginas = list(_paginas_pdf(pdf, 512))
+            self.assertTrue(all(max(im.size) <= 513 for im, _ in paginas))
+            for imagen, _ in paginas:
+                imagen.close()
+            # Una raíz de recortes ya incluida no debe duplicarse.
+            segundo = construir_indice(base, base / "otro-indice", CodificadorFalso(),
+                                       recortes=recortes)
+            self.assertEqual(sum(x["ruta"] == "piezas/pieza.png" for x in segundo["items"]), 1)
+
     def test_fotogramas_video_sintetico(self):
         try:
             import cv2
