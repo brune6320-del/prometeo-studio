@@ -1,0 +1,74 @@
+{
+  "modelo": "SAM 2.1 Hiera Small",
+  "pesos_sha256": "6d1aa6f30de5c92224f8172114de081d104bbd23dd9dc5c58996f0cad5dc4d38",
+  "pruebas_correctas": true,
+  "codigo_sam_commit": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+  "versiones": {
+    "torch": "2.5.1",
+    "torchvision": "0.20.1",
+    "numpy": "2.2.6",
+    "Pillow": "11.3.0",
+    "PyMuPDF": "1.26.5"
+  },
+  "dispositivo": "cpu",
+  "red": "socket.connect bloqueado durante carga e inferencia",
+  "mps_fallback_cpu": false,
+  "casos": [
+    {
+      "caso": "documento-bloque-1",
+      "area_real_bloque": 39438,
+      "area_exportada": 39438,
+      "error_relativo": 0.0,
+      "politica": "bloque_caja_usuario",
+      "puntuacion_sam": 0.9932017922401428
+    },
+    {
+      "caso": "documento-bloque-2",
+      "area_real_bloque": 39125,
+      "area_exportada": 39125,
+      "error_relativo": 0.0,
+      "politica": "bloque_caja_usuario",
+      "puntuacion_sam": 0.9933397173881531
+    },
+    {
+      "caso": "documento-bloque-3",
+      "area_real_bloque": 125584,
+      "area_exportada": 125584,
+      "error_relativo": 0.0,
+      "politica": "bloque_caja_usuario",
+      "puntuacion_sam": 0.9964678287506104
+    },
+    {
+      "caso": "rejilla-4x4",
+      "propuestas": 1,
+      "error_area_rectangulo": 0.0001
+    },
+    {
+      "caso": "rectangulo",
+      "area_real": 40000,
+      "area_exportada": 39993,
+      "error_relativo": 0.000175,
+      "iou": 0.999825,
+      "puntuacion": 0.9957916736602783
+    },
+    {
+      "caso": "circulo",
+      "area_real": 51424,
+      "area_exportada": 51259,
+      "error_relativo": 0.003208618543870566,
+      "iou": 0.9967913814561294,
+      "puntuacion": 0.993036687374115
+    },
+    {
+      "caso": "triangulo",
+      "area_real": 50796,
+      "area_exportada": 50668,
+      "error_relativo": 0.0025198834553901883,
+      "iou": 0.9974801165446098,
+      "puntuacion": 0.9907042384147644
+    }
+  ],
+  "segundos": 22.56163024995476,
+  "pico_rss_bytes_macos": 910163968,
+  "nota_documento": "Área del bloque declarado; no certifica detección semántica SAM."
+}

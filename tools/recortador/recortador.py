@@ -149,11 +149,14 @@ def validar_prompts(datos, fuente):
         if not isinstance(p, dict):
             raise ValueError('Cada pieza debe ser un objeto.')
         tipo = p.get('tipo', 'bloque' if fuente.procedencia['tipo'] == 'pdf' else 'objeto')
-        if tipo not in TIPOS:
+        if not isinstance(tipo, str) or tipo not in TIPOS:
             raise ValueError('Tipo de pieza desconocido.')
-        puntos = [punto(v) for v in p.get('puntos', [])]
+        raw_puntos = p.get('puntos', [])
+        if not isinstance(raw_puntos, list) or len(raw_puntos) > 256:
+            raise ValueError('puntos debe ser una lista de hasta 256 coordenadas.')
+        puntos = [punto(v) for v in raw_puntos]
         labels = p.get('etiquetas', [1] * len(puntos))
-        if len(labels) != len(puntos) or any(type(v) is not int or v not in (0, 1) for v in labels):
+        if not isinstance(labels, list) or len(labels) != len(puntos) or any(type(v) is not int or v not in (0, 1) for v in labels):
             raise ValueError('etiquetas debe contener 0/1 y corresponder a los puntos.')
         if any(not (0 <= x < w and 0 <= y < h) for x, y in puntos):
             raise ValueError('Punto fuera de la imagen/tesela seleccionada.')
@@ -173,6 +176,10 @@ def validar_prompts(datos, fuente):
 
 class MotorSAM:
     def __init__(self, dispositivo='cpu', pesos=None):
+        # Torch 2.5.1 necesita CPU para interpolación bicúbica en MPS.
+        # Debe establecerse antes de importar torch en este proceso.
+        if dispositivo == 'mps':
+            os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')
         import torch
         from sam2.build_sam import build_sam2
         from sam2.sam2_image_predictor import SAM2ImagePredictor
@@ -189,6 +196,8 @@ class MotorSAM:
             MODELO['config'], str(pesos), device=dispositivo, apply_postprocessing=False))
 
     def preparar(self, fuente):
+        if max(fuente.imagen.size) > MAX_PX:
+            raise ValueError('La imagen supera 2048 px.')
         fondo = Image.new('RGBA', fuente.imagen.size, 'white')
         rgb = np.array(Image.alpha_composite(fondo, fuente.imagen).convert('RGB'), copy=True)
         with self.torch.inference_mode():
@@ -235,6 +244,15 @@ def propuestas(motor, fuente, prompts=None, rejilla=0, min_score=0.8, min_area=6
         area = int(mask.sum())
         if rejilla:
             if score < min_score or area < min_area or area > w * h * .9:
+                continue
+            # El fondo puede dejar unos píxeles vacíos en las esquinas. Medir una
+            # franja, no solo cuatro píxeles; las selecciones explícitas no se filtran.
+            franja = max(1, round(min(w, h) * .02))
+            borde = (np.count_nonzero(mask[:franja]) + np.count_nonzero(mask[-franja:])
+                     + np.count_nonzero(mask[franja:-franja, :franja])
+                     + np.count_nonzero(mask[franja:-franja, -franja:]))
+            area_borde = w * h - max(0, w - 2*franja) * max(0, h - 2*franja)
+            if borde / area_borde > .5:
                 continue
             duplicado = False
             for anterior in aceptadas:
@@ -292,13 +310,13 @@ def exportar_pieza(fuente, prompt, mask, score, carpeta, indice, documento=False
 
 def ejecutar(entrada, salida, *, prompts=None, rejilla=0, dispositivo='cpu', pagina=1,
              ppp=150, tesela=1, region=None, documento=False, motor=None):
-    if bool(prompts) == bool(rejilla):
+    if (prompts is not None) == bool(rejilla):
         raise ValueError('Elige JSON de indicaciones o rejilla, exclusivamente.')
     salida = Path(salida).resolve()
     if salida.exists():
         raise ValueError('La carpeta de salida ya existe; elige una nueva para no mezclar piezas.')
     fuente = abrir_fuente(entrada, pagina=pagina, ppp=ppp, tesela=tesela, region=region)
-    instrucciones = validar_prompts(prompts, fuente) if prompts else None
+    instrucciones = validar_prompts(prompts, fuente) if prompts is not None else None
     if rejilla and not 2 <= rejilla <= 16:
         raise ValueError('Rejilla: entre 2 y 16 puntos por lado.')
     salida.parent.mkdir(parents=True, exist_ok=True)
@@ -306,9 +324,9 @@ def ejecutar(entrada, salida, *, prompts=None, rejilla=0, dispositivo='cpu', pag
     try:
         with exclusivo():
             motor = motor or MotorSAM(dispositivo)
-            motor.preparar(fuente)
             piezas = []
             try:
+                motor.preparar(fuente)
                 for prompt, mask, score in propuestas(motor, fuente, instrucciones, rejilla):
                     pieza = exportar_pieza(fuente, prompt, mask, score, temporal, len(piezas) + 1,
                                            documento=documento or fuente.procedencia['tipo'] == 'pdf')
@@ -317,6 +335,7 @@ def ejecutar(entrada, salida, *, prompts=None, rejilla=0, dispositivo='cpu', pag
             finally:
                 motor.liberar_imagen()
         resultado = {'version': 1, 'modelo': MODELO, 'dispositivo': dispositivo,
+                     'mps_fallback_cpu': dispositivo == 'mps' and os.environ.get('PYTORCH_ENABLE_MPS_FALLBACK') == '1',
                      'fuente': fuente.procedencia, 'modo': 'rejilla' if rejilla else 'indicaciones',
                      'rejilla': rejilla or None, 'piezas': piezas,
                      'nota': 'Tipos declarados por el usuario; SAM no clasifica texto, tablas o símbolos.'}
