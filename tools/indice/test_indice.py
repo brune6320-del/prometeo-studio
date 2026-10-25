@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image
 
 from buscar import cargar_indice, duplicados, grupos, parecidos
+from exportar import exportar
 from indexar import construir_indice
 from medir import crear_pares_sinteticos, evaluar
 
@@ -73,6 +74,40 @@ class IndiceSinteticoTest(unittest.TestCase):
         resultado = evaluar(base, consulta, positivos, tipos)
         self.assertLess(resultado["global"]["recall@1"], 1.0)
         self.assertEqual(resultado["global"]["recall@5"], 1.0)
+
+    def test_exportar_gustos_solo_lectura_y_holdout_congelado(self):
+        cache = Path(__file__).parent / ".cache"
+        cache.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=cache) as temporal:
+            base = Path(temporal)
+            origen = base / "origen"
+            origen.mkdir()
+            Image.new("RGB", (24, 24), (200, 20, 20)).save(origen / "a.png")
+            (origen / "a-copia.png").write_bytes((origen / "a.png").read_bytes())
+            Image.new("RGB", (24, 24), (20, 20, 200)).save(origen / "b.png")
+            indice_dir = base / "indice"
+            indice = construir_indice(origen, indice_dir, CodificadorFalso())
+            sha_a = next(x["sha256_archivo"] for x in indice["items"] if x["ruta"] == "a.png")
+            gustos = base / "gustos.json"
+            contenido = json.dumps({"version": 1, "referentes": {sha_a: 2, "sin-vinculo": 0.2},
+                                   "items": [{"ruta": "b.png", "voto": "✕"}]})
+            gustos.write_text(contenido, encoding="utf-8")
+            salida = base / "dataset"
+            primero = exportar(indice_dir, salida, gustos, porcentaje=20)
+            congelado = (salida / "holdout.json").read_bytes()
+            segundo = exportar(indice_dir, salida, gustos, porcentaje=20)
+            self.assertEqual(congelado, (salida / "holdout.json").read_bytes())
+            self.assertEqual(gustos.read_text(encoding="utf-8"), contenido)
+            self.assertEqual(primero["totales"], segundo["totales"])
+            self.assertEqual(primero["gustos_sin_vincular"], ["sin-vinculo"])
+            registros = []
+            for nombre in ("train", "holdout"):
+                registros.extend(json.loads(line) for line in (salida / f"{nombre}.jsonl").read_text().splitlines())
+            self.assertEqual(len(registros), 3)
+            self.assertEqual({x["etiqueta"] for x in registros}, {"♥", "✕"})
+            self.assertEqual(len({x["split"] for x in registros if x["sha256_archivo"] == sha_a}), 1)
+            with self.assertRaises(ValueError):
+                exportar(indice_dir, salida, gustos, porcentaje=25)
 
 
 if __name__ == "__main__":

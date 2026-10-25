@@ -49,3 +49,13 @@ PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -m unittest discover -s . -p 'test_*.
 ```
 
 `medir.py` dibuja referentes artificiales en memoria y produce tres consultas por base: recorte, giro de 12° y cambio de color. Compara cada consulta contra las bases y comunica recall@1 y recall@5 global y por transformación. No acepta rutas de datos reales ni guarda las imágenes. Las pruebas usan vectores falsos para verificar el cálculo sin descargar pesos.
+
+## Exportar etiquetas y holdout
+
+```sh
+nice -n 15 .venv/bin/python exportar.py salidas/mi-indice --gustos /ruta/a/gustos.json --salida salidas/dataset
+```
+
+`gustos.json` se abre **solo para lectura**. Si no se indica, se busca junto a la carpeta de medios o al índice. El formato actual de Studio guarda pesos en `referentes`: peso >1 se interpreta como ♥ acumulado y peso <1 como ✕ acumulado; 1 queda sin etiqueta. También se aceptan entradas explícitas `items` con `voto: "♥"/"✕"`. Solo se vinculan claves que coincidan con SHA-256, ID o ruta relativa de un elemento indexado. El manifiesto muestra las claves sin vincular; no se inventan correspondencias para `reglas`, `herramientas` o `pares`.
+
+Se escriben `train.jsonl`, `holdout.jsonl`, `sin_etiqueta.jsonl`, `holdout.json` y `manifest.json`, sin copiar imágenes ni pesos. La asignación train/holdout depende del SHA-256 del **archivo fuente**, el porcentaje y una sal fija; `holdout.json` conserva la asignación y rechaza cambios de política. Reencuadres o duplicados visuales con bytes distintos podrían caer en ambos conjuntos: revisar antes de entrenar. Este exportador no entrena nada.
