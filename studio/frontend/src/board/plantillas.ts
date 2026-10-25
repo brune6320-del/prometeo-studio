@@ -1,4 +1,4 @@
-import { cloneBoardForImport, createBoard, createCard, type BoardCard, type BoardDocument, type BoardRelation } from './model';
+import { cloneBoardForImport, createBoard, createCard, normalizeBoard, type BoardCard, type BoardDocument, type BoardRelation } from './model';
 import { nuevaTareaId } from './tareas';
 
 export interface Plantilla {
@@ -11,7 +11,7 @@ export interface Plantilla {
 }
 
 const STORAGE_KEY = 'prometeo-studio-plantillas-v1';
-const MAX_PLANTILLAS = 24;
+export const MAX_PLANTILLAS = 24;
 
 function tableroCon(nombre: string, cards: BoardCard[], relations: BoardRelation[] = []): BoardDocument {
   const board = createBoard(nombre);
@@ -95,54 +95,62 @@ export function materializar(board: BoardDocument, nombre?: string): { cards: Bo
   return { cards: copy.cards, relations: copy.relations, title: nombre ?? board.title };
 }
 
-function guardadas(): Plantilla[] {
+/** Plantillas guardadas en el formato antiguo (localStorage global). Solo para migrarlas. */
+export function leerPlantillasLegacy(): Plantilla[] {
   if (typeof window === 'undefined' || !window.localStorage) return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.flatMap((entry) => {
-      if (typeof entry !== 'object' || entry === null) return [];
-      const item = entry as Partial<Plantilla>;
-      if (typeof item.id !== 'string' || typeof item.nombre !== 'string' || typeof item.board !== 'object' || item.board === null) return [];
-      return [{
-        id: item.id,
-        nombre: item.nombre.slice(0, 80),
-        descripcion: typeof item.descripcion === 'string' ? item.descripcion.slice(0, 200) : 'Plantilla guardada',
-        creada: typeof item.creada === 'string' ? item.creada : undefined,
-        builtin: false,
-        board: item.board as BoardDocument,
-      }];
-    });
+    return normalizarPlantillas(JSON.parse(raw));
   } catch {
     return [];
   }
 }
 
-export function listarPlantillas(): Plantilla[] {
-  return [...guardadas(), ...PLANTILLAS_BUILTIN];
+/** Borra la copia global una vez que las plantillas viven en el proyecto. */
+export function borrarPlantillasLegacy(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try { window.localStorage.removeItem(STORAGE_KEY); } catch { /* almacenamiento bloqueado */ }
 }
 
-export function guardarPlantilla(board: BoardDocument): Plantilla[] {
-  if (typeof window === 'undefined' || !window.localStorage) return guardadas();
-  const actuales = guardadas();
-  const plantilla: Plantilla = {
-    id: `plantilla-${Date.now().toString(36)}`,
-    nombre: board.title.slice(0, 80),
+/** Normaliza plantillas de proyecto: descarta lo irrecuperable sin romper el resto. */
+export function normalizarPlantillas(value: unknown): Plantilla[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const out: Plantilla[] = [];
+  for (const entry of value) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const item = entry as Partial<Plantilla>;
+    if (typeof item.id !== 'string' || !item.id.trim() || seen.has(item.id)) continue;
+    const board = normalizeBoard(item.board);
+    if (!board) continue;
+    seen.add(item.id);
+    out.push({
+      id: item.id.slice(0, 120),
+      nombre: (typeof item.nombre === 'string' ? item.nombre : board.title).slice(0, 80),
+      descripcion: typeof item.descripcion === 'string' ? item.descripcion.slice(0, 200) : 'Plantilla guardada',
+      creada: typeof item.creada === 'string' ? item.creada : undefined,
+      builtin: false,
+      board,
+    });
+    if (out.length >= MAX_PLANTILLAS) break;
+  }
+  return out;
+}
+
+/** Copia inmutable de un tablero como plantilla guardable. */
+export function crearPlantilla(board: BoardDocument): Plantilla {
+  return {
+    id: `plantilla-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    nombre: board.title.slice(0, 80) || 'Plantilla sin nombre',
     descripcion: `${board.cards.length} tarjetas guardadas desde un tablero`,
     creada: new Date().toISOString(),
     builtin: false,
     board: JSON.parse(JSON.stringify(board)) as BoardDocument,
   };
-  const siguiente = [plantilla, ...actuales].slice(0, MAX_PLANTILLAS);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(siguiente));
-  return siguiente;
 }
 
-export function eliminarPlantilla(id: string): Plantilla[] {
-  if (typeof window === 'undefined' || !window.localStorage) return guardadas();
-  const siguiente = guardadas().filter((item) => item.id !== id);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(siguiente));
-  return siguiente;
+/** Lista completa: las guardadas del proyecto delante y las incluidas detrás. */
+export function listarPlantillas(guardadas: readonly Plantilla[] = leerPlantillasLegacy()): Plantilla[] {
+  return [...guardadas, ...PLANTILLAS_BUILTIN];
 }

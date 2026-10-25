@@ -39,7 +39,7 @@ import {
 import { geometriaConector, rectDeTarjeta } from '../board/conectores';
 import { readColumnData, setColumnFolded, columnChildIds } from '../board/columnas';
 import { normalizarVistaPrevia } from '../board/vistaPrevia';
-import { guardarPlantilla, eliminarPlantilla, listarPlantillas, materializar, type Plantilla } from '../board/plantillas';
+import { borrarPlantillasLegacy, crearPlantilla, leerPlantillasLegacy, listarPlantillas, materializar, type Plantilla } from '../board/plantillas';
 import { ABRIR_TABLERO_EVENT } from '../board/tools/tablero';
 import { studioApi } from '../api/client';
 import { fitBoardCamera, MAX_BOARD_ZOOM, MIN_BOARD_ZOOM, zoomAtPoint, screenToWorld } from '../board/camera';
@@ -88,13 +88,17 @@ import {
   type PdfReferenceSource,
 } from '../board/projectModel';
 import {
+  addProjectPlantillas,
   assignBoardToProject,
   createProject,
   deletePdfReference,
+  deleteProjectPlantilla,
   loadProjectWorkspace,
   removeBoardProjectLink,
+  renameProject,
   savePdfReference,
   saveProjectGustos,
+  saveProjectPlantilla,
   setActiveProject,
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
@@ -121,6 +125,31 @@ interface BoardWorkspaceProps {
 const GRID_SIZE = 24;
 const COLORS: Array<BoardCard['color']> = ['paper', 'sand', 'sage', 'rose'];
 const RAIL_TOOLS = ['note', 'link', 'media', 'tareas', 'columna', 'referente', 'marco', 'entropia'];
+
+const ATAJOS: Array<{ grupo: string; items: Array<[string, string]> }> = [
+  { grupo: 'Lienzo', items: [
+    ['Arrastrar el fondo', 'Seleccionar tarjetas con un rectángulo'],
+    ['⇧ + arrastrar el fondo', 'Añadir al rectángulo sin perder la selección'],
+    ['Espacio + arrastrar', 'Mover el lienzo'],
+    ['Rueda o dos dedos', 'Mover el lienzo'],
+    ['⌘/Ctrl + rueda', 'Acercar y alejar'],
+  ] },
+  { grupo: 'Tarjetas', items: [
+    ['N', 'Abrir la biblioteca de herramientas'],
+    ['Doble clic en el título', 'Renombrar una tarjeta o un marco'],
+    ['Doble clic en la URL', 'Editar la dirección de un enlace'],
+    ['Alt/Opción + arrastrar', 'Duplicar una tarjeta'],
+    ['⇧ + clic', 'Añadir o quitar de la selección'],
+    ['⌘/Ctrl + Z', 'Deshacer'],
+    ['⌘/Ctrl + ⇧ + Z', 'Rehacer'],
+  ] },
+  { grupo: 'Vistas', items: [
+    ['Doble clic en un proyecto', 'Abrir el pliego de dos páginas'],
+    ['← →', 'Cambiar diapositiva en Archivo o Muro'],
+    ['Esc', 'Cerrar el pliego, la caja de luz o cancelar'],
+    ['?', 'Abrir o cerrar este panel'],
+  ] },
+];
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -193,6 +222,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [projectLoadAttempt, setProjectLoadAttempt] = useState(0);
   const [projectDialog, setProjectDialog] = useState(false);
   const [projectName, setProjectName] = useState('');
+  const [renamingProject, setRenamingProject] = useState(false);
+  const [projectDraft, setProjectDraft] = useState('');
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [spacePanActive, setSpacePanActive] = useState(false);
+  const spaceHeld = useRef(false);
   const [pdfReferenceDialog, setPdfReferenceDialog] = useState(false);
   const [pdfReferenceQuote, setPdfReferenceQuote] = useState('');
   const [pdfReferenceNote, setPdfReferenceNote] = useState('');
@@ -670,6 +704,29 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     rememberActiveBoard(activeBoardId);
   }, [activeBoardId, loaded]);
 
+  // Las plantillas guardadas ya no viven en localStorage global: la primera vez que
+  // aparece un proyecto se mueven a su registro y se borra la copia antigua.
+  const migratedTemplates = useRef(false);
+  useEffect(() => {
+    if (!loaded || !activeProject || migratedTemplates.current) return;
+    const legacy = leerPlantillasLegacy();
+    if (legacy.length === 0) return;
+    migratedTemplates.current = true;
+    const projectId = activeProject.id;
+    void (async () => {
+      try {
+        const plantillas = await addProjectPlantillas(projectId, legacy);
+        borrarPlantillasLegacy();
+        setProjects((current) => current.map((project) => project.id === projectId ? { ...project, plantillas } : project));
+        setTemplates(listarPlantillas(plantillas));
+        setNotice(`${legacy.length} ${legacy.length === 1 ? 'plantilla guardada se movió' : 'plantillas guardadas se movieron'} a «${activeProject.name}».`);
+      } catch (error) {
+        migratedTemplates.current = false;
+        setProjectError(error instanceof Error ? error.message : 'No se pudieron mover las plantillas al proyecto.');
+      }
+    })();
+  }, [activeProject, loaded]);
+
   // El sistema de diseño del tablero se aplica en la raíz para que alcance
   // también a los portales (pliego, caja de luz, diálogos), no solo al lienzo.
   useEffect(() => {
@@ -1082,8 +1139,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       : 'El rectángulo no tocó ninguna tarjeta.');
   };
 
-  const beginPan = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest('.board-card, .board-frame, .board-free-media, .board-controls, .board-dialog, button, input, select, a, .board-empty')) return;
+  const beginPan = (event: React.PointerEvent<HTMLDivElement>, force = false) => {
+    if (event.button !== 0 || (!force && (event.target as HTMLElement).closest('.board-card, .board-frame, .board-free-media, .board-controls, .board-dialog, button, input, select, a, .board-empty'))) return;
     detenerInercia();
     detenerRetornoZoom();
     if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
@@ -1118,9 +1175,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const endPan = (event: React.PointerEvent<HTMLDivElement>) => {
     const drag = panDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    const movido = Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 4;
     panDrag.current = null;
     setIsPanning(false);
     liberarPuntero(drag.captureEl, event.pointerId);
+    if (movido) {
+      // Un paneo no es un clic en el vacío: no debe borrar la selección actual.
+      suppressViewportClick.current = true;
+      window.setTimeout(() => { suppressViewportClick.current = false; }, 0);
+    }
     const velocidad = velocidadDeMuestras(drag.samples, 90);
     programarSincronizacion();
     iniciarInercia(velocidad.x, velocidad.y);
@@ -1171,11 +1234,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const beginViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (spaceHeld.current && event.button === 0) {
+      beginPan(event, true);
+      return;
+    }
     if (frameToolId) {
       startFrameDraw(event);
       return;
     }
-    if (event.shiftKey && event.button === 0) {
+    if (event.button === 0) {
       const target = event.target as HTMLElement;
       if (!target.closest('.board-card, .board-column, .board-frame, .board-free-media, .board-controls, .board-dialog, button, input, select, a, .board-empty')) {
         iniciarMarquesina(event);
@@ -1201,7 +1268,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     detenerInercia();
     detenerRetornoZoom();
     if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
-    if (event.button !== 0 || event.detail > 1 || frameToolId || connectMode || card.locked || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
+    if (spaceHeld.current || event.button !== 0 || event.detail > 1 || frameToolId || connectMode || card.locked || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
     suppressCardClick.current = false;
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
     setSettlingIds([]);
@@ -1637,6 +1704,35 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     enqueueBoardSave(result.board!);
   }, [activeBoard, boardHistories]);
 
+  // Espacio + arrastrar mueve el lienzo; el arrastre simple queda para el rectángulo.
+  useEffect(() => {
+    const setSpace = (held: boolean) => {
+      spaceHeld.current = held;
+      setSpacePanActive(held);
+    };
+    const down = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' || event.repeat) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      event.preventDefault();
+      setSpace(true);
+    };
+    const up = (event: KeyboardEvent) => {
+      if (event.code !== 'Space') return;
+      event.preventDefault();
+      setSpace(false);
+    };
+    const blur = () => setSpace(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
+    };
+  }, []);
+
   useEffect(() => {
     const handleHistoryShortcut = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.key.toLocaleLowerCase() !== 'z') return;
@@ -1656,6 +1752,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       const target = event.target;
       const typing = target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
       if (event.key === 'Escape') {
+        if (shortcutsOpen) {
+          event.preventDefault();
+          setShortcutsOpen(false);
+          return;
+        }
         if (archiveFullscreenId) {
           event.preventDefault();
           setArchiveFullscreenId(null);
@@ -1675,14 +1776,21 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         }
         return;
       }
+      if (shortcutsOpen) return;
+      if (typing) return;
+      if (event.key === '?' || (event.shiftKey && event.key === '/')) {
+        event.preventDefault();
+        setShortcutsOpen(true);
+        return;
+      }
+      if (event.key.toLocaleLowerCase() !== 'n') return;
       if (archiveFullscreenId) return;
-      if (typing || event.key.toLocaleLowerCase() !== 'n') return;
       event.preventDefault();
       setAddMenuOpen((open) => !open);
     };
     window.addEventListener('keydown', handleAddShortcut);
     return () => window.removeEventListener('keydown', handleAddShortcut);
-  }, [addMenuOpen, archiveFullscreenId, frameToolId]);
+  }, [addMenuOpen, archiveFullscreenId, frameToolId, shortcutsOpen]);
 
   useEffect(() => {
     if (!exportMenuOpen && !libraryMenuOpen) return;
@@ -1706,6 +1814,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   }, [exportMenuOpen, libraryMenuOpen]);
 
   const handleCardSelection = (cardId: string, event: Modificadores) => {
+    if (spaceHeld.current) return;
     if (suppressCardClick.current) {
       suppressCardClick.current = false;
       return;
@@ -1949,7 +2058,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const abrirPlantillas = () => {
-    setTemplates(listarPlantillas());
+    setTemplates(listarPlantillas(activeProject?.plantillas ?? []));
     setTemplateDialog(true);
   };
 
@@ -1981,14 +2090,43 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setNotice(`Tablero «${board.title}» creado desde la plantilla «${plantilla.nombre}».`);
   };
 
-  const guardarTableroComoPlantilla = () => {
-    if (!activeBoard) return;
-    setTemplates(guardarPlantilla(activeBoard));
-    setNotice(`«${activeBoard.title}» guardado como plantilla reutilizable.`);
+  const guardarTableroComoPlantilla = async () => {
+    if (!activeBoard || !activeProject) return;
+    const plantilla = crearPlantilla(activeBoard);
+    try {
+      const plantillas = await saveProjectPlantilla(activeProject.id, plantilla);
+      setProjects((current) => current.map((project) => project.id === activeProject.id ? { ...project, plantillas } : project));
+      setTemplates(listarPlantillas(plantillas));
+      setNotice(`«${activeBoard.title}» guardado como plantilla del proyecto «${activeProject.name}».`);
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : 'No se pudo guardar la plantilla en el proyecto.');
+    }
   };
 
-  const borrarPlantillaGuardada = (id: string) => {
-    setTemplates(eliminarPlantilla(id));
+  const borrarPlantillaGuardada = async (id: string) => {
+    if (!activeProject) return;
+    try {
+      const plantillas = await deleteProjectPlantilla(activeProject.id, id);
+      setProjects((current) => current.map((project) => project.id === activeProject.id ? { ...project, plantillas } : project));
+      setTemplates(listarPlantillas(plantillas));
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : 'No se pudo eliminar la plantilla.');
+    }
+  };
+
+  const commitProjectRename = async () => {
+    if (!activeProject) return;
+    const name = projectDraft.trim().slice(0, 120);
+    setRenamingProject(false);
+    if (!name || name === activeProject.name) return;
+    try {
+      const updated = await renameProject(activeProject.id, name);
+      setProjects((current) => current.map((project) => project.id === updated.id ? updated : project));
+      setProjectError(null);
+      setNotice(`Proyecto renombrado a «${updated.name}».`);
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : 'No se pudo renombrar el proyecto.');
+    }
   };
 
   const renameBoard = (title: string) => {
@@ -2556,10 +2694,49 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         </button>
         <div className="board-identity">
           <span className="board-mark" aria-hidden="true">P</span>
-          <label className="sr-only" htmlFor="project-select">Proyecto</label>
-          <select id="project-select" className="board-project-select" value={activeProjectId} onChange={(event) => { void handleProjectSelect(event.target.value); }} aria-label="Elegir proyecto" disabled={!projects.length}>
-            {projects.length ? projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>) : <option value="">Proyectos no disponibles</option>}
-          </select>
+          {renamingProject && activeProject ? (
+            <input
+              className="board-project-rename"
+              value={projectDraft}
+              autoFocus
+              maxLength={120}
+              aria-label="Nombre del proyecto"
+              onChange={(event) => setProjectDraft(event.target.value)}
+              onBlur={() => { void commitProjectRename(); }}
+              onKeyDown={(event) => {
+                event.stopPropagation();
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  event.currentTarget.blur();
+                } else if (event.key === 'Escape') {
+                  event.preventDefault();
+                  setProjectDraft(activeProject.name);
+                  setRenamingProject(false);
+                }
+              }}
+            />
+          ) : (
+            <>
+              <label className="sr-only" htmlFor="project-select">Proyecto</label>
+              <select
+                id="project-select"
+                className="board-project-select"
+                value={activeProjectId}
+                onChange={(event) => { void handleProjectSelect(event.target.value); }}
+                onDoubleClick={(event) => {
+                  if (!activeProject) return;
+                  event.preventDefault();
+                  setProjectDraft(activeProject.name);
+                  setRenamingProject(true);
+                }}
+                aria-label="Elegir proyecto"
+                title="Doble clic para renombrar el proyecto"
+                disabled={!projects.length}
+              >
+                {projects.length ? projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>) : <option value="">Proyectos no disponibles</option>}
+              </select>
+            </>
+          )}
           <span className="board-identity-separator" aria-hidden="true">·</span>
           <label className="sr-only" htmlFor="board-select">Tablero</label>
           <select id="board-select" className="board-board-select" value={activeBoard.id} onChange={(event) => {
@@ -2619,6 +2796,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           <button className="board-icon-button" onClick={() => zoomBy(1 / 1.15)} aria-label="Alejar" title="Alejar"><ZoomOut size={16} /></button>
           <button ref={zoomValueRef} className="board-zoom-value" onClick={fitBoard} title="Ajustar el tablero a la pantalla" aria-label={`Zoom ${Math.round(zoom * 100)} por ciento, ajustar tablero`}>{Math.round(zoom * 100)}%</button>
           <button className="board-icon-button" onClick={() => zoomBy(1.15)} aria-label="Acercar" title="Acercar"><ZoomIn size={16} /></button>
+
+          <button
+            type="button"
+            className="board-icon-button board-help-button"
+            onClick={() => setShortcutsOpen(true)}
+            aria-label="Atajos de teclado"
+            title="Atajos de teclado (?)"
+          >?</button>
 
           <div className="board-menu-wrap" ref={exportMenuRef}>
             <button type="button" className="board-bar-button" onClick={() => { setExportMenuOpen((open) => !open); setLibraryMenuOpen(false); }} aria-haspopup="menu" aria-expanded={exportMenuOpen} title="Exportar y publicar">
@@ -2712,7 +2897,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       <main
         ref={viewportRef}
-        className={`board-viewport ${isPanning ? 'panning' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
+        className={`board-viewport ${isPanning ? 'panning' : ''} ${spacePanActive ? 'space-pan' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
         onPointerDown={beginViewportGesture}
         onPointerMove={moveViewportGesture}
         onPointerUp={endViewportGesture}
@@ -2966,7 +3151,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           />
         )}
 
-        <div className="board-count">{activeBoard.cards.length} {activeBoard.cards.length === 1 ? 'tarjeta' : 'tarjetas'} · ⇧ + arrastra el fondo para seleccionar un área · ⌘/Ctrl + rueda para acercar</div>
+        <div className="board-count">{activeBoard.cards.length} {activeBoard.cards.length === 1 ? 'tarjeta' : 'tarjetas'} · arrastra el fondo para seleccionar · Espacio + arrastra para mover · ⌘/Ctrl + rueda para acercar</div>
       </main>
 
         <input ref={importInput} type="file" accept="application/json,.json,text/markdown,.md" hidden onChange={(event) => { void importBoard(event.target.files?.[0]); event.target.value = ''; }} />
@@ -3012,6 +3197,36 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           onClose={() => setMirarOpen(false)}
           onAceptar={aceptarLecturaEnReferente}
         />
+      )}
+
+      {shortcutsOpen && (
+        <div className="board-add-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShortcutsOpen(false); }}>
+          <div className="board-dialog board-shortcuts" role="dialog" aria-modal="true" aria-labelledby="board-shortcuts-title">
+            <div className="board-dialog-heading">
+              <h2 id="board-shortcuts-title">Atajos del tablero</h2>
+              <button type="button" onClick={() => setShortcutsOpen(false)} aria-label="Cerrar atajos"><X size={16} /></button>
+            </div>
+            <p className="board-dialog-hint">Los mismos gestos que ves en los controles, sin tener que buscarlos.</p>
+            <div className="board-shortcuts-groups">
+              {ATAJOS.map((group) => (
+                <section className="board-shortcuts-group" key={group.grupo} aria-label={group.grupo}>
+                  <h3>{group.grupo}</h3>
+                  <dl>
+                    {group.items.map(([keys, label]) => (
+                      <div className="board-shortcut" key={`${group.grupo}-${keys}`}>
+                        <dt><kbd>{keys}</kbd></dt>
+                        <dd>{label}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              ))}
+            </div>
+            <div className="board-dialog-actions">
+              <button type="button" className="board-tool primary" onClick={() => setShortcutsOpen(false)}>Entendido</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {addMenuOpen && (

@@ -11,6 +11,7 @@ import {
   type PdfReference,
 } from './projectModel';
 import { normalizarGustos, type Gustos } from './vanguardia/gustos';
+import { normalizarPlantillas, MAX_PLANTILLAS, type Plantilla } from './plantillas';
 
 const DATABASE_NAME = 'prometeo-studio-project-workspace';
 const DATABASE_VERSION = 2;
@@ -282,6 +283,128 @@ export async function createProject(name: string): Promise<BoardProject> {
     throw error;
   }
   return project;
+}
+
+
+/** Guarda una plantilla dentro del proyecto, sin duplicar id y con el tope local. */
+export async function saveProjectPlantilla(projectId: string, plantilla: Plantilla): Promise<Plantilla[]> {
+  const database = await openDatabase();
+  const transaction = database.transaction(PROJECTS_STORE, 'readwrite');
+  const finished = transactionFinished(transaction);
+  const store = transaction.objectStore(PROJECTS_STORE);
+  const request = store.get(projectId);
+  let missing = false;
+  let next: Plantilla[] = [];
+  request.onsuccess = () => {
+    const project = normalizeBoardProject(request.result);
+    if (!project) {
+      missing = true;
+      try { transaction.abort(); } catch { /* transaction already closed */ }
+      return;
+    }
+    const clean = normalizarPlantillas([plantilla])[0];
+    if (!clean) {
+      try { transaction.abort(); } catch { /* transaction already closed */ }
+      return;
+    }
+    next = [clean, ...project.plantillas.filter((item) => item.id !== clean.id)].slice(0, MAX_PLANTILLAS);
+    store.put({ ...project, plantillas: next, updatedAt: new Date().toISOString() } satisfies BoardProject);
+  };
+  try {
+    await finished;
+  } catch (error) {
+    if (missing) throw new Error('El proyecto ya no existe en el almacenamiento local.');
+    throw error;
+  }
+  return next;
+}
+
+/** Elimina una plantilla guardada del proyecto. */
+export async function deleteProjectPlantilla(projectId: string, plantillaId: string): Promise<Plantilla[]> {
+  const database = await openDatabase();
+  const transaction = database.transaction(PROJECTS_STORE, 'readwrite');
+  const finished = transactionFinished(transaction);
+  const store = transaction.objectStore(PROJECTS_STORE);
+  const request = store.get(projectId);
+  let missing = false;
+  let next: Plantilla[] = [];
+  request.onsuccess = () => {
+    const project = normalizeBoardProject(request.result);
+    if (!project) {
+      missing = true;
+      try { transaction.abort(); } catch { /* transaction already closed */ }
+      return;
+    }
+    next = project.plantillas.filter((item) => item.id !== plantillaId);
+    store.put({ ...project, plantillas: next, updatedAt: new Date().toISOString() } satisfies BoardProject);
+  };
+  try {
+    await finished;
+  } catch (error) {
+    if (missing) throw new Error('El proyecto ya no existe en el almacenamiento local.');
+    throw error;
+  }
+  return next;
+}
+
+/** Migra las plantillas guardadas en el formato global antiguo al proyecto activo. */
+export async function addProjectPlantillas(projectId: string, plantillas: readonly Plantilla[]): Promise<Plantilla[]> {
+  const database = await openDatabase();
+  const transaction = database.transaction(PROJECTS_STORE, 'readwrite');
+  const finished = transactionFinished(transaction);
+  const store = transaction.objectStore(PROJECTS_STORE);
+  const request = store.get(projectId);
+  let missing = false;
+  let next: Plantilla[] = [];
+  request.onsuccess = () => {
+    const project = normalizeBoardProject(request.result);
+    if (!project) {
+      missing = true;
+      try { transaction.abort(); } catch { /* transaction already closed */ }
+      return;
+    }
+    const existing = new Set(project.plantillas.map((item) => item.id));
+    const incoming = normalizarPlantillas(plantillas).filter((item) => !existing.has(item.id));
+    next = [...incoming, ...project.plantillas].slice(0, MAX_PLANTILLAS);
+    store.put({ ...project, plantillas: next, updatedAt: new Date().toISOString() } satisfies BoardProject);
+  };
+  try {
+    await finished;
+  } catch (error) {
+    if (missing) throw new Error('El proyecto ya no existe en el almacenamiento local.');
+    throw error;
+  }
+  return next;
+}
+
+/** Renombra un proyecto conservando sus tableros, gustos, referencias y plantillas. */
+export async function renameProject(projectId: string, name: string): Promise<BoardProject> {
+  const clean = createBoardProject(name);
+  const database = await openDatabase();
+  const transaction = database.transaction(PROJECTS_STORE, 'readwrite');
+  const finished = transactionFinished(transaction);
+  const store = transaction.objectStore(PROJECTS_STORE);
+  const request = store.get(projectId);
+  let missing = false;
+  let updated: BoardProject | null = null;
+  request.onsuccess = () => {
+    const project = normalizeBoardProject(request.result);
+    if (!project) {
+      missing = true;
+      try { transaction.abort(); } catch { /* transaction already closed */ }
+      return;
+    }
+    updated = { ...project, name: clean.name, updatedAt: new Date().toISOString() };
+    store.put(updated);
+  };
+  try {
+    await finished;
+  } catch (error) {
+    if (missing) throw new Error('El proyecto ya no existe en el almacenamiento local.');
+    throw error;
+  }
+  if (!updated) throw new Error('No se pudo renombrar el proyecto.');
+  return updated;
 }
 
 export async function saveProjectGustos(projectId: string, gustos: Gustos): Promise<void> {

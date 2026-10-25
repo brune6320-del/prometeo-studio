@@ -3,6 +3,7 @@ import { createCard, isSafeExternalUrl, type BoardCard } from '../model';
 import type { BoardTool } from './registry';
 import { esTarjetaDe } from './guard';
 import { CuerpoTexto } from './parts';
+import { UrlEnSitio } from '../../components/InlineEdit';
 import { leerVistaPrevia } from '../vistaPrevia';
 
 /**
@@ -37,6 +38,14 @@ export const linkTool: BoardTool<BoardCard> = {
               {preview.descripcion && <span>{preview.descripcion}</span>}
             </span>
           </a>
+          <div className="board-link-url">
+            <UrlEnSitio
+              value={datos.url ?? ''}
+              onCommit={(url) => editar({ ...datos, url })}
+              ariaLabel="URL del enlace"
+            />
+            {seguro && <a href={datos.url} target="_blank" rel="noreferrer" aria-label="Abrir el enlace" title="Abrir en una pestaña nueva" onClick={(event) => event.stopPropagation()}>↗</a>}
+          </div>
           <CuerpoTexto datos={datos} editar={editar} placeholder="Añade una nota…" />
         </>
       );
@@ -45,7 +54,12 @@ export const linkTool: BoardTool<BoardCard> = {
       <>
         <div className="board-card-link">
           <Link2 size={13} aria-hidden="true" />
-          {seguro ? <a href={datos.url} target="_blank" rel="noreferrer">{datos.url}</a> : <span>Añade una dirección web segura</span>}
+          <UrlEnSitio
+            value={datos.url ?? ''}
+            onCommit={(url) => editar({ ...datos, url })}
+            ariaLabel="URL del enlace"
+          />
+          {seguro && <a href={datos.url} target="_blank" rel="noreferrer" aria-label="Abrir el enlace" title="Abrir en una pestaña nueva" onClick={(event) => event.stopPropagation()}>↗</a>}
         </div>
         <CuerpoTexto datos={datos} editar={editar} placeholder="Escribe una idea…" />
       </>

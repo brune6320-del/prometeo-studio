@@ -5104,3 +5104,169 @@
     width: 104px;
   }
 }
+
+/* ── G7 · detalles de edición, atajos y gestos ───────────────────────────── */
+
+.board-viewport {
+  cursor: default;
+}
+
+.board-viewport.space-pan {
+  cursor: grab;
+}
+
+.board-viewport.space-pan.panning {
+  cursor: grabbing;
+}
+
+.board-project-rename {
+  width: min(190px, 20vw);
+  min-width: 120px;
+  height: var(--control-h);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-md);
+  color: var(--fg-1);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: var(--font-size-caption);
+}
+
+.board-project-rename:focus {
+  outline: 1px dashed var(--accent);
+  outline-offset: 1px;
+}
+
+.board-link-url {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  margin: 5px 2px 7px;
+  padding-top: 4px;
+  border-top: 1px dashed var(--card-rule);
+  color: var(--paper-muted);
+  font-size: var(--font-size-caption);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.board-link-url-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.board-link-url a {
+  flex: 0 0 auto;
+  color: var(--paper-ink);
+  text-decoration: none;
+}
+
+.board-link-url a:hover {
+  text-decoration: underline;
+}
+
+.board-url-edit {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.board-inline-error {
+  color: var(--st-failed);
+  font-size: var(--font-size-caption);
+  line-height: 1.3;
+}
+
+.board-help-button {
+  font-weight: 700;
+}
+
+.board-shortcuts {
+  width: min(680px, calc(100vw - 24px));
+  max-height: min(720px, calc(100vh - 120px));
+  overflow-y: auto;
+}
+
+.board-shortcuts-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-3) 0 var(--space-4);
+}
+
+.board-shortcuts-group h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--fg-3);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.board-shortcuts-group dl {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+}
+
+.board-shortcut {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.board-shortcut dt {
+  margin: 0;
+}
+
+.board-shortcut dd {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: var(--font-size-caption);
+  line-height: 1.35;
+}
+
+.board-shortcut kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--line-control);
+  border-radius: var(--radius-xs);
+  color: var(--fg-1);
+  background: var(--surface-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+}
+
+/* A 1280 los controles del tablero no caben en una fila: la cabecera envuelve
+   sin recortar ni tapar botones (el tablero gana altura, no pierde controles). */
+@media (max-width: 1380px) {
+  .board-header {
+    height: auto;
+    min-height: var(--header-h);
+    flex-wrap: wrap;
+    padding: 6px var(--space-3);
+    row-gap: 5px;
+  }
+
+  .board-identity {
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .board-topbar-search {
+    flex: 1 1 200px;
+    max-width: 320px;
+  }
+
+  .board-topbar-actions {
+    flex: 1 0 auto;
+    justify-content: flex-end;
+  }
+}

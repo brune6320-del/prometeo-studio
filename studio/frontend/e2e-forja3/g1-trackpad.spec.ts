@@ -94,9 +94,11 @@ test.describe('G1 · trackpad acoplado', () => {
         mapa.dosDedos += 1;
       } else if (tipo === 3) {
         await page.mouse.move(vacio.x, vacio.y);
+        await page.keyboard.down('Space');
         await page.mouse.down();
         await page.mouse.move(vacio.x + 18, vacio.y + 12, { steps: 3 });
         await page.mouse.up();
+        await page.keyboard.up('Space');
         mapa.fondo += 1;
       } else if (tipo === 4) {
         const cabeza = page.locator('[data-card-id="g1-nota-a"] .board-card-head');
