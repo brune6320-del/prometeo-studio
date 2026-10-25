@@ -828,6 +828,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const addToolCard = useCallback((toolId: string, configure?: (card: BoardCard) => void, at?: { x: number; y: number }): BoardCard | null => {
     const tool = getBoardTool(toolId);
     if (!activeBoard) return null;
+    // El tablero más reciente: dos altas seguidas no deben colocar la segunda
+    // usando la lista de tarjetas anterior.
+    const boardActual = activeBoardRef.current ?? activeBoard;
     if (frameToolId) setNotice(null);
     setFrameToolId(null);
     setFrameDraft(null);
@@ -851,27 +854,49 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         derecha: screenToWorld({ x: Math.max(72, viewportSize.width - 72), y: 72 }, cameraRef.current).x,
         abajo: screenToWorld({ x: 72, y: Math.max(72, viewportSize.height - 72) }, cameraRef.current).y,
       };
-      const libre = (candidatoX: number, candidatoY: number) => !activeBoard.cards.some((item) => {
-        const altoItem = item.type === 'marco' ? readFrameData(item).alto : 200;
-        return candidatoX < item.x + item.width && candidatoX + ancho > item.x
+      const medidas = measureCardSizes();
+      const libre = (candidatoX: number, candidatoY: number) => !boardActual.cards.some((item) => {
+        const medida = medidas.get(item.id);
+        const anchoItem = medida?.width ?? item.width;
+        const altoItem = medida?.height ?? (item.type === 'marco'
+          ? readFrameData(item).alto
+          : item.type === 'columna'
+            ? 260
+            : item.height ?? 200);
+        return candidatoX < item.x + anchoItem && candidatoX + ancho > item.x
           && candidatoY < item.y + altoItem && candidatoY + alto > item.y;
       });
-      for (let intento = 0; intento < 60; intento += 1) {
-        if (libre(x, y)) break;
-        x += 40;
-        y += 40;
-        if (x > visible.derecha - ancho - 24) x = visible.izquierda + 24;
-        if (y > visible.abajo - alto - 24) y = visible.arriba + 24;
+      // Espiral desde el centro: el primer hueco visible sin tapar nada. Si el
+      // tablero está lleno, cae arriba a la izquierda, que sigue siendo visible.
+      const paso = 40;
+      let colocado = false;
+      for (let anillo = 0; anillo <= 18 && !colocado; anillo += 1) {
+        for (let ix = -anillo; ix <= anillo && !colocado; ix += 1) {
+          for (let iy = -anillo; iy <= anillo && !colocado; iy += 1) {
+            if (Math.abs(ix) !== anillo && Math.abs(iy) !== anillo) continue;
+            const candidatoX = x + ix * paso;
+            const candidatoY = y + iy * paso;
+            if (candidatoX < visible.izquierda || candidatoY < visible.arriba) continue;
+            if (candidatoX + ancho > visible.derecha || candidatoY + alto > visible.abajo) continue;
+            if (libre(candidatoX, candidatoY)) {
+              x = candidatoX;
+              y = candidatoY;
+              colocado = true;
+            }
+          }
+        }
       }
-      x = Math.max(visible.izquierda, Math.min(visible.derecha - ancho - 24, x));
-      y = Math.max(visible.arriba, Math.min(visible.abajo - alto - 24, y));
+      if (!colocado) {
+        x = visible.izquierda + 24;
+        y = visible.arriba + 24;
+      }
     }
     const card = tool.crear(x, y) as BoardCard;
     configure?.(card);
     updateBoard((board) => ({ ...board, cards: [...board.cards, card] }));
     setSelectedCardIds([card.id]);
     return card;
-  }, [activeBoard, frameToolId, updateBoard, viewportSize]);
+  }, [activeBoard, frameToolId, measureCardSizes, updateBoard, viewportSize]);
 
   const chooseTool = useCallback((toolId: string) => {
     setAddMenuOpen(false);
@@ -1234,6 +1259,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const beginViewportGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (!target.closest('input, textarea, select, [contenteditable="true"]')) {
+      viewportRef.current?.focus({ preventScroll: true });
+    }
     if (spaceHeld.current && event.button === 0) {
       beginPan(event, true);
       return;
@@ -1713,7 +1742,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const down = (event: KeyboardEvent) => {
       if (event.code !== 'Space' || event.repeat) return;
       const target = event.target;
-      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (target instanceof HTMLElement && target.closest('input, textarea, select, button, a, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [contenteditable="true"]')) return;
       event.preventDefault();
       setSpace(true);
     };
@@ -1757,6 +1786,41 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           setShortcutsOpen(false);
           return;
         }
+        if (templateDialog) {
+          event.preventDefault();
+          setTemplateDialog(false);
+          return;
+        }
+        if (nestedDialog) {
+          event.preventDefault();
+          setNestedDialog(false);
+          return;
+        }
+        if (linkDialog) {
+          event.preventDefault();
+          setLinkDialog(false);
+          return;
+        }
+        if (projectDialog) {
+          event.preventDefault();
+          setProjectDialog(false);
+          return;
+        }
+        if (pdfReferenceDialog) {
+          event.preventDefault();
+          setPdfReferenceDialog(false);
+          return;
+        }
+        if (referencesOpen) {
+          event.preventDefault();
+          setReferencesOpen(false);
+          return;
+        }
+        if (mirarOpen) {
+          event.preventDefault();
+          setMirarOpen(false);
+          return;
+        }
         if (archiveFullscreenId) {
           event.preventDefault();
           setArchiveFullscreenId(null);
@@ -1790,7 +1854,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     };
     window.addEventListener('keydown', handleAddShortcut);
     return () => window.removeEventListener('keydown', handleAddShortcut);
-  }, [addMenuOpen, archiveFullscreenId, frameToolId, shortcutsOpen]);
+  }, [addMenuOpen, archiveFullscreenId, frameToolId, shortcutsOpen, templateDialog, nestedDialog, linkDialog, projectDialog, pdfReferenceDialog, referencesOpen, mirarOpen]);
 
   useEffect(() => {
     if (!exportMenuOpen && !libraryMenuOpen) return;
@@ -2897,6 +2961,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
       <main
         ref={viewportRef}
+        tabIndex={-1}
         className={`board-viewport ${isPanning ? 'panning' : ''} ${spacePanActive ? 'space-pan' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
         onPointerDown={beginViewportGesture}
         onPointerMove={moveViewportGesture}

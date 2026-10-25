@@ -188,10 +188,6 @@ export const UrlEnSitio: React.FC<UrlEnSitioProps> = ({ value, onCommit, ariaLab
   const cerrado = useRef(false);
 
   useEffect(() => {
-    if (!editando) setBorrador(value);
-  }, [value, editando]);
-
-  useEffect(() => {
     if (editando) {
       inputRef.current?.focus();
       inputRef.current?.select();

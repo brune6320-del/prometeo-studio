@@ -5270,3 +5270,7 @@
     justify-content: flex-end;
   }
 }
+
+.board-viewport:focus {
+  outline: none;
+}
