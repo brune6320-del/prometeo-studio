@@ -22,6 +22,8 @@
 | G4 · Irene, 2.ª pasada | `4b898f5` | deuda H-4 (vídeos inactivos, flechas, contador, móvil), pliego de dos páginas, filas por año, zonas de cursor en muro, tono mono/punteado en Archivo, Muro y Mesa; `REPORTES/G4-irene.md`; 4 tests unitarios y 5 E2E nuevos |
 | G5 · Open Design | `6f64c7e` | clone y licencias verificadas, estudio de catálogos de skills/sistemas, «+ Más» navegable con búsqueda/categorías/vista previa, selector de sistema por tablero (Forja 2 + Archivo Irene); `PROCEDENCIA.md`, `REPORTES/G5-open-design.md`; 7 tests unitarios y 2 E2E |
 | G6 · Editor PDF | `4c335d6` | reintento de parche idempotente (reutiliza la operación), tabla «Comprobación / Esperado / Obtenido», checks vectoriales y raster, paneles plegables y ventana estrecha; `REPORTES/G6-pdf.md`; 3 tests unittest y 3 E2E con motor real |
+| G7 · Detalles | `01e31b5` | renombrar proyecto y URL, panel «?», plantillas dentro del proyecto, rectángulo simple y `Espacio` + pan; `REPORTES/G7-detalles.md`; 6 E2E |
+| G8 · Caza de errores | `f15261f` | caza guiada + soak de 15 min; `Esc` en diálogos, colocación libre de herramientas, cabecera a 1280 y plantillas resueltas; `REPORTES/G8-caza.md` |
 
 ## 2. Comprobaciones del último cierre (G8)
 
@@ -38,7 +40,7 @@ Ejecutadas dentro de `studio/frontend`:
 | `unittest tests.studio.test_g6_pdf` | 3 tests, 3 pasan con `case_a` y `case_b_scan` |
 | Soak G8 | 903 s, 691 ciclos, 15 recargas, 0 errores, peor FPS 57 |
 
-Backend sin cambios en G4. El endpoint `GET /api/url-preview` sigue como se cerró en G3. Detalle en `REPORTES/G3-paridad.md`.
+Backend: `GET /api/url-preview` como en G3; en G6 se cambió la reutilización de operaciones preparadas y la forma de los `checks` del verificador. Detalle en `REPORTES/G3-paridad.md` y `REPORTES/G6-pdf.md`.
 
 Capturas en `REPORTES/capturas-forja3/`: todas las de G0–G7 más `g8-despues.png`. El cierre completo y la tabla Milanote están en `REPORTES/FORJA3.md`.
 
@@ -49,6 +51,10 @@ Capturas en `REPORTES/capturas-forja3/`: todas las de G0–G7 más `g8-despues.p
 - **G3:** conector con tirador y ancla lateral, etiqueta con doble clic y curva que se recalcula al mover; ⇧ + rectángulo selecciona 3 tarjetas y muestra la barra de alineación; Alt+arrastrar deja 1 original + 1 copia; una nota suelta entra en una columna, la columna se pliega y conserva su hijo; tareas marcan, añaden y guardan; URL con vista previa pinta título, descripción e imagen; tablero anidado se crea y se abre; plantilla «Proyecto» crea 3 columnas; tarjeta bloqueada no se mueve ni se borra hasta desbloquear; nota con título, negrita, lista, cita y código se pinta al abrir y ofrece barra de formato.
 - **G3 URL preview:** el bloqueo SSRF resuelve el host y revalida la URL final tras redirección. No fija la IP durante la conexión: queda como **H1** declarado, no como garantía SPEC.
 - **G4:** cerrada la deuda H-4. El vídeo de la diapositiva inactiva se pausa; `←`/`→` mueven el bloque activo; contador `1 / 3`; móvil en una columna con barra fija. Pliego de dos páginas al doble clic en un proyecto. Mesa con modo «Por año» y `More →`. Muro con zonas de cursor y tono blanco/punteado. Capturas y detalles en `REPORTES/G4-irene.md`.
+- **G5:** «+ Más» con búsqueda, cinco categorías, vista previa y alta; 10 herramientas del registro. Sistema por tablero Forja 2 / Archivo Irene, aplicado en la raíz para alcanzar portales y persistido tras recargar. `PROCEDENCIA.md` declara que no se copió código.
+- **G6:** reintentar un parche raster o vectorial reutiliza la operación y actualiza el texto; la verificación muestra comprobación/esperado/obtenido; 760 y 520 px no desbordan y los paneles pliegan. Verificado con `case_a.pdf` y `case_b_scan.pdf`.
+- **G7:** doble clic renombra proyecto y edita URL (con validación); panel `?`; plantillas migradas al proyecto; selección simple y pan con `Espacio`. 6 E2E.
+- **G8:** caza guiada 14,6 s y soak de 903 s / 691 ciclos / 15 recargas / 0 errores de consola / peor FPS 57. `Esc` cierra diálogos y las altas buscan hueco libre.
 
 ## 4. Deuda acumulada
 
@@ -57,10 +63,10 @@ Capturas en `REPORTES/capturas-forja3/`: todas las de G0–G7 más `g8-despues.p
 - **Solo Bruno:** WKWebView empaquetado, 120 Hz reales y trackpad/dedos físicos.
 - **G5 · biblioteca:** el test de G3 que abría «Tablero anidado» se adaptó al nuevo flujo (elegir + «Añadir al tablero»); no cambió la app para complacer al test.
 - **G5 · sistemas:** el sistema Irene cambia tokens, no la geometría interna de cada herramienta. No se copió código de los repos estudiados; ver `PROCEDENCIA.md`.
-- **G3 · rectángulo:** exige `⇧` para no quitarle el pan al fondo (G1). Si se quiere arrastre simple, mover el pan a Espacio+arrastrar (fila 15 de G0, G7).
+- **Rectángulo y pan (G7):** arrastrar el fondo selecciona; `Espacio` + arrastrar mueve el lienzo; dos dedos siguen moviendo. `⇧` añade al rectángulo.
 - **G3 · columnas:** no se redimensionan a mano; el orden es por altura, no manual.
 - **G3 · conectores:** no hay selector visual de color/grosor; el modelo ya guarda `tone`.
-- **G3 · plantillas:** las guardadas viven en `localStorage`, no viajan con el proyecto.
+- **Plantillas (G7):** las guardadas viven en el proyecto (IndexedDB); las antiguas de `localStorage` se migran al abrir y la clave global se borra.
 - **Trackpad físico:** Playwright simula rueda y puntero; falta la prueba de Bruno en la app de escritorio (WKWebView) con dedos reales.
 - **120 Hz:** no medido en WKWebView empaquetado; no hay opción documentada que aplicar.
 - **Medios:** data URL dentro del tablero (límite 12 MB); sin miniaturas.
