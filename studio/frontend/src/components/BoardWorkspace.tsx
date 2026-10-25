@@ -11,6 +11,7 @@ import {
   LayoutTemplate,
   Library,
   Link2,
+  List,
   Lock,
   LockOpen,
   Pencil,
@@ -44,6 +45,7 @@ import {
 } from '../board/model';
 import { geometriaConector, rectDeTarjeta } from '../board/conectores';
 import { vecinoGeometrico, type Direccion } from '../board/navegacion';
+import { coincideBusqueda, ordenDePintado, ventanaVirtual, INDICE_ROW_HEIGHT } from '../board/indice';
 import { readColumnData, setColumnFolded, columnChildIds } from '../board/columnas';
 import { normalizarVistaPrevia } from '../board/vistaPrevia';
 import { borrarPlantillasLegacy, crearPlantilla, leerPlantillasLegacy, listarPlantillas, materializar, type Plantilla } from '../board/plantillas';
@@ -272,6 +274,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   /** El listener se registra una vez; cada render actualiza el despachador con el estado vigente. */
   const ejecutarAtajoRef = useRef<(atajo: AtajoLienzo, event: KeyboardEvent) => void>(() => {});
   const [search, setSearch] = useState('');
+  const [searchScope, setSearchScope] = useState<'tablero' | 'proyecto' | 'biblioteca'>('tablero');
+  const [searchActivo, setSearchActivo] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [indexOpen, setIndexOpen] = useState(false);
+  const [indexQuery, setIndexQuery] = useState('');
+  const [indexScroll, setIndexScroll] = useState(0);
+  const indexSearchRef = useRef<HTMLInputElement>(null);
+  const pendingCentro = useRef<{ boardId: string; cardId: string } | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [libraryMenuOpen, setLibraryMenuOpen] = useState(false);
@@ -3076,6 +3086,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   /** Esc cierra primero lo que esté abierto; si no hay nada, deselecciona. */
   const cerrarAlgo = (event: KeyboardEvent): boolean => {
+    if (indexOpen) {
+      event.preventDefault();
+      cerrarIndice(true);
+      return true;
+    }
     if (shortcutsOpen) {
       event.preventDefault();
       setShortcutsOpen(false);
@@ -3185,6 +3200,18 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       if (archiveFullscreenId) return;
       event.preventDefault();
       setAddMenuOpen((open) => !open);
+      return;
+    }
+    if (atajo.accion === 'buscar') {
+      event.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+      return;
+    }
+    if (atajo.accion === 'indice') {
+      event.preventDefault();
+      if (indexOpen) cerrarIndice(true);
+      else abrirIndice();
       return;
     }
     if (atajo.accion === 'deshacer') {
@@ -3380,6 +3407,112 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     return new Set((activeBoard?.cards ?? []).filter((card) => !query || `${card.title} ${card.body} ${card.url ?? ''}`.toLocaleLowerCase().includes(query)).map((card) => card.id));
   }, [activeBoard?.cards, search]);
 
+  const resultadosBusqueda = useMemo(() => {
+    const query = search.trim();
+    if (!query) return [] as Array<{ boardId: string; boardTitle: string; card: BoardCard }>;
+    const fuentes = searchScope === 'tablero'
+      ? (activeBoard ? [activeBoard] : [])
+      : projectBoards.length ? projectBoards : activeBoard ? [activeBoard] : [];
+    const vistos = new Set<string>();
+    const resultados: Array<{ boardId: string; boardTitle: string; card: BoardCard }> = [];
+    for (const board of fuentes) {
+      for (const card of board.cards) {
+        if (searchScope === 'biblioteca' && !(card.type === 'referente' || board.title.toLocaleLowerCase().includes('biblioteca'))) continue;
+        if (!coincideBusqueda(card, query)) continue;
+        const clave = `${board.id}:${card.id}`;
+        if (vistos.has(clave)) continue;
+        vistos.add(clave);
+        resultados.push({ boardId: board.id, boardTitle: board.title, card });
+        if (resultados.length >= 200) return resultados;
+      }
+    }
+    return resultados;
+  }, [activeBoard, projectBoards, search, searchScope]);
+
+  useEffect(() => {
+    setSearchActivo(0);
+  }, [search, searchScope]);
+
+  const indiceOrdenado = useMemo(() => ordenDePintado(activeBoard?.cards ?? []), [activeBoard?.cards]);
+  const indiceFiltrado = useMemo(
+    () => indiceOrdenado.filter((card) => coincideBusqueda(card, indexQuery)),
+    [indiceOrdenado, indexQuery],
+  );
+  const ventanaIndice = ventanaVirtual(indiceFiltrado.length, indexScroll, 420, INDICE_ROW_HEIGHT);
+  const indiceVisibles = indiceFiltrado.slice(ventanaIndice.inicio, ventanaIndice.fin);
+
+  useEffect(() => {
+    if (!indexOpen) return;
+    const frame = requestAnimationFrame(() => indexSearchRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
+  }, [indexOpen]);
+
+  const cerrarIndice = useCallback((devolverFoco = true) => {
+    setIndexOpen(false);
+    setIndexQuery('');
+    setIndexScroll(0);
+    if (devolverFoco) viewportRef.current?.focus({ preventScroll: true });
+  }, []);
+
+  const abrirIndice = useCallback(() => {
+    setIndexOpen(true);
+    setIndexQuery('');
+    setIndexScroll(0);
+  }, []);
+
+  /** ⌘F · Enter lleva al resultado: cambia de tablero si hace falta, selecciona y centra. */
+  const centrarEnTarjeta = useCallback((boardId: string, cardId: string) => {
+    const board = boardsRef.current.find((item) => item.id === boardId);
+    if (!board) return;
+    if (activeBoard?.id !== boardId) {
+      pendingCentro.current = { boardId, cardId };
+      setActiveBoardId(boardId);
+      setSelectedCardIds([]);
+      setSearch('');
+      return;
+    }
+    const card = board.cards.find((item) => item.id === cardId);
+    if (!card) return;
+    const contenedor = board.cards.find((item) => {
+      if (item.type !== 'marco') return false;
+      const data = readFrameData(item);
+      return data.vista !== 'libre' && data.hijos.includes(card.id);
+    });
+    const objetivo = contenedor ?? card;
+    const medida = measureCardSizes().get(objetivo.id);
+    const ancho = medida?.width ?? objetivo.width;
+    const alto = medida?.height ?? objetivo.height ?? (objetivo.type === 'marco' ? readFrameData(objetivo).alto : 210);
+    const zoom = Math.max(0.55, Math.min(1.4, cameraRef.current.zoom));
+    cameraRef.current = {
+      zoom,
+      pan: {
+        x: viewportSize.width / 2 - (objetivo.x + ancho / 2) * zoom,
+        y: viewportSize.height / 2 - (objetivo.y + alto / 2) * zoom,
+      },
+    };
+    setSelectedCardIds([objetivo.id]);
+    setSearch('');
+    aplicarCamara();
+    sincronizarCamara();
+    viewportRef.current?.focus({ preventScroll: true });
+  }, [activeBoard?.id, aplicarCamara, measureCardSizes, sincronizarCamara, viewportSize.height, viewportSize.width]);
+
+  useEffect(() => {
+    const pendiente = pendingCentro.current;
+    if (!pendiente || !activeBoard || activeBoard.id !== pendiente.boardId) return;
+    pendingCentro.current = null;
+    const timer = window.setTimeout(() => centrarEnTarjeta(pendiente.boardId, pendiente.cardId), 80);
+    return () => window.clearTimeout(timer);
+  }, [activeBoard, centrarEnTarjeta]);
+
+  const seleccionarDesdeIndice = (card: BoardCard, event: React.MouseEvent) => {
+    if (event.shiftKey || event.metaKey || event.ctrlKey) {
+      setSelectedCardIds((current) => alternarEnSeleccion(current, card.id));
+    } else {
+      setSelectedCardIds([card.id]);
+    }
+  };
+
   if (!loaded) {
     return <div className="board-loading" role="status">Abriendo tu tablero…</div>;
   }
@@ -3489,8 +3622,72 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
         <div className="board-topbar-search">
           <Search size={14} aria-hidden="true" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el tablero" aria-label="Buscar tarjetas" />
+          <input
+            ref={searchInputRef}
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                setSearchActivo((actual) => Math.min(Math.max(0, resultadosBusqueda.length - 1), actual + 1));
+              } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                setSearchActivo((actual) => Math.max(0, actual - 1));
+              } else if (event.key === 'Enter') {
+                const resultado = resultadosBusqueda[searchActivo] ?? resultadosBusqueda[0];
+                if (resultado) {
+                  event.preventDefault();
+                  centrarEnTarjeta(resultado.boardId, resultado.card.id);
+                }
+              } else if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                setSearch('');
+                viewportRef.current?.focus({ preventScroll: true });
+              }
+            }}
+            placeholder="Buscar en el tablero"
+            aria-label="Buscar tarjetas"
+            aria-expanded={Boolean(search.trim())}
+          />
           {search && <button type="button" onClick={() => setSearch('')} aria-label="Limpiar búsqueda"><X size={13} /></button>}
+          {search.trim() && (
+            <div className="board-search-results" role="listbox" aria-label="Resultados de búsqueda">
+              <div className="board-search-results-head">
+                <strong aria-live="polite" data-testid="search-count">{resultadosBusqueda.length} {resultadosBusqueda.length === 1 ? 'resultado' : 'resultados'}</strong>
+                <label>
+                  Alcance
+                  <select value={searchScope} onChange={(event) => setSearchScope(event.target.value as 'tablero' | 'proyecto' | 'biblioteca')} aria-label="Alcance de búsqueda">
+                    <option value="tablero">Tablero</option>
+                    <option value="proyecto">Proyecto</option>
+                    <option value="biblioteca">Biblioteca</option>
+                  </select>
+                </label>
+              </div>
+              {resultadosBusqueda.length === 0 ? (
+                <p className="board-search-empty">Nada coincide. Prueba otro término o alcance.</p>
+              ) : (
+                <ul>
+                  {resultadosBusqueda.slice(0, 40).map((resultado, indice) => (
+                    <li key={`${resultado.boardId}:${resultado.card.id}`}>
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={indice === searchActivo}
+                        className={indice === searchActivo ? 'is-active' : ''}
+                        onMouseEnter={() => setSearchActivo(indice)}
+                        onClick={() => centrarEnTarjeta(resultado.boardId, resultado.card.id)}
+                      >
+                        <span className="board-search-result-title">{resultado.card.title || 'Sin título'}</span>
+                        <span className="board-search-result-meta">{resultado.card.type} · {resultado.boardTitle}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="board-search-hint">Enter salta al primero · ↑↓ recorre · Esc vuelve al lienzo</p>
+            </div>
+          )}
         </div>
 
         <div className="board-topbar-actions">
@@ -3554,6 +3751,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           <button
             type="button"
             className="board-icon-button"
+            onClick={() => (indexOpen ? cerrarIndice(true) : abrirIndice())}
+            aria-label="Índice del tablero"
+            title="Índice del tablero (L)"
+          ><List size={16} /></button>
+          <button
+            type="button"
+            className="board-icon-button"
             onClick={() => void abrirArchivo()}
             aria-label="Archivo y recientes borrados"
             title="Archivo · recientes borrados (30 días)"
@@ -3602,6 +3806,70 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
               <div className="board-reference-actions"><button className="board-tool" onClick={() => handleOpenPdfReference(reference)}>Abrir página</button><button className="board-tool danger" onClick={() => void handleDeletePdfReference(reference)}>Eliminar</button></div>
             </article>
           ))}
+        </aside>
+      )}
+
+      {indexOpen && activeBoard && (
+        <aside className="board-index-panel" aria-label="Índice del tablero">
+          <div className="board-index-head">
+            <div>
+              <strong>Índice</strong>
+              <span>{indiceFiltrado.length} de {activeBoard.cards.length} · arriba se pinta encima</span>
+            </div>
+            <button type="button" className="board-icon-button" onClick={() => cerrarIndice(true)} aria-label="Cerrar índice"><X size={15} /></button>
+          </div>
+          <input
+            ref={indexSearchRef}
+            className="board-index-search"
+            value={indexQuery}
+            onChange={(event) => { setIndexQuery(event.target.value); setIndexScroll(0); }}
+            placeholder="Buscar en el índice"
+            aria-label="Buscar en el índice"
+          />
+          <div className="board-index-tools">
+            <span aria-live="polite">{selectedCardIds.length} {selectedCardIds.length === 1 ? 'seleccionada' : 'seleccionadas'}</span>
+            <button type="button" className="board-tool" onClick={() => ordenarSeleccion('frente')} disabled={!selectedCardIds.length}>Traer al frente</button>
+          </div>
+          <div
+            className="board-index-list"
+            style={{ height: 420 }}
+            onScroll={(event) => setIndexScroll(event.currentTarget.scrollTop)}
+            role="listbox"
+            aria-label="Tarjetas en orden de pintado"
+            aria-multiselectable="true"
+          >
+            <div style={{ paddingTop: ventanaIndice.offsetSuperior, paddingBottom: ventanaIndice.offsetInferior }}>
+              {indiceVisibles.map((card) => (
+                <div
+                  key={card.id}
+                  className={`board-index-row ${selectedCardIds.includes(card.id) ? 'selected' : ''}`}
+                  style={{ height: INDICE_ROW_HEIGHT }}
+                  role="option"
+                  aria-selected={selectedCardIds.includes(card.id)}
+                  tabIndex={0}
+                  onClick={(event) => seleccionarDesdeIndice(card, event)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      seleccionarDesdeIndice(card, event as unknown as React.MouseEvent);
+                    }
+                  }}
+                >
+                  <span className="board-index-title">{card.title || 'Sin título'}</span>
+                  <span className="board-index-meta">{card.type}{card.locked ? ' · bloqueada' : ''}</span>
+                  <button
+                    type="button"
+                    className="board-index-lock"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={(event) => { event.stopPropagation(); updateCard(card.id, { locked: !card.locked }); }}
+                    aria-label={card.locked ? `Desbloquear ${card.title || 'tarjeta'}` : `Bloquear ${card.title || 'tarjeta'}`}
+                  >{card.locked ? <Lock size={13} /> : <LockOpen size={13} />}</button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="board-index-foot">El índice es una lista, no un panel de capas: se abre con L y Esc vuelve al lienzo.</p>
         </aside>
       )}
 

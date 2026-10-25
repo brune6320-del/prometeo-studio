@@ -33,7 +33,9 @@ export type AccionLienzo =
   | 'herramientas'
   | 'pan'
   | 'agrupar'
-  | 'desagrupar';
+  | 'desagrupar'
+  | 'buscar'
+  | 'indice';
 
 export type GrupoAyuda = 'Selección' | 'Edición' | 'Mover' | 'Orden' | 'Lienzo' | 'Vistas' | 'Herramientas';
 
@@ -189,6 +191,8 @@ export const ATAJOS_LIENZO: AtajoLienzo[] = [
   // Herramientas
   { id: 'herramientas', tipo: 'tecla', tecla: 'n', modificadores: {}, accion: 'herramientas', descripcion: 'Abrir la biblioteca de herramientas', grupo: 'Herramientas' },
   { id: 'ayuda', tipo: 'tecla', tecla: '?', modificadores: {}, accion: 'ayuda', descripcion: 'Abrir o cerrar este panel', grupo: 'Herramientas' },
+  { id: 'buscar', tipo: 'tecla', tecla: 'f', modificadores: { primario: true }, accion: 'buscar', descripcion: 'Buscar en el tablero, el proyecto o la biblioteca', grupo: 'Selección' },
+  { id: 'indice', tipo: 'tecla', tecla: 'l', modificadores: {}, accion: 'indice', descripcion: 'Abrir el índice de objetos en orden de pintado', grupo: 'Selección' },
 ];
 
 export interface GrupoDeAyuda {
