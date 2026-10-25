@@ -10,6 +10,7 @@
     "test:l1-app": "playwright test -c playwright.l1.config.ts",
     "test:l2-app": "playwright test -c playwright.l2.config.ts",
     "test:e2e": "playwright test",
+    "test:t2-produccion": "playwright test -c playwright.t2.config.ts",
     "entropia": "node scripts/entropia.mjs",
     "test:entropia": "node scripts/entropia-determinismo.mjs",
     "lint": "oxlint",

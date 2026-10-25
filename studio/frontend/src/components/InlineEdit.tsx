@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { isSafeExternalUrl } from '../board/model';
 
 interface TituloEnSitioProps {
@@ -13,19 +13,15 @@ interface TituloEnSitioProps {
 export const TituloEnSitio: React.FC<TituloEnSitioProps> = ({ value, onCommit, ariaLabel, className = '', placeholder = 'Sin título' }) => {
   const [editando, setEditando] = useState(false);
   const [borrador, setBorrador] = useState(value);
-  const inputRef = useRef<HTMLInputElement>(null);
   const cerrado = useRef(false);
 
-  useEffect(() => {
-    if (!editando) setBorrador(value);
-  }, [value, editando]);
-
-  useEffect(() => {
-    if (editando) {
-      inputRef.current?.focus();
-      inputRef.current?.select();
-    }
-  }, [editando]);
+  // Sin efectos por tarjeta: en un tablero de 500 piezas, montar y desmontar
+  // dos efectos por título se nota al borrar. El foco se resuelve en el ref.
+  const enfocar = useCallback((input: HTMLInputElement | null) => {
+    if (!input) return;
+    input.focus();
+    input.select();
+  }, []);
 
   const guardar = () => {
     if (cerrado.current) return;
@@ -44,7 +40,7 @@ export const TituloEnSitio: React.FC<TituloEnSitioProps> = ({ value, onCommit, a
   if (editando) {
     return (
       <input
-        ref={inputRef}
+        ref={enfocar}
         className={`board-inline-input ${className}`}
         value={borrador}
         maxLength={200}

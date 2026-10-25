@@ -21,6 +21,8 @@ export interface BoardCardItemProps {
   connectionTarget?: boolean;
   connectMode: boolean;
   colors: Array<BoardCard['color']>;
+  /** Por debajo del 35 % solo queda el título: menos DOM para mover y borrar cientos. */
+  compact?: boolean;
   onSelect: (card: BoardCard, modifiers: Modificadores) => void;
   onConnect: (cardId: string) => void;
   onConnectStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
@@ -44,6 +46,7 @@ export const BoardCardItem = React.memo(function BoardCardItem({
   connectionTarget = false,
   connectMode,
   colors,
+  compact = false,
   onSelect,
   onConnect,
   onConnectStart,
@@ -61,6 +64,33 @@ export const BoardCardItem = React.memo(function BoardCardItem({
     if (card.locked) return;
     onDragStart(card, event);
   };
+  if (compact) {
+    return (
+      <article
+        data-card-id={card.id}
+        data-card-type={card.type}
+        data-locked={card.locked ? 'si' : 'no'}
+        tabIndex={0}
+        aria-label={`Tarjeta: ${card.title || 'sin título'}`}
+        className={`board-card board-card-compact color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${card.locked ? 'is-locked' : ''}`}
+        style={{ left: card.x, top: card.y, width: card.width }}
+        onPointerDown={iniciarArrastre}
+        onPointerMove={onDragMove}
+        onPointerUp={onDragEnd}
+        onPointerCancel={onDragEnd}
+        onClick={(event) => onSelect(card, event)}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onSelect(card, event);
+          }
+        }}
+      >
+        <span className="board-card-title">{card.title || 'Sin título'}</span>
+      </article>
+    );
+  }
   return (
     <article
       data-card-id={card.id}

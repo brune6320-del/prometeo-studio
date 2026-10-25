@@ -493,6 +493,7 @@
   position: absolute;
   z-index: 2;
   inset: 0;
+  contain: layout style paint;
   transform-origin: 0 0;
   pointer-events: none;
   will-change: transform;
@@ -526,11 +527,32 @@
   color: var(--board-ink);
   background: var(--card-paper);
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.12);
+  /* Aísla el cálculo de estilo de cada pieza: borrar cientos no recalcula el lienzo entero. */
+  contain: layout style;
   pointer-events: auto;
   user-select: text;
   transform: translate3d(0, calc(-1 * var(--card-lift, 0px)), 0) rotate(var(--card-tilt, 0deg));
   transform-origin: 55% 60%;
   transition: box-shadow 120ms var(--ease-standard), opacity 120ms var(--ease-standard), transform 120ms var(--ease-standard);
+}
+
+/* LOD mínimo: una pieza ligera, sin capa GPU ni sombra por tarjeta. */
+.board-card-compact {
+  min-height: 0;
+  padding: 4px 6px;
+  border-top-width: 1px;
+  overflow: hidden;
+  transform: none;
+  box-shadow: none;
+  transition: none;
+  contain: layout style paint;
+}
+
+.board-card-compact .board-card-title {
+  font-size: var(--font-size-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .board-frame {
@@ -544,6 +566,7 @@
   border-radius: var(--radius-xl);
   background: rgba(255, 138, 82, 0.055);
   color: var(--text-1, var(--fg-1));
+  contain: layout style;
   pointer-events: auto;
   transition: opacity 110ms ease, background 110ms ease;
 }
@@ -3102,6 +3125,42 @@
   box-shadow: var(--shadow-2);
 }
 
+/* Deshacer de un borrado: abajo, cerca de la selección y del pulgar. */
+.board-undo-toast {
+  top: auto;
+  bottom: calc(var(--space-6) + 48px);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+}
+
+.board-undo-toast > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-undo-toast .board-undo-action {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  color: var(--accent-text);
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.board-undo-toast .board-undo-action:hover {
+  color: var(--accent-hover, var(--accent-text));
+}
+
 
 /* ── G2 · imagen y vídeo como objetos libres ───────────────────────────── */
 .board-free-media {
@@ -3110,6 +3169,7 @@
   border-radius: var(--radius-sm);
   background: transparent;
   box-shadow: var(--shadow-1);
+  contain: layout style;
   pointer-events: auto;
   transform: translate3d(0, calc(-1 * var(--card-lift, 0px)), 0) rotate(var(--card-tilt, 0deg));
   transform-origin: 55% 60%;

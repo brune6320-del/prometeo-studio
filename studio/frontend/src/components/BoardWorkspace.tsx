@@ -49,16 +49,36 @@ import { imanDeCaja, inclinacionPorVelocidad, type GuiasIman } from '../board/im
 import { esMediaLibre, medirMedio } from '../board/medio';
 import {
   cardsInsideFrame,
-  detachCardFromFrames,
   FRAME_MIN_SIZE,
   readFrameData,
   rectFromPoints,
-  removeFrameKeepingChildren,
   setFrameView,
   type FrameRect,
   type FrameView,
 } from '../board/frames';
 import { emptyBoardHistory, recordBoardChange, redoBoardChange, undoBoardChange, type BoardHistory } from '../board/history';
+import {
+  atajoParaEvento,
+  esObjetivoDeTexto,
+  gruposDeAyuda,
+  textoAtajo,
+  type AtajoLienzo,
+} from '../board/atajos';
+import {
+  borrarTarjetas,
+  claveDeRafaga,
+  duplicarSeleccion,
+  moverTarjetas,
+  reordenarTarjetas,
+  seleccionarTodoElTablero,
+  tarjetasAMover,
+} from '../board/seleccion';
+import {
+  copiarTarjetas,
+  esMarcaDeTarjetas,
+  hayTarjetasCopiadas,
+  pegarTarjetas,
+} from '../board/portapapeles';
 import { agregarImagenDesdeUrl, importarBiblioteca } from '../board/referentes/biblioteca';
 import { construirZipObsidian, notasObsidian } from '../board/referentes/historial';
 import { aceptarLectura } from '../board/referentes/mirar';
@@ -125,31 +145,6 @@ interface BoardWorkspaceProps {
 const GRID_SIZE = 24;
 const COLORS: Array<BoardCard['color']> = ['paper', 'sand', 'sage', 'rose'];
 const RAIL_TOOLS = ['note', 'link', 'media', 'tareas', 'columna', 'referente', 'marco', 'entropia'];
-
-const ATAJOS: Array<{ grupo: string; items: Array<[string, string]> }> = [
-  { grupo: 'Lienzo', items: [
-    ['Arrastrar el fondo', 'Seleccionar tarjetas con un rectángulo'],
-    ['⇧ + arrastrar el fondo', 'Añadir al rectángulo sin perder la selección'],
-    ['Espacio + arrastrar', 'Mover el lienzo'],
-    ['Rueda o dos dedos', 'Mover el lienzo'],
-    ['⌘/Ctrl + rueda', 'Acercar y alejar'],
-  ] },
-  { grupo: 'Tarjetas', items: [
-    ['N', 'Abrir la biblioteca de herramientas'],
-    ['Doble clic en el título', 'Renombrar una tarjeta o un marco'],
-    ['Doble clic en la URL', 'Editar la dirección de un enlace'],
-    ['Alt/Opción + arrastrar', 'Duplicar una tarjeta'],
-    ['⇧ + clic', 'Añadir o quitar de la selección'],
-    ['⌘/Ctrl + Z', 'Deshacer'],
-    ['⌘/Ctrl + ⇧ + Z', 'Rehacer'],
-  ] },
-  { grupo: 'Vistas', items: [
-    ['Doble clic en un proyecto', 'Abrir el pliego de dos páginas'],
-    ['← →', 'Cambiar diapositiva en Archivo o Muro'],
-    ['Esc', 'Cerrar el pliego, la caja de luz o cancelar'],
-    ['?', 'Abrir o cerrar este panel'],
-  ] },
-];
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -254,6 +249,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [templateDialog, setTemplateDialog] = useState(false);
   const [templates, setTemplates] = useState<Plantilla[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Aviso de borrado con deshacer: la red de seguridad es el historial, no un diálogo. */
+  const [aviso, setAviso] = useState<{ texto: string; deshacer?: () => void; historial?: boolean } | null>(null);
+  const avisoTimer = useRef<number | null>(null);
+  /** El listener se registra una vez; cada render actualiza el despachador con el estado vigente. */
+  const ejecutarAtajoRef = useRef<(atajo: AtajoLienzo, event: KeyboardEvent) => void>(() => {});
   const [search, setSearch] = useState('');
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -1735,6 +1735,19 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }));
   };
 
+  const mostrarAviso = useCallback((texto: string, deshacer?: () => void, historial = false) => {
+    if (avisoTimer.current) window.clearTimeout(avisoTimer.current);
+    setAviso({ texto, deshacer, historial });
+    avisoTimer.current = window.setTimeout(() => {
+      avisoTimer.current = null;
+      setAviso(null);
+    }, 5000);
+  }, []);
+
+  useEffect(() => () => {
+    if (avisoTimer.current) window.clearTimeout(avisoTimer.current);
+  }, []);
+
   const undo = useCallback(() => {
     if (!activeBoard) return;
     const history = boardHistories[activeBoard.id] ?? emptyBoardHistory();
@@ -1743,6 +1756,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setBoardHistories((current) => ({ ...current, [activeBoard.id]: result.history }));
     setBoards((current) => current.map((board) => board.id === activeBoard.id ? result.board! : board));
     setSelectedCardIds((current) => current.filter((id) => result.board!.cards.some((card) => card.id === id)));
+    setAviso((current) => current?.historial ? null : current);
     enqueueBoardSave(result.board!);
   }, [activeBoard, boardHistories]);
 
@@ -1754,25 +1768,29 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setBoardHistories((current) => ({ ...current, [activeBoard.id]: result.history }));
     setBoards((current) => current.map((board) => board.id === activeBoard.id ? result.board! : board));
     setSelectedCardIds((current) => current.filter((id) => result.board!.cards.some((card) => card.id === id)));
+    setAviso((current) => current?.historial ? null : current);
     enqueueBoardSave(result.board!);
   }, [activeBoard, boardHistories]);
 
-  // Espacio + arrastrar mueve el lienzo; el arrastre simple queda para el rectángulo.
+  // Un solo listener de teclado para todo el lienzo. La tabla de atajos decide
+  // qué hacer; aquí solo se filtran el foco y la repetición.
   useEffect(() => {
     const setSpace = (held: boolean) => {
       spaceHeld.current = held;
       setSpacePanActive(held);
     };
     const down = (event: KeyboardEvent) => {
-      if (event.code !== 'Space' || event.repeat) return;
-      const target = event.target;
-      if (target instanceof HTMLElement && target.closest('input, textarea, select, button, a, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [contenteditable="true"]')) return;
-      event.preventDefault();
-      setSpace(true);
+      if (locked) return;
+      const atajo = atajoParaEvento(event);
+      if (!atajo) return;
+      if (event.repeat && !atajo.repetible) return;
+      // Esc sigue cerrando diálogos aunque el foco esté en un campo; el resto no.
+      if (atajo.accion !== 'cerrar' && esObjetivoDeTexto(event.target)) return;
+      ejecutarAtajoRef.current(atajo, event);
     };
     const up = (event: KeyboardEvent) => {
       if (event.code !== 'Space') return;
-      event.preventDefault();
+      if (spaceHeld.current) event.preventDefault();
       setSpace(false);
     };
     const blur = () => setSpace(false);
@@ -1784,101 +1802,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
     };
-  }, []);
-
-  useEffect(() => {
-    const handleHistoryShortcut = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLocaleLowerCase() !== 'z') return;
-      const target = event.target;
-      if (target instanceof HTMLElement && target.closest('input, textarea, [contenteditable="true"]')) return;
-      event.preventDefault();
-      if (event.shiftKey) redo();
-      else undo();
-    };
-    window.addEventListener('keydown', handleHistoryShortcut);
-    return () => window.removeEventListener('keydown', handleHistoryShortcut);
-  }, [redo, undo]);
-
-  useEffect(() => {
-    const handleAddShortcut = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
-      const target = event.target;
-      const typing = target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
-      if (event.key === 'Escape') {
-        if (shortcutsOpen) {
-          event.preventDefault();
-          setShortcutsOpen(false);
-          return;
-        }
-        if (templateDialog) {
-          event.preventDefault();
-          setTemplateDialog(false);
-          return;
-        }
-        if (nestedDialog) {
-          event.preventDefault();
-          setNestedDialog(false);
-          return;
-        }
-        if (linkDialog) {
-          event.preventDefault();
-          setLinkDialog(false);
-          return;
-        }
-        if (projectDialog) {
-          event.preventDefault();
-          setProjectDialog(false);
-          return;
-        }
-        if (pdfReferenceDialog) {
-          event.preventDefault();
-          setPdfReferenceDialog(false);
-          return;
-        }
-        if (referencesOpen) {
-          event.preventDefault();
-          setReferencesOpen(false);
-          return;
-        }
-        if (mirarOpen) {
-          event.preventDefault();
-          setMirarOpen(false);
-          return;
-        }
-        if (archiveFullscreenId) {
-          event.preventDefault();
-          setArchiveFullscreenId(null);
-          return;
-        }
-        if (frameToolId) {
-          event.preventDefault();
-          frameDraw.current = null;
-          setFrameDraft(null);
-          setFrameToolId(null);
-          setNotice(null);
-          return;
-        }
-        if (addMenuOpen) {
-          event.preventDefault();
-          setAddMenuOpen(false);
-        }
-        return;
-      }
-      if (shortcutsOpen) return;
-      if (typing) return;
-      if (event.key === '?' || (event.shiftKey && event.key === '/')) {
-        event.preventDefault();
-        setShortcutsOpen(true);
-        return;
-      }
-      if (event.key.toLocaleLowerCase() !== 'n') return;
-      if (archiveFullscreenId) return;
-      event.preventDefault();
-      setAddMenuOpen((open) => !open);
-    };
-    window.addEventListener('keydown', handleAddShortcut);
-    return () => window.removeEventListener('keydown', handleAddShortcut);
-  }, [addMenuOpen, archiveFullscreenId, frameToolId, shortcutsOpen, templateDialog, nestedDialog, linkDialog, projectDialog, pdfReferenceDialog, referencesOpen, mirarOpen]);
+  }, [locked]);
 
   useEffect(() => {
     if (!exportMenuOpen && !libraryMenuOpen) return;
@@ -1888,17 +1812,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       setExportMenuOpen(false);
       setLibraryMenuOpen(false);
     };
-    const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setExportMenuOpen(false);
-      setLibraryMenuOpen(false);
-    };
     window.addEventListener('pointerdown', cerrar);
-    window.addEventListener('keydown', escape);
-    return () => {
-      window.removeEventListener('pointerdown', cerrar);
-      window.removeEventListener('keydown', escape);
-    };
+    return () => window.removeEventListener('pointerdown', cerrar);
   }, [exportMenuOpen, libraryMenuOpen]);
 
   const handleCardSelection = (cardId: string, event: Modificadores) => {
@@ -2096,10 +2011,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const handleDeletePdfReference = async (reference: PdfReference) => {
-    if (!window.confirm('¿Eliminar la referencia a «' + reference.sourceName + '», página ' + reference.page + '?')) return;
     try {
       await deletePdfReference(reference.id);
       setProjectReferences((current) => current.filter((item) => item.id !== reference.id));
+      mostrarAviso(`Referencia a «${reference.sourceName}» eliminada`, () => {
+        setProjectReferences((current) => current.some((item) => item.id === reference.id) ? current : [reference, ...current]);
+        void savePdfReference(reference).catch((error: unknown) => {
+          setProjectError(error instanceof Error ? error.message : 'No se pudo recuperar la referencia PDF.');
+        });
+      });
     } catch (error) {
       setProjectError(error instanceof Error ? error.message : 'No se pudo eliminar la referencia PDF.');
     }
@@ -2222,22 +2142,24 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const removeCurrentBoard = async () => {
-    if (!activeBoard || !window.confirm(`¿Eliminar «${activeBoard.title}» y sus tarjetas?`)) return;
+    if (!activeBoard) return;
+    const board = activeBoard;
+    const projectId = projectIdByBoardId.get(board.id);
     if (!(await flushBoardWrites())) {
       setNotice('No se eliminó el tablero porque tiene cambios sin guardar. Reintenta o exporta una copia.');
       return;
     }
     try {
-      await removeBoardFromStore(activeBoard.id);
+      await removeBoardFromStore(board.id);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'No se pudo quitar el tablero guardado.');
       return;
     }
-    try { await removeBoardProjectLink(activeBoard.id); } catch { /* El vínculo huérfano no borra referencias ni otros tableros. */ }
-    const remaining = boards.filter((board) => board.id !== activeBoard.id);
+    try { await removeBoardProjectLink(board.id); } catch { /* El vínculo huérfano no borra referencias ni otros tableros. */ }
+    const remaining = boards.filter((item) => item.id !== board.id);
     setProjectIdByBoardId((current) => {
       const next = new Map(current);
-      next.delete(activeBoard.id);
+      next.delete(board.id);
       return next;
     });
     setSelectedCardIds([]);
@@ -2259,6 +2181,18 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         setNotice(error instanceof Error ? error.message : 'No se pudo crear un tablero de reemplazo.');
       }
     }
+    mostrarAviso(`Tablero «${board.title || 'Sin título'}» eliminado`, () => {
+      setBoards((current) => current.some((item) => item.id === board.id) ? current : [board, ...current]);
+      if (projectId) {
+        setProjectIdByBoardId((current) => new Map(current).set(board.id, projectId));
+        void assignBoardToProject(board.id, projectId).catch((error: unknown) => {
+          setProjectError(error instanceof Error ? error.message : 'No se pudo recuperar el vínculo del tablero.');
+        });
+      }
+      setActiveBoardId(board.id);
+      setSelectedCardIds([]);
+      enqueueBoardSave(board, { immediate: true });
+    });
   };
 
   /** La vista previa la resuelve el motor local; si falla, el enlace queda igual de válido. */
@@ -2620,6 +2554,277 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setNotice('Entropía: «no» recordado sin tocar el collage.');
   };
 
+  const lastArrow = useRef<{ clave: string; at: number }>({ clave: '', at: 0 });
+
+  /** Borra N tarjetas en un solo paso de historial y ofrece deshacer durante 5 s. */
+  const deleteCards = useCallback((ids: readonly string[]) => {
+    const board = activeBoardRef.current ?? activeBoard;
+    if (!board || !ids.length) return 0;
+    const seleccionadas = new Set(ids);
+    const bloqueadas = board.cards.filter((card) => seleccionadas.has(card.id) && card.locked);
+    const eliminables = board.cards
+      .filter((card) => seleccionadas.has(card.id) && !card.locked)
+      .map((card) => card.id);
+    if (!eliminables.length) {
+      setNotice('Todas las tarjetas seleccionadas están bloqueadas.');
+      return 0;
+    }
+    updateBoard((actual) => borrarTarjetas(actual, eliminables));
+    const borradas = new Set(eliminables);
+    setSelectedCardIds((current) => current.filter((id) => !borradas.has(id)));
+    const cantidad = eliminables.length;
+    const bloqueo = bloqueadas.length
+      ? ` · ${bloqueadas.length} ${bloqueadas.length === 1 ? 'bloqueada se queda' : 'bloqueadas se quedan'}`
+      : '';
+    mostrarAviso(
+      `${cantidad} ${cantidad === 1 ? 'tarjeta eliminada' : 'tarjetas eliminadas'}${bloqueo}`,
+      undefined,
+      true,
+    );
+    return cantidad;
+  }, [activeBoard, mostrarAviso, updateBoard]);
+
+  const removeCard = (id: string) => {
+    deleteCards([id]);
+  };
+
+  const deleteSelectedCards = () => {
+    deleteCards(selectedCardIds);
+  };
+
+  const copiarSeleccion = useCallback((cortar: boolean) => {
+    const board = activeBoardRef.current;
+    if (!board || !selectedCardIds.length) return;
+    const marca = copiarTarjetas(board, selectedCardIds);
+    if (!marca) return;
+    try {
+      void navigator.clipboard?.writeText(marca).catch(() => { /* el portapapeles interno sigue disponible */ });
+    } catch {
+      /* Sin permiso de portapapeles la copia interna funciona igual. */
+    }
+    if (cortar) deleteCards(selectedCardIds);
+  }, [deleteCards, selectedCardIds]);
+
+  const pegarSeleccion = useCallback(() => {
+    const board = activeBoardRef.current;
+    if (!board) return false;
+    const resultado = pegarTarjetas(board);
+    if (!resultado) return false;
+    updateBoard(() => resultado.board);
+    setSelectedCardIds(resultado.newIds);
+    return true;
+  }, [updateBoard]);
+
+  const duplicarSeleccionActual = useCallback(() => {
+    const board = activeBoardRef.current;
+    if (!board || !selectedCardIds.length) return;
+    let nuevos: string[] = [];
+    updateBoard((actual) => {
+      const duplicado = duplicarSeleccion(actual, selectedCardIds);
+      nuevos = duplicado.newIds;
+      return duplicado.board;
+    });
+    if (nuevos.length) setSelectedCardIds(nuevos);
+  }, [selectedCardIds, updateBoard]);
+
+  const moverSeleccion = useCallback((dx: number, dy: number) => {
+    const board = activeBoardRef.current;
+    if (!board || !selectedCardIds.length) return;
+    const ids = tarjetasAMover(board, selectedCardIds);
+    if (!ids.length) return;
+    const ahora = Date.now();
+    const clave = claveDeRafaga(lastArrow.current.clave, lastArrow.current.at, ahora);
+    lastArrow.current = { clave, at: ahora };
+    updateBoard((actual) => moverTarjetas(actual, ids, dx, dy), { coalesceKey: clave });
+  }, [selectedCardIds, updateBoard]);
+
+  const ordenarSeleccion = useCallback((modo: 'adelante' | 'atras' | 'frente' | 'fondo') => {
+    if (!selectedCardIds.length) return;
+    updateBoard((board) => ({ ...board, cards: reordenarTarjetas(board.cards, selectedCardIds, modo) }));
+  }, [selectedCardIds, updateBoard]);
+
+  /** Esc cierra primero lo que esté abierto; si no hay nada, deselecciona. */
+  const cerrarAlgo = (event: KeyboardEvent): boolean => {
+    if (shortcutsOpen) {
+      event.preventDefault();
+      setShortcutsOpen(false);
+      return true;
+    }
+    if (templateDialog) {
+      event.preventDefault();
+      setTemplateDialog(false);
+      return true;
+    }
+    if (nestedDialog) {
+      event.preventDefault();
+      setNestedDialog(false);
+      return true;
+    }
+    if (linkDialog) {
+      event.preventDefault();
+      setLinkDialog(false);
+      return true;
+    }
+    if (projectDialog) {
+      event.preventDefault();
+      setProjectDialog(false);
+      return true;
+    }
+    if (pdfReferenceDialog) {
+      event.preventDefault();
+      setPdfReferenceDialog(false);
+      return true;
+    }
+    if (referencesOpen) {
+      event.preventDefault();
+      setReferencesOpen(false);
+      return true;
+    }
+    if (mirarOpen) {
+      event.preventDefault();
+      setMirarOpen(false);
+      return true;
+    }
+    if (archiveFullscreenId) {
+      event.preventDefault();
+      setArchiveFullscreenId(null);
+      return true;
+    }
+    if (exportMenuOpen) {
+      event.preventDefault();
+      setExportMenuOpen(false);
+      return true;
+    }
+    if (libraryMenuOpen) {
+      event.preventDefault();
+      setLibraryMenuOpen(false);
+      return true;
+    }
+    if (frameToolId) {
+      event.preventDefault();
+      frameDraw.current = null;
+      setFrameDraft(null);
+      setFrameToolId(null);
+      setNotice(null);
+      return true;
+    }
+    if (addMenuOpen) {
+      event.preventDefault();
+      setAddMenuOpen(false);
+      return true;
+    }
+    if (selectedCardIds.length) {
+      event.preventDefault();
+      setSelectedCardIds([]);
+      return true;
+    }
+    return false;
+  };
+
+  /** Despachador único: la tabla ya decidió la acción; aquí solo se ejecuta. */
+  const ejecutarAtajo = (atajo: AtajoLienzo, event: KeyboardEvent) => {
+    if (shortcutsOpen && atajo.accion !== 'cerrar' && atajo.accion !== 'ayuda') return;
+
+    if (atajo.accion === 'cerrar') {
+      cerrarAlgo(event);
+      return;
+    }
+    if (atajo.accion === 'ayuda') {
+      event.preventDefault();
+      setShortcutsOpen((open) => !open);
+      setAddMenuOpen(false);
+      return;
+    }
+    if (atajo.accion === 'pan') {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('button, a, [role="button"], [role="menuitem"], [role="option"], [role="tab"]')) return;
+      event.preventDefault();
+      spaceHeld.current = true;
+      setSpacePanActive(true);
+      return;
+    }
+    if (atajo.accion === 'herramientas') {
+      if (archiveFullscreenId) return;
+      event.preventDefault();
+      setAddMenuOpen((open) => !open);
+      return;
+    }
+    if (atajo.accion === 'deshacer') {
+      event.preventDefault();
+      undo();
+      return;
+    }
+    if (atajo.accion === 'rehacer') {
+      event.preventDefault();
+      redo();
+      return;
+    }
+    if (atajo.accion === 'seleccionarTodo') {
+      event.preventDefault();
+      setSelectedCardIds(seleccionarTodoElTablero(activeBoardRef.current ?? activeBoard!, framedChildIds));
+      return;
+    }
+    if (atajo.accion === 'pegar') {
+      // El evento paste decide: imagen o texto del sistema primero, copia interna después.
+      return;
+    }
+    if (atajo.accion === 'copiar' || atajo.accion === 'cortar') {
+      if (!selectedCardIds.length) return;
+      event.preventDefault();
+      copiarSeleccion(atajo.accion === 'cortar');
+      return;
+    }
+    if (!selectedCardIds.length) return;
+    event.preventDefault();
+    switch (atajo.accion) {
+      case 'borrar':
+        deleteCards(selectedCardIds);
+        break;
+      case 'duplicar':
+        duplicarSeleccionActual();
+        break;
+      case 'moverIzquierda':
+        moverSeleccion(-1, 0);
+        break;
+      case 'moverDerecha':
+        moverSeleccion(1, 0);
+        break;
+      case 'moverArriba':
+        moverSeleccion(0, -1);
+        break;
+      case 'moverAbajo':
+        moverSeleccion(0, 1);
+        break;
+      case 'moverIzquierda10':
+        moverSeleccion(-10, 0);
+        break;
+      case 'moverDerecha10':
+        moverSeleccion(10, 0);
+        break;
+      case 'moverArriba10':
+        moverSeleccion(0, -10);
+        break;
+      case 'moverAbajo10':
+        moverSeleccion(0, 10);
+        break;
+      case 'traerAdelante':
+        ordenarSeleccion('adelante');
+        break;
+      case 'enviarAtras':
+        ordenarSeleccion('atras');
+        break;
+      case 'alFrente':
+        ordenarSeleccion('frente');
+        break;
+      case 'alFondo':
+        ordenarSeleccion('fondo');
+        break;
+      default:
+        break;
+    }
+  };
+  ejecutarAtajoRef.current = ejecutarAtajo;
+
   /**
    * Pegar una URL de imagen sobre un Referente (o con uno seleccionado) añade un
    * medio que apunta a esa fuente con la fecha del día. No descarga la imagen.
@@ -2648,6 +2853,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         return;
       }
       const text = event.clipboardData?.getData('text/plain').trim() ?? '';
+      // Copia interna: una marca corta; si el sistema trae texto o imagen, mandan ellos.
+      if ((esMarcaDeTarjetas(text) || (!text && hayTarjetasCopiadas())) && pegarSeleccion()) {
+        event.preventDefault();
+        return;
+      }
       if (!text || !isSafeExternalUrl(text) || !activeBoard) return;
       const selectedId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
       const targetId = hoveredReferenteId.current ?? selectedId;
@@ -2678,54 +2888,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [activeBoard, addToolCard, aplicarVistaPrevia, replaceCard, selectedCardIds]);
-
-  const removeCard = (id: string) => {
-    const card = activeBoard?.cards.find((item) => item.id === id);
-    if (card?.locked) {
-      setNotice('Esta tarjeta está bloqueada. Desbloquéala para moverla o eliminarla.');
-      return;
-    }
-    const isFrame = card?.type === 'marco';
-    if (!window.confirm(isFrame
-      ? '¿Eliminar este marco? Las tarjetas de dentro seguirán en la pizarra.'
-      : '¿Eliminar esta tarjeta y sus relaciones?')) return;
-    updateBoard((board) => {
-      const cards = isFrame
-        ? removeFrameKeepingChildren(board.cards, id)
-        : detachCardFromFrames(board.cards.filter((item) => item.id !== id), id);
-      return {
-        ...board,
-        cards,
-        relations: board.relations.filter((relation) => relation.from !== id && relation.to !== id),
-      };
-    });
-    setSelectedCardIds((current) => current.filter((selectedId) => selectedId !== id));
-  };
-
-  const deleteSelectedCards = () => {
-    if (!selectedCardIds.length || !activeBoard) return;
-    const bloqueadas = activeBoard.cards.filter((card) => card.locked && selectedCardIds.includes(card.id));
-    const eliminables = selectedCardIds.filter((id) => !bloqueadas.some((card) => card.id === id));
-    if (!eliminables.length) {
-      setNotice('Todas las tarjetas seleccionadas están bloqueadas.');
-      return;
-    }
-    if (bloqueadas.length) setNotice(`${bloqueadas.length} ${bloqueadas.length === 1 ? 'tarjeta bloqueada se queda' : 'tarjetas bloqueadas se quedan'}; se eliminan las demás.`);
-    const count = eliminables.length;
-    if (!window.confirm(`¿Eliminar ${count} ${count === 1 ? 'tarjeta seleccionada' : 'tarjetas seleccionadas'} y sus relaciones?`)) return;
-    const selected = new Set(eliminables);
-    updateBoard((board) => {
-      let cards = board.cards.filter((card) => !selected.has(card.id));
-      for (const id of selected) cards = detachCardFromFrames(cards, id);
-      return {
-        ...board,
-        cards,
-        relations: board.relations.filter((relation) => !selected.has(relation.from) && !selected.has(relation.to)),
-      };
-    });
-    setSelectedCardIds([]);
-  };
+  }, [activeBoard, addToolCard, aplicarVistaPrevia, pegarSeleccion, replaceCard, selectedCardIds]);
 
   const onCardSelect = useCallback((card: BoardCard, event: Modificadores) => cardHandlers.current?.select(card.id, event), []);
   const onCardConnect = useCallback((cardId: string) => cardHandlers.current?.connect(cardId), []);
@@ -2937,6 +3100,23 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         </div>
       )}
       {notice && <div className="board-toast" role="status">{notice}<button onClick={() => setNotice(null)} aria-label="Cerrar aviso"><X size={14} /></button></div>}
+      {aviso && (
+        <div className="board-toast board-undo-toast" role="status" data-testid="board-undo-toast">
+          <span>{aviso.texto}</span>
+          {(aviso.historial || aviso.deshacer) && (
+            <button
+              type="button"
+              className="board-undo-action"
+              onClick={() => {
+                const deshacer = aviso.historial ? undo : aviso.deshacer;
+                setAviso(null);
+                deshacer?.();
+              }}
+            >Deshacer</button>
+          )}
+          <button type="button" onClick={() => setAviso(null)} aria-label="Cerrar aviso"><X size={14} /></button>
+        </div>
+      )}
       {referencesOpen && activeProject && (
         <aside className="board-reference-panel" aria-label={`Referencias PDF de ${activeProject.name}`}>
           <div className="board-reference-heading"><div><strong>Referencias PDF</strong><span>{activeProject.name}</span></div><button className="board-icon-button" onClick={() => setReferencesOpen(false)} aria-label="Cerrar referencias"><X size={15} /></button></div>
@@ -3201,6 +3381,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                  connectionTarget={connectDraft?.target === card.id}
                  connectMode={connectMode}
                  colors={COLORS}
+                 compact={zoom < 0.35}
                  onSelect={onCardSelect}
                  onConnect={onCardConnect}
                  onConnectStart={onCardConnectStart}
@@ -3297,14 +3478,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             </div>
             <p className="board-dialog-hint">Los mismos gestos que ves en los controles, sin tener que buscarlos.</p>
             <div className="board-shortcuts-groups">
-              {ATAJOS.map((group) => (
+              {gruposDeAyuda().map((group) => (
                 <section className="board-shortcuts-group" key={group.grupo} aria-label={group.grupo}>
                   <h3>{group.grupo}</h3>
                   <dl>
-                    {group.items.map(([keys, label]) => (
-                      <div className="board-shortcut" key={`${group.grupo}-${keys}`}>
-                        <dt><kbd>{keys}</kbd></dt>
-                        <dd>{label}</dd>
+                    {group.items.map((atajo) => (
+                      <div className="board-shortcut" key={atajo.id}>
+                        <dt><kbd>{textoAtajo(atajo)}</kbd></dt>
+                        <dd>{atajo.descripcion}</dd>
                       </div>
                     ))}
                   </dl>
