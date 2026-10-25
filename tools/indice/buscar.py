@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image, ImageOps
 
 from indexar import VERSION
-from modelo import ModeloVisual
+from modelo import MODEL_ID, ModeloVisual, sha256_archivo
 
 
 def cargar_indice(carpeta: Path) -> tuple[np.ndarray, dict]:
@@ -19,6 +19,9 @@ def cargar_indice(carpeta: Path) -> tuple[np.ndarray, dict]:
         indice = json.load(handle)
     if indice.get("version") != VERSION or indice.get("vectores") != "vectores.npz":
         raise ValueError("Versión o archivo de vectores no admitido")
+    if (indice.get("sha256_vectores_npz") is not None
+            and sha256_archivo(carpeta / "vectores.npz") != indice["sha256_vectores_npz"]):
+        raise ValueError("SHA-256 de vectores.npz no coincide con indice.json")
     with np.load(carpeta / "vectores.npz", allow_pickle=False) as datos:
         vectores = datos["vectores"].astype(np.float32, copy=True)
         ids = datos["ids"].tolist()
@@ -165,6 +168,8 @@ def main() -> None:
             consulta = vectores[args.fila]
             resultado = parecidos(vectores, indice, consulta, args.n, args.fila)
         else:
+            if indice["modelo"] != MODEL_ID:
+                raise RuntimeError("El índice fue creado con otro modelo o preprocesado")
             modelo = ModeloVisual(args.dispositivo)
             if modelo.pesos_sha256 != indice["sha256_pesos"]:
                 raise RuntimeError("El índice fue creado con otros pesos")

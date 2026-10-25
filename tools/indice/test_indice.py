@@ -154,6 +154,39 @@ class IndiceSinteticoTest(unittest.TestCase):
         self.assertLess(resultado["global"]["recall@1"], 1.0)
         self.assertEqual(resultado["global"]["recall@5"], 1.0)
 
+    def test_recall_rechaza_nulos_y_no_modifica_entradas(self):
+        bases = np.eye(6, dtype=np.float32) * 3
+        consultas = bases.copy() * 2
+        copia = consultas.copy()
+        evaluar(bases, consultas, list(range(6)), ["giro"] * 6)
+        np.testing.assert_array_equal(consultas, copia)
+        np.testing.assert_array_equal(bases, np.eye(6, dtype=np.float32) * 3)
+        consultas[0] = 0
+        with self.assertRaises(ValueError):
+            evaluar(bases, consultas, list(range(6)), ["giro"] * 6)
+
+    def test_integridad_vectores_y_casi_duplicados(self):
+        cache = Path(__file__).parent / ".cache"
+        cache.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=cache) as temporal:
+            base = Path(temporal)
+            origen = base / "medios"
+            origen.mkdir()
+            for nombre, color in (("a.png", (200, 20, 20)), ("b.png", (198, 20, 20)),
+                                  ("c.png", (20, 20, 200))):
+                Image.new("RGB", (32, 32), color).save(origen / nombre)
+            destino = base / "indice"
+            construir_indice(origen, destino, CodificadorFalso(), recortes=None)
+            vectores, indice = cargar_indice(destino)
+            pares = duplicados(vectores, indice)
+            self.assertEqual(len(pares), 1)
+            self.assertEqual(pares[0]["clase"], "casi_exacto")
+            with np.load(destino / "vectores.npz", allow_pickle=False) as npz:
+                contenido = {k: npz[k].copy() for k in npz.files}
+            contenido["vectores"][0] = vectores[2]
+            np.savez_compressed(destino / "vectores.npz", **contenido)
+            with self.assertRaisesRegex(ValueError, "SHA-256"):
+                cargar_indice(destino)
     def test_exportar_gustos_solo_lectura_y_holdout_congelado(self):
         cache = Path(__file__).parent / ".cache"
         cache.mkdir(exist_ok=True)

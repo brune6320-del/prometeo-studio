@@ -233,6 +233,7 @@ def construir_indice(
             )
             handle.flush()
             os.fsync(handle.fileno())
+        documento["sha256_vectores_npz"] = sha256_archivo(temporal_npz)
         with temporal_json.open("w", encoding="utf-8") as handle:
             json.dump(documento, handle, ensure_ascii=False, indent=2)
             handle.write("\n")

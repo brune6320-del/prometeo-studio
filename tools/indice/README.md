@@ -9,6 +9,8 @@ Embeddings locales con **SigLIP base patch16 224**, en CPU o MPS. No se entrena 
 - `model.safetensors`: SHA-256 **publicado** `2c63cb7d1f2e95ba501893cbb8faeb4ea9a3af295498d35097126228659c2af8`; `modelo.py` lo recalcula sobre la descarga y rechaza cualquier discrepancia.
 - Fuentes: [ficha del modelo](https://huggingface.co/google/siglip-base-patch16-224/tree/main), [archivo y SHA-256](https://huggingface.co/google/siglip-base-patch16-224/blob/264b4cf2be2e3805db80dd7f84df43989a4b76e0/model.safetensors), [código de SigLIP](https://github.com/huggingface/transformers/blob/main/src/transformers/models/siglip/modeling_siglip.py).
 
+La revisión histórica de pesos no contiene README. La declaración Apache-2.0 se comprobó en la ficha oficial, revisión `7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed`; se conserva la procedencia en `evidencias/licencia_modelo.json`. El SHA publicado de los pesos históricos se comprobó por separado y se recalcula al cargar el modelo.
+
 Los pesos se guardan en `tools/indice/.cache/hf/`, ignorado por Git. Tampoco se versionan imágenes ni índices generados.
 
 ## Instalación
@@ -46,6 +48,8 @@ nice -n 15 .venv/bin/python buscar.py grupos salidas/mi-indice -k 8
 ```
 
 `--fila` reutiliza un vector indexado y excluye esa misma fila de los resultados; no carga de nuevo el modelo. `duplicados` encuentra bytes idénticos, píxeles idénticos y pares con dHash a distancia ≤6 **y** similitud de embeddings ≥0,95. Los umbrales son ajustables y las comparaciones de pares crecen cuadráticamente con el número de elementos. `grupos` usa k-means esférico determinista en NumPy; agrupa afinidad visual, no categorías semánticas garantizadas.
+
+Los índices nuevos guardan además el SHA-256 del `.npz`; el lector lo verifica antes de cargar vectores. Esto detecta archivos alterados o una escritura interrumpida entre NPZ y JSON. Los índices previos sin este campo siguen admitidos con las comprobaciones de IDs, dimensiones y hashes de fuentes. La consulta externa verifica también la identidad del modelo. Los grupos conservan la procedencia de cada miembro.
 
 ## Medir solo con datos sintéticos
 

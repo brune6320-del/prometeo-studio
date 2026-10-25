@@ -43,8 +43,8 @@ def crear_pares_sinteticos(n: int = 12, lado: int = 224, semilla: int = 23):
 
 def evaluar(vectores_base: np.ndarray, vectores_consulta: np.ndarray,
             positivos: list[int], transformaciones: list[str]) -> dict:
-    bases = np.asarray(vectores_base, dtype=np.float32)
-    consultas = np.asarray(vectores_consulta, dtype=np.float32)
+    bases = np.array(vectores_base, dtype=np.float32, copy=True)
+    consultas = np.array(vectores_consulta, dtype=np.float32, copy=True)
     if bases.ndim != 2 or consultas.ndim != 2 or bases.shape[1] != consultas.shape[1]:
         raise ValueError("Dimensiones de vectores incompatibles")
     if len(consultas) != len(positivos) or len(consultas) != len(transformaciones) or not len(consultas):
@@ -53,6 +53,9 @@ def evaluar(vectores_base: np.ndarray, vectores_consulta: np.ndarray,
         raise ValueError("Positivo fuera de la galería")
     if not np.all(np.isfinite(bases)) or not np.all(np.isfinite(consultas)):
         raise ValueError("Vectores no finitos")
+    if (np.any(np.linalg.norm(bases, axis=1) < 1e-8)
+            or np.any(np.linalg.norm(consultas, axis=1) < 1e-8)):
+        raise ValueError("Vectores nulos no permiten medir recall")
     bases /= np.maximum(np.linalg.norm(bases, axis=1, keepdims=True), 1e-12)
     consultas /= np.maximum(np.linalg.norm(consultas, axis=1, keepdims=True), 1e-12)
     puntuaciones = consultas @ bases.T
