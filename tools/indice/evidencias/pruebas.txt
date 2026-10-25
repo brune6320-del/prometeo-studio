@@ -1,0 +1,17 @@
+test_exportar_gustos_solo_lectura_y_holdout_congelado (test_indice.IndiceSinteticoTest) ... ok
+test_exportar_protege_gustos_y_funciona_sin_etiquetas (test_indice.IndiceSinteticoTest) ... ok
+test_fotogramas_video_sintetico (test_indice.IndiceSinteticoTest) ... ok
+test_indexar_buscar_y_duplicados (test_indice.IndiceSinteticoTest) ... ok
+test_integridad_vectores_y_casi_duplicados (test_indice.IndiceSinteticoTest) ... ok
+test_pdf_y_recortador_sinteticos (test_indice.IndiceSinteticoTest) ... <frozen importlib._bootstrap>:228: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+<frozen importlib._bootstrap>:228: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+<frozen importlib._bootstrap>:228: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+ok
+test_recall_rechaza_nulos_y_no_modifica_entradas (test_indice.IndiceSinteticoTest) ... ok
+test_recortes_giros_color_y_recall (test_indice.IndiceSinteticoTest) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.290s
+
+OK
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

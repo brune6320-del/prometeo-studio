@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/Users/gladys/Projects/prometeo-indice/tools/indice/verificar_sintetico.py", line 101, in <module>
+    print(json.dumps(verificar(), ensure_ascii=False, indent=2))
+  File "/Users/gladys/Projects/prometeo-indice/tools/indice/verificar_sintetico.py", line 63, in verificar
+    assert vecinos[0]["ruta"] == "ref-01.png", vecinos[0]
+AssertionError: {'id': '6896c111670d5f3e77451841b28fd9f59104313172139a3abd3794b11ef19ca6', 'ruta': 'ref-05.png', 'tipo': 'imagen', 'sha256_archivo': '6896c111670d5f3e77451841b28fd9f59104313172139a3abd3794b11ef19ca6', 'sha256_visual': 'e3f4df5b5ac150178862248e3be3efe4bcab3e71074561db23371ff89c5d65c0', 'dhash': 'd4ccccd4fcd0d494', 'origen': 'carpeta', 'ruta_fuente': 'ref-05.png', 'fila': 10, 'similitud': 0.932414}

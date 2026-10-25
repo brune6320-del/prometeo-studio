@@ -1,0 +1,8 @@
+{
+  "repo": "google/siglip-base-patch16-224",
+  "revision_ficha": "7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed",
+  "licencia_declarada": "apache-2.0",
+  "url_ficha": "https://huggingface.co/google/siglip-base-patch16-224/resolve/7fd15f0689c79d79e38b1c2e2e2370a7bf2761ed/README.md",
+  "revision_pesos": "264b4cf2be2e3805db80dd7f84df43989a4b76e0",
+  "nota": "La revisi\u00f3n hist\u00f3rica de pesos no contiene README; licencia consultada en la revisi\u00f3n de ficha indicada."
+}

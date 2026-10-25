@@ -22,7 +22,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-La primera ejecución necesita conexión para descargar los pesos. Para fotogramas de video instala además `opencv-python-headless==4.11.0.86`. Las versiones en `requirements.txt` son las verificadas aquí con Python 3.9.6 en macOS ARM.
+La primera ejecución necesita conexión para descargar los pesos. `requirements.txt` incluye OpenCV para video y PyMuPDF para PDF. Las versiones fijadas son las verificadas aquí con Python 3.9.6 en macOS ARM.
 
 ## Indexar
 
@@ -72,10 +72,22 @@ La búsqueda automática también revisa `gustos.json` en la raíz del repositor
 
 Se escriben `train.jsonl`, `holdout.jsonl`, `sin_etiqueta.jsonl`, `holdout.json` y `manifest.json`, sin copiar imágenes ni pesos. La asignación train/holdout depende del SHA-256 del **archivo fuente**, el porcentaje y una sal fija; `holdout.json` conserva la asignación y rechaza cambios de política. Reencuadres o duplicados visuales con bytes distintos podrían caer en ambos conjuntos: revisar antes de entrenar. Este exportador no entrena nada.
 
-## Verificación en esta Mac
+## Verificación en esta Mac — 25/10/2026
 
-- Peso `model.safetensors` descargado en caché local y SHA-256 recalculado: `2c63cb7d1f2e95ba501893cbb8faeb4ea9a3af295498d35097126228659c2af8`, coincide con el publicado.
-- Cuatro pruebas con imágenes, video y vectores sintéticos: correctas.
-- `medir.py --n 6 --lote 1 --dispositivo cpu`, 18 consultas sintéticas: recall@1 **0,9444** y recall@5 **1,0**. Por transformación, recorte 0,8333/1,0; giro 1,0/1,0; color 1,0/1,0.
-- Índice real SigLIP de seis imágenes sintéticas y búsqueda de un recorte externo: el original `ref-00.png` quedó primero (coseno 0,97216).
-- No se midió calidad sobre referentes reales ni escala de miles de archivos.
+- Peso descargado y SHA-256 recalculado: `2c63cb7d1f2e95ba501893cbb8faeb4ea9a3af295498d35097126228659c2af8`, coincide con el publicado.
+- Ocho pruebas unitarias, sin omisiones: imágenes, PDF grande acotado, video, piezas, duplicados casi exactos, integridad, etiquetas y holdout. Registro: `evidencias/pruebas.txt`.
+- Verificación integral con SigLIP real y medios exclusivamente sintéticos: 8 imágenes, 2 páginas PDF y 2 fotogramas, búsqueda de 12 vecinos, duplicados, 3 grupos y exportación repetible. CPU, lote 1, nice 15, 6,89 s y pico RSS del proceso 685,64 MiB. Son medidas de esta ejecución pequeña, no una garantía de memoria para toda entrada.
+- 18 consultas sintéticas, 6 bases: recall@1 **0,9444** y recall@5 **1,0**. Recorte: 0,8333/1,0; giro: 1,0/1,0; color: 1,0/1,0. Un recorte de `ref-01` queda segundo: se conserva el resultado negativo y el primer ensayo fallido. No se ajustaron modelo ni umbrales para ocultarlo.
+- `pip check`: correcto. Evidencia estructurada: `evidencias/integral_cpu.json`.
+
+Reproducir desde la raíz del repositorio (quitar `HF_HUB_OFFLINE=1` si todavía no hay caché):
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=2 VECLIB_MAXIMUM_THREADS=2 HF_HUB_OFFLINE=1 nice -n 15 tools/indice/.venv/bin/python tools/indice/verificar_sintetico.py
+```
+
+**NO VERIFICADO:** MPS, otra Mac, calidad con referentes reales, miles de archivos y salidas reales del recortador (no existe en esta base). No se encontró `gustos.json` real: el vínculo con IDs de tarjetas de Studio requiere una correspondencia explícita con archivos; las claves desconocidas se reportan sin inventarla. El holdout agrupa por bytes de fuente, no por familia visual: recortes guardados en archivos distintos pueden cruzar particiones. El porcentaje hash no garantiza ambos splits con datasets diminutos. No hubo entrenamiento ni medición sobre datos reales.
+
+## Entrega al propietario
+
+`entrega/D2-indice-visual-master.zip` contiene código y documentación en `FULL/`, evidencias y parches por commit en `RECUPERACION/`, más manifiestos SHA-256 y CRC-32. No contiene pesos, medios, entorno virtual ni cachés. `empaquetar.py` genera y verifica el ZIP desde un commit limpio; la suma del contenedor y la verificación de todos los miembros quedan en `entrega/verificacion.json`. El commit fuente del paquete se identifica dentro de él; un commit posterior incorpora únicamente el contenedor y su verificación.
