@@ -1,21 +1,18 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
-  BookOpen,
+  ChevronDown,
   FolderPlus,
   Magnet,
   Download,
-  Eye,
-  ImagePlus,
   Library,
   Link2,
+  Pencil,
   Plus,
   Search,
-  StickyNote,
   Trash2,
   Undo2,
   Redo2,
-  Upload,
   X,
   ZoomIn,
   ZoomOut,
@@ -106,6 +103,7 @@ interface BoardWorkspaceProps {
 
 const GRID_SIZE = 24;
 const COLORS: Array<BoardCard['color']> = ['paper', 'sand', 'sage', 'rose'];
+const RAIL_TOOLS = ['note', 'link', 'media', 'referente', 'marco', 'entropia'];
 
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -164,6 +162,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [notice, setNotice] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [libraryMenuOpen, setLibraryMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const libraryMenuRef = useRef<HTMLDivElement>(null);
   const [linkDialog, setLinkDialog] = useState(false);
   const [linkTitle, setLinkTitle] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
@@ -211,7 +213,6 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const activeProjectReferences = projectReferences.filter((reference) => reference.projectId === activeProjectId);
   const activeBoard = projectBoards.find((board) => board.id === activeBoardId) ?? projectBoards[0] ?? null;
   const selectedCards = activeBoard?.cards.filter((card) => selectedCardIds.includes(card.id)) ?? [];
-  const selectedCard = selectedCards.length === 1 ? selectedCards[0] : null;
   const activeHistory = activeBoard ? boardHistories[activeBoard.id] ?? emptyBoardHistory() : emptyBoardHistory();
   const canUndo = activeHistory.undo.length > 0;
   const canRedo = activeHistory.redo.length > 0;
@@ -437,7 +438,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   }, [boards, updateBoardById]);
 
   /** Crea una tarjeta con la herramienta del registro, en el centro de la vista. */
-  const addToolCard = useCallback((toolId: string, configure?: (card: BoardCard) => void): BoardCard | null => {
+  const addToolCard = useCallback((toolId: string, configure?: (card: BoardCard) => void, at?: { x: number; y: number }): BoardCard | null => {
     const tool = getBoardTool(toolId);
     if (!activeBoard) return null;
     if (frameToolId) setNotice(null);
@@ -448,8 +449,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       setNotice(`La herramienta «${toolId}» no está instalada.`);
       return null;
     }
-    const center = screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, { pan, zoom });
-    const card = tool.crear(center.x - 130, center.y - 90) as BoardCard;
+    const destino = at ?? screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, { pan, zoom });
+    const card = tool.crear(destino.x - 130, destino.y - 90) as BoardCard;
     configure?.(card);
     updateBoard((board) => ({ ...board, cards: [...board.cards, card] }));
     setSelectedCardIds([card.id]);
@@ -467,6 +468,38 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setFrameToolId(null);
     addToolCard(toolId);
   }, [addToolCard]);
+
+  const startToolDrag = (toolId: string) => (event: React.DragEvent<HTMLButtonElement>) => {
+    event.dataTransfer.setData('application/x-prometeo-tool', toolId);
+    event.dataTransfer.effectAllowed = 'copy';
+  };
+
+  const dropTool = (event: React.DragEvent<HTMLDivElement>) => {
+    const toolId = event.dataTransfer.getData('application/x-prometeo-tool');
+    if (!toolId || !activeBoard) return;
+    event.preventDefault();
+    const rect = viewportRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, { pan, zoom });
+    const tool = getBoardTool(toolId);
+    if (tool?.tipo === 'marco') {
+      setFrameToolId(null);
+      addToolCard(toolId, undefined, punto);
+      setNotice('Marco creado. Arrástralo por la cabecera o cambia de vista en su menú.');
+      return;
+    }
+    addToolCard(toolId, undefined, punto);
+  };
+
+  const publicarSeleccion = () => {
+    const marcoSeleccionado = selectedCards.find((card) => card.type === 'marco');
+    if (!marcoSeleccionado) {
+      setNotice('Selecciona un marco para publicar su vista actual.');
+      return;
+    }
+    void publishFrame(marcoSeleccionado);
+  };
+
 
   /** El marco se dibuja arrastrando; las tarjetas cuyo centro cae dentro pasan a ser hijas por id. */
   const createFrameFromRect = useCallback((rect: FrameRect, toolId: string) => {
@@ -766,6 +799,27 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     window.addEventListener('keydown', handleAddShortcut);
     return () => window.removeEventListener('keydown', handleAddShortcut);
   }, [addMenuOpen, archiveFullscreenId, frameToolId]);
+
+  useEffect(() => {
+    if (!exportMenuOpen && !libraryMenuOpen) return;
+    const cerrar = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (exportMenuRef.current?.contains(target) || libraryMenuRef.current?.contains(target)) return;
+      setExportMenuOpen(false);
+      setLibraryMenuOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setExportMenuOpen(false);
+      setLibraryMenuOpen(false);
+    };
+    window.addEventListener('pointerdown', cerrar);
+    window.addEventListener('keydown', escape);
+    return () => {
+      window.removeEventListener('pointerdown', cerrar);
+      window.removeEventListener('keydown', escape);
+    };
+  }, [exportMenuOpen, libraryMenuOpen]);
 
   const handleCardSelection = (cardId: string, event: React.MouseEvent<HTMLElement>) => {
     if (suppressCardClick.current) {
@@ -1383,25 +1437,18 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   return (
     <div className="board-workspace" inert={locked || undefined}>
       <header className="board-header" data-testid="board-topbar">
-        <button className="board-back" onClick={() => void leaveBoard()} title="Volver al espacio PDF">
-          <ArrowLeft size={16} aria-hidden="true" /> <span>PDF Studio</span>
+        <button className="board-back" onClick={() => void leaveBoard()} title="Volver al espacio PDF" aria-label="Volver a PDF Studio">
+          <ArrowLeft size={16} aria-hidden="true" />
         </button>
-        <div className="board-heading">
+        <div className="board-identity">
           <span className="board-mark" aria-hidden="true">P</span>
-          <label className="sr-only" htmlFor="board-name">Nombre del tablero</label>
-          <input id="board-name" value={activeBoard.title} maxLength={120} onChange={(event) => renameBoard(event.target.value)} aria-label="Nombre del tablero" />
-          <span className={`board-save-state ${saveState}`} aria-live="polite">
-            {saveState === 'saving' ? 'Guardando…' : saveState === 'error' ? 'Sin guardar' : 'Guardado'}
-          </span>
-        </div>
-        <div className="board-header-actions">
           <label className="sr-only" htmlFor="project-select">Proyecto</label>
-          <select id="project-select" value={activeProjectId} onChange={(event) => { void handleProjectSelect(event.target.value); }} aria-label="Elegir proyecto" disabled={!projects.length}>
+          <select id="project-select" className="board-project-select" value={activeProjectId} onChange={(event) => { void handleProjectSelect(event.target.value); }} aria-label="Elegir proyecto" disabled={!projects.length}>
             {projects.length ? projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>) : <option value="">Proyectos no disponibles</option>}
           </select>
-          <button className="board-icon-button" onClick={() => { setProjectName(''); setProjectDialog(true); }} aria-label="Crear proyecto" title="Crear proyecto"><FolderPlus size={16} /></button>
+          <span className="board-identity-separator" aria-hidden="true">·</span>
           <label className="sr-only" htmlFor="board-select">Tablero</label>
-          <select id="board-select" value={activeBoard.id} onChange={async (event) => {
+          <select id="board-select" className="board-board-select" value={activeBoard.id} onChange={async (event) => {
             const saved = await flushBoardWrites();
             if (!saved) {
               setNotice('No se cambió de tablero porque el actual aún no se pudo guardar. Reintenta o exporta una copia.');
@@ -1412,72 +1459,64 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           }} aria-label="Elegir tablero">
             {projectBoards.map((board) => <option key={board.id} value={board.id}>{board.title || 'Sin título'}</option>)}
           </select>
-          <button className="board-icon-button" onClick={addNewBoard} aria-label="Crear tablero" title="Crear tablero"><Plus size={16} /></button>
+          <button className="board-icon-button" onClick={() => { const nombre = window.prompt('Nombre del tablero', activeBoard.title); if (nombre !== null) renameBoard(nombre.trim() || activeBoard.title); }} aria-label="Renombrar tablero" title="Renombrar tablero"><Pencil size={15} /></button>
+          <button className="board-icon-button" onClick={() => { setProjectName(''); setProjectDialog(true); }} aria-label="Crear proyecto" title="Crear proyecto"><FolderPlus size={16} /></button>
+          <button className="board-icon-button" onClick={() => void addNewBoard()} aria-label="Crear tablero" title="Crear tablero"><Plus size={16} /></button>
           <button className="board-icon-button danger" onClick={() => void removeCurrentBoard()} aria-label="Eliminar tablero" title="Eliminar tablero"><Trash2 size={15} /></button>
+          <span className={`board-save-state ${saveState}`} aria-live="polite">
+            {saveState === 'saving' ? 'Guardando…' : saveState === 'error' ? 'Sin guardar' : 'Guardado'}
+          </span>
+        </div>
+
+        <div className="board-topbar-search">
+          <Search size={14} aria-hidden="true" />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en el tablero" aria-label="Buscar tarjetas" />
+          {search && <button type="button" onClick={() => setSearch('')} aria-label="Limpiar búsqueda"><X size={13} /></button>}
+        </div>
+
+        <div className="board-topbar-actions">
+          <button className="board-icon-button" onClick={undo} disabled={!canUndo} title="Deshacer (⌘/Ctrl + Z)" aria-label="Deshacer"><Undo2 size={16} /></button>
+          <button className="board-icon-button" onClick={redo} disabled={!canRedo} title="Rehacer (⌘/Ctrl + Shift + Z)" aria-label="Rehacer"><Redo2 size={16} /></button>
+          <span className="board-tool-divider" aria-hidden="true" />
+          <button className={`board-icon-button ${connectMode ? 'active' : ''}`} onClick={() => { setConnectMode((value) => !value); setConnectFromId(null); setNotice(connectMode ? null : 'Elige una tarjeta y luego otra para conectarlas.'); }} aria-pressed={connectMode} title="Relacionar tarjetas" aria-label="Relacionar tarjetas"><Link2 size={16} /></button>
+          <button className={`board-icon-button ${snapEnabled ? 'active' : ''}`} onClick={() => setSnapEnabled((enabled) => !enabled)} aria-pressed={snapEnabled} title="Ajustar a la cuadrícula" aria-label="Ajustar a la cuadrícula"><Magnet size={16} /></button>
+          <span className="board-tool-divider" aria-hidden="true" />
+          <button className="board-icon-button" onClick={() => zoomBy(1 / 1.15)} aria-label="Alejar" title="Alejar"><ZoomOut size={16} /></button>
+          <button className="board-zoom-value" onClick={fitBoard} title="Ajustar el tablero a la pantalla" aria-label={`Zoom ${Math.round(zoom * 100)} por ciento, ajustar tablero`}>{Math.round(zoom * 100)}%</button>
+          <button className="board-icon-button" onClick={() => zoomBy(1.15)} aria-label="Acercar" title="Acercar"><ZoomIn size={16} /></button>
+
+          <div className="board-menu-wrap" ref={exportMenuRef}>
+            <button type="button" className="board-bar-button" onClick={() => { setExportMenuOpen((open) => !open); setLibraryMenuOpen(false); }} aria-haspopup="menu" aria-expanded={exportMenuOpen} title="Exportar y publicar">
+              <Download size={15} /> Exportar <ChevronDown size={14} />
+            </button>
+            {exportMenuOpen && (
+              <div className="board-menu" role="menu" aria-label="Exportar">
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); exportJson(); }}>JSON del tablero</button>
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); exportMarkdown(); }}>Markdown</button>
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); exportProjectMarkdown(); }} disabled={!activeProject}>Obsidian del proyecto</button>
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); exportReferentesObsidian(); }}>Referentes a Obsidian</button>
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); publicarSeleccion(); }}>Publicar marco seleccionado</button>
+              </div>
+            )}
+          </div>
+
+          <div className="board-menu-wrap" ref={libraryMenuRef}>
+            <button type="button" className="board-bar-button" onClick={() => { setLibraryMenuOpen((open) => !open); setExportMenuOpen(false); }} aria-haspopup="menu" aria-expanded={libraryMenuOpen} title="Biblioteca y rituales">
+              <Library size={15} /> Biblioteca <ChevronDown size={14} />
+            </button>
+            {libraryMenuOpen && (
+              <div className="board-menu" role="menu" aria-label="Biblioteca">
+                <button type="button" role="menuitem" onClick={() => { setLibraryMenuOpen(false); setMirarOpen(true); }}>Volver a mirar</button>
+                <button type="button" role="menuitem" onClick={() => { setLibraryMenuOpen(false); void crearManifiesto(); }} disabled={manifesting}>{manifesting ? 'Escribiendo…' : 'Manifiesto de la semana'}</button>
+                <button type="button" role="menuitem" onClick={() => { setLibraryMenuOpen(false); void importReferentes(); }}>Importar referentes</button>
+                <button type="button" role="menuitem" onClick={() => { setLibraryMenuOpen(false); gustosInput.current?.click(); }}>Importar gustos</button>
+                <button type="button" role="menuitem" onClick={() => { setLibraryMenuOpen(false); setPdfReferenceDialog(true); }} disabled={!activeProject || !pdfReferenceSource}>Referenciar página PDF</button>
+                <button type="button" role="menuitem" onClick={() => { setLibraryMenuOpen(false); setReferencesOpen(true); }} disabled={!activeProjectReferences.length}>Referencias PDF ({activeProjectReferences.length})</button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
-
-      <nav className="board-controls" aria-label="Herramientas del tablero">
-        <button className="board-tool" onClick={() => setPdfReferenceDialog(true)} disabled={!activeProject || !pdfReferenceSource} title={pdfReferenceSource ? 'Guardar la página PDF actual como referencia' : 'Abre un PDF para guardar referencias de página'}><BookOpen size={15} /> Referenciar página PDF</button>
-        <button className={`board-tool ${referencesOpen ? 'active' : ''}`} onClick={() => setReferencesOpen((open) => !open)} disabled={!activeProjectReferences.length} aria-pressed={referencesOpen} title="Mostrar referencias PDF de este proyecto">Referencias PDF ({activeProjectReferences.length})</button>
-        <button className="board-tool" onClick={exportProjectMarkdown} disabled={!activeProject} title="Exportar notas del proyecto para Obsidian">Exportar proyecto a Obsidian</button>
-        <span className="board-tool-divider" />
-        <div className="board-add">
-          <button
-            className="board-tool primary"
-            onClick={() => setAddMenuOpen((open) => !open)}
-            aria-haspopup="menu"
-            aria-expanded={addMenuOpen}
-            title="Añadir tarjeta (N)"
-          >
-            <Plus size={15} /> Añadir
-          </button>
-        </div>
-        <button className="board-tool" onClick={() => addToolCard('note')}><StickyNote size={15} /> Nueva nota</button>
-        <button className="board-tool" onClick={() => { setLinkDialog(true); setLinkError(null); }}><Link2 size={15} /> Añadir enlace</button>
-        <button className="board-tool" onClick={() => mediaInput.current?.click()}><ImagePlus size={15} /> Añadir multimedia</button>
-        <span className="board-tool-divider" />
-        <button className="board-tool" onClick={undo} disabled={!canUndo} title="Deshacer (⌘/Ctrl + Z)" aria-label="Deshacer">
-          <Undo2 size={14} /> Deshacer
-        </button>
-        <button className="board-tool" onClick={redo} disabled={!canRedo} title="Rehacer (⌘/Ctrl + Shift + Z)" aria-label="Rehacer">
-          <Redo2 size={14} /> Rehacer
-        </button>
-        <button className={`board-tool ${snapEnabled ? 'active' : ''}`} onClick={() => setSnapEnabled((enabled) => !enabled)} aria-pressed={snapEnabled} title="Ajustar movimiento a la cuadrícula">
-          <Magnet size={14} /> Ajuste
-        </button>
-        <button className={`board-tool ${connectMode ? 'active' : ''}`} onClick={() => { setConnectMode((value) => !value); setConnectFromId(null); setNotice(connectMode ? null : 'Elige una tarjeta y luego otra para conectarlas.'); }} aria-pressed={connectMode}>
-          <Link2 size={15} /> {connectMode ? 'Terminar relaciones' : 'Relacionar'}
-        </button>
-        <span className="board-tool-divider" />
-        <button className="board-tool" onClick={() => alignSelection('left')} disabled={selectedCardIds.length < 2} title="Alinear a la izquierda">← Alinear</button>
-        <button className="board-tool" onClick={() => alignSelection('center-x')} disabled={selectedCardIds.length < 2} title="Alinear los centros sobre el eje vertical">↕ Centro vertical</button>
-        <button className="board-tool" onClick={() => alignSelection('right')} disabled={selectedCardIds.length < 2} title="Alinear a la derecha">Alinear →</button>
-        <button className="board-tool" onClick={() => alignSelection('top')} disabled={selectedCardIds.length < 2} title="Alinear arriba">↑ Arriba</button>
-        <button className="board-tool" onClick={() => alignSelection('center-y')} disabled={selectedCardIds.length < 2} title="Alinear los centros sobre el eje horizontal">↔ Centro horizontal</button>
-        <button className="board-tool" onClick={() => alignSelection('bottom')} disabled={selectedCardIds.length < 2} title="Alinear abajo">Abajo ↓</button>
-        <button className="board-tool" onClick={() => distributeSelection('horizontal')} disabled={selectedCardIds.length < 3} title="Distribuir con espacios iguales">Distribuir ↔</button>
-        <button className="board-tool" onClick={() => distributeSelection('vertical')} disabled={selectedCardIds.length < 3} title="Distribuir verticalmente">Distribuir ↕</button>
-        <button className="board-tool danger" onClick={deleteSelectedCards} disabled={!selectedCardIds.length} title="Eliminar tarjetas seleccionadas">Eliminar selección</button>
-        <span className="board-tool-divider" />
-        <div className="board-search">
-          <Search size={14} aria-hidden="true" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar tarjetas" aria-label="Buscar tarjetas" />
-          {search && <button onClick={() => setSearch('')} aria-label="Limpiar búsqueda"><X size={13} /></button>}
-        </div>
-        <div className="board-spacer" />
-        <button className="board-tool" onClick={() => setMirarOpen(true)} title="Elegir tres referentes y unos ojos, y pedir tres lecturas"><Eye size={14} /> Volver a mirar</button>
-        <button className="board-tool" onClick={() => void crearManifiesto()} disabled={manifesting} title="Crear un marco con el manifiesto de la semana: collages con ♥, lecturas aceptadas y pesos que subieron">{manifesting ? 'Escribiendo…' : 'Manifiesto'}</button>
-        <button className="board-tool" onClick={() => void importReferentes()} title="Crear o actualizar el tablero Biblioteca con los referentes de los vídeos"><Library size={14} /> Importar referentes</button>
-        <button className="board-tool" onClick={() => gustosInput.current?.click()} title="Sumar los ♥/✕ de un gustos-parcial.json a este proyecto">Importar gustos</button>
-        <button className="board-tool" onClick={exportReferentesObsidian} title="Descargar un ZIP con una nota Markdown por referente, con enlaces entre los del mismo marco"><BookOpen size={14} /> Referentes a Obsidian</button>
-        <button className="board-tool" onClick={() => importInput.current?.click()}><Upload size={14} /> Importar</button>
-        <button className="board-tool" onClick={exportJson}><Download size={14} /> Exportar JSON</button>
-        <button className="board-tool" onClick={exportMarkdown}>Obsidian Markdown</button>
-        <input ref={importInput} type="file" accept="application/json,.json,text/markdown,.md" hidden onChange={(event) => { void importBoard(event.target.files?.[0]); event.target.value = ''; }} />
-        <input ref={mediaInput} type="file" accept="image/*,video/*,audio/*,application/pdf,text/plain,.txt" hidden onChange={(event) => { void addMedia(event.target.files?.[0]); event.target.value = ''; }} />
-        <input ref={gustosInput} type="file" accept="application/json,.json" hidden aria-label="Archivo de gustos parciales" onChange={(event) => { void importGustos(event.target.files?.[0]); event.target.value = ''; }} />
-      </nav>
 
       {engineMessage && <div className="board-engine-notice" role="status"><span>{engineMessage}</span>{onRetryEngine && <button className="board-tool" onClick={onRetryEngine}>Reintentar motor PDF</button>}</div>}
       {projectError && <div className="board-alert" role="alert"><span>{projectError} Tus tableros locales siguen disponibles.</span><button type="button" onClick={() => { loadedProjectBoardSignature.current = ''; setProjectError(null); setProjectLoadAttempt((value) => value + 1); }}>Reintentar proyectos</button><button type="button" onClick={() => setProjectError(null)} aria-label="Cerrar aviso"><X size={14} /></button></div>}
@@ -1490,7 +1529,6 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         </div>
       )}
       {notice && <div className="board-toast" role="status">{notice}<button onClick={() => setNotice(null)} aria-label="Cerrar aviso"><X size={14} /></button></div>}
-
       {referencesOpen && activeProject && (
         <aside className="board-reference-panel" aria-label={`Referencias PDF de ${activeProject.name}`}>
           <div className="board-reference-heading"><div><strong>Referencias PDF</strong><span>{activeProject.name}</span></div><button className="board-icon-button" onClick={() => setReferencesOpen(false)} aria-label="Cerrar referencias"><X size={15} /></button></div>
@@ -1507,6 +1545,36 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         </aside>
       )}
 
+      <div className="board-body">
+        <aside className="board-rail" aria-label="Herramientas del tablero">
+          {RAIL_TOOLS.map((toolId) => {
+            const tool = getBoardTool(toolId);
+            if (!tool) return null;
+            const Icono = tool.icono;
+            const etiquetas: Record<string, string> = { note: 'Nota', link: 'Enlace', media: 'Imagen', referente: 'Referente', marco: 'Marco', entropia: 'Entropía' };
+            const aria: Record<string, string> = { note: 'Nueva nota', link: 'Añadir enlace', media: 'Añadir imagen', referente: 'Añadir referente', marco: 'Dibujar marco', entropia: 'Añadir entropía' };
+            return (
+              <button
+                key={toolId}
+                type="button"
+                className={`board-rail-tool ${frameToolId === toolId ? 'active' : ''}`}
+                onClick={() => chooseTool(toolId)}
+                draggable
+                onDragStart={startToolDrag(toolId)}
+                aria-label={aria[toolId] ?? tool.nombre}
+                title={`${etiquetas[toolId] ?? tool.nombre} · arrastra al tablero`}
+              >
+                {Icono ? <Icono size={19} /> : <Plus size={18} />}
+                <span>{etiquetas[toolId] ?? tool.nombre}</span>
+              </button>
+            );
+          })}
+          <button type="button" className="board-rail-tool" onClick={() => setAddMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={addMenuOpen} aria-label="Más herramientas" title="Más herramientas del registro">
+            <Plus size={19} />
+            <span>Más</span>
+          </button>
+        </aside>
+
       <main
         ref={viewportRef}
         className={`board-viewport ${isPanning ? 'panning' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
@@ -1515,6 +1583,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         onPointerMove={moveViewportGesture}
         onPointerUp={endViewportGesture}
         onPointerCancel={endViewportGesture}
+        onDragOver={(event) => { if (event.dataTransfer.types.includes('application/x-prometeo-tool')) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }}
+        onDrop={dropTool}
         onClickCapture={(event) => {
           if (!suppressViewportClick.current) return;
           suppressViewportClick.current = false;
@@ -1668,14 +1738,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
           )}
         </div>
 
-        <div className="board-zoom-controls" aria-label="Controles de vista">
-          <button onClick={() => zoomBy(1.15)} aria-label="Acercar"><ZoomIn size={16} /></button>
-          <span>{Math.round(zoom * 100)}%</span>
-          <button onClick={() => zoomBy(1 / 1.15)} aria-label="Alejar"><ZoomOut size={16} /></button>
-          <button onClick={fitBoard} aria-label="Ajustar tablero" title="Ajustar todas las tarjetas">Ajustar</button>
-        </div>
         <div className="board-count">{activeBoard.cards.length} {activeBoard.cards.length === 1 ? 'tarjeta' : 'tarjetas'} · arrastra el fondo para moverte · ⌘/Ctrl + rueda para acercar</div>
       </main>
+
+        <input ref={importInput} type="file" accept="application/json,.json,text/markdown,.md" hidden onChange={(event) => { void importBoard(event.target.files?.[0]); event.target.value = ''; }} />
+        <input ref={mediaInput} type="file" accept="image/*,video/*,audio/*,application/pdf,text/plain,.txt" hidden onChange={(event) => { void addMedia(event.target.files?.[0]); event.target.value = ''; }} />
+        <input ref={gustosInput} type="file" accept="application/json,.json" hidden aria-label="Archivo de gustos parciales" onChange={(event) => { void importGustos(event.target.files?.[0]); event.target.value = ''; }} />
+      </div>
 
       {archiveFullscreenFrame && (
         <div className="board-archive-fullscreen" role="dialog" aria-modal="true" aria-label={`Archivo a pantalla completa: ${archiveFullscreenFrame.title || 'marco'}`}>
@@ -1689,11 +1758,22 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         </div>
       )}
 
-      {selectedCards.length > 1 ? (
-        <aside className="board-selection" aria-live="polite">{selectedCards.length} tarjetas seleccionadas</aside>
-      ) : selectedCard ? (
-        <aside className="board-selection" aria-live="polite">Seleccionada: <strong>{selectedCard.title || 'Sin título'}</strong></aside>
-      ) : null}
+      {selectedCards.length > 1 && (
+        <div className="board-selection-bar" role="toolbar" aria-label={`Alinear ${selectedCards.length} tarjetas seleccionadas`}>
+          <span className="board-selection-count">{selectedCards.length} seleccionadas</span>
+          <button type="button" className="board-selection-button" onClick={() => alignSelection('left')} aria-label="Alinear a la izquierda" title="Alinear a la izquierda">Izq</button>
+          <button type="button" className="board-selection-button" onClick={() => alignSelection('center-x')} aria-label="Centrar en vertical" title="Alinear los centros sobre el eje vertical">Centro</button>
+          <button type="button" className="board-selection-button" onClick={() => alignSelection('right')} aria-label="Alinear a la derecha" title="Alinear a la derecha">Der</button>
+          <button type="button" className="board-selection-button" onClick={() => alignSelection('top')} aria-label="Alinear arriba" title="Alinear arriba">Arriba</button>
+          <button type="button" className="board-selection-button" onClick={() => alignSelection('center-y')} aria-label="Centrar en horizontal" title="Alinear los centros sobre el eje horizontal">Medio</button>
+          <button type="button" className="board-selection-button" onClick={() => alignSelection('bottom')} aria-label="Alinear abajo" title="Alinear abajo">Abajo</button>
+          <span className="board-tool-divider" aria-hidden="true" />
+          <button type="button" className="board-selection-button" onClick={() => distributeSelection('horizontal')} disabled={selectedCardIds.length < 3} aria-label="Distribuir horizontalmente" title="Distribuir con espacios iguales en horizontal">↔</button>
+          <button type="button" className="board-selection-button" onClick={() => distributeSelection('vertical')} disabled={selectedCardIds.length < 3} aria-label="Distribuir verticalmente" title="Distribuir con espacios iguales en vertical">↕</button>
+          <span className="board-tool-divider" aria-hidden="true" />
+          <button type="button" className="board-selection-button danger" onClick={deleteSelectedCards} aria-label="Eliminar tarjetas seleccionadas" title="Eliminar tarjetas seleccionadas"><Trash2 size={14} /></button>
+        </div>
+      )}
 
       {mirarOpen && (
         <MirarDialog
