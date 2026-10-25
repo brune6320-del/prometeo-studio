@@ -357,6 +357,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [publishingFrameId, setPublishingFrameId] = useState<string | null>(null);
   /** El manifiesto semanal espera al motor local; el botón no se dispara dos veces. */
   const [manifesting, setManifesting] = useState(false);
+  const [propuestaManifiesto, setPropuestaManifiesto] = useState<{ frame: BoardCard; cards: BoardCard[] } | null>(null);
   const [boardHistories, setBoardHistories] = useState<Record<string, BoardHistory>>({});
   /** «nueva» declara que no había historial que restaurar; «restaurada» que sí. */
   const [historyStatus, setHistoryStatus] = useState<'nueva' | 'restaurada'>('nueva');
@@ -3210,17 +3211,48 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         fuentes: fuentesEntropia,
         ahora,
       });
-      updateBoard((board) => ({ ...board, cards: [...board.cards, ...cards] }));
-      setSelectedCardIds([frame.id]);
+      setPropuestaManifiesto({ frame, cards });
       setNotice(resultado.disponible
-        ? `Manifiesto creado con ${seleccion.collages.length} ${seleccion.collages.length === 1 ? 'collage' : 'collages'} y ${resultado.lineas.length} líneas. Abre «Ver como Archivo» o pulsa «Publicar».`
-        : `Sin DeepSeek (${resultado.motivo}). El marco ya está creado con 12 líneas vacías para escribir a mano.`);
+        ? 'Propuesta de manifiesto lista en el lienzo. Enter o clic la acepta; Esc la descarta.'
+        : `Sin DeepSeek (${resultado.motivo}). Hay una propuesta con 12 líneas vacías para escribir a mano. Enter o clic la acepta; Esc la descarta.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'No se pudo crear el manifiesto.');
     } finally {
       setManifesting(false);
     }
   };
+
+  const aceptarManifiesto = useCallback(() => {
+    const propuesta = propuestaManifiesto;
+    if (!propuesta) return;
+    updateBoard((board) => ({ ...board, cards: [...board.cards, ...propuesta.cards] }));
+    setSelectedCardIds([propuesta.frame.id]);
+    setPropuestaManifiesto(null);
+    setNotice('Manifiesto aceptado. Ya forma parte del tablero.');
+  }, [propuestaManifiesto, updateBoard]);
+
+  const descartarManifiesto = useCallback(() => {
+    setPropuestaManifiesto(null);
+    setNotice('Propuesta descartada. El tablero no cambió.');
+  }, []);
+
+  useEffect(() => {
+    if (!propuestaManifiesto) return;
+    const alTeclear = (event: KeyboardEvent) => {
+      if (esObjetivoDeTexto(event.target)) return;
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        aceptarManifiesto();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        descartarManifiesto();
+      }
+    };
+    window.addEventListener('keydown', alTeclear, true);
+    return () => window.removeEventListener('keydown', alTeclear, true);
+  }, [aceptarManifiesto, descartarManifiesto, propuestaManifiesto]);
 
   /** Las herramientas entregan la tarjeta completa; se conserva el agrupado de deshacer por campo de texto. */
   const replaceCard = useCallback((next: BoardCard) => {
@@ -4601,6 +4633,26 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
               />
             );
           })}
+          {propuestaManifiesto && (
+            <div
+              className="board-propuesta"
+              style={{
+                left: propuestaManifiesto.frame.x,
+                top: propuestaManifiesto.frame.y,
+                width: propuestaManifiesto.frame.width,
+                height: readFrameData(propuestaManifiesto.frame).alto,
+              }}
+              role="group"
+              aria-label="Propuesta de manifiesto pendiente"
+              onClick={(event) => { event.stopPropagation(); aceptarManifiesto(); }}
+            >
+              <div className="board-propuesta-head">Propuesta de la IA · Enter o clic acepta · Esc descarta</div>
+              <h3>{propuestaManifiesto.frame.title || 'Manifiesto'}</h3>
+              <div className="board-propuesta-lines">
+                {propuestaManifiesto.cards.slice(0, 12).map((card) => <p key={card.id}>{card.title || card.body}</p>)}
+              </div>
+            </div>
+          )}
           {frameDraft && (
             <div
               className="board-frame-draft"

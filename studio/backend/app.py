@@ -259,6 +259,35 @@ class VerifyExportRequest(BaseModel):
     output_filename: Optional[str] = None
 
 
+class TypographyRequest(BaseModel):
+    node_id: str
+    new_text: Optional[str] = None
+    font_size_pt: Optional[float] = Field(default=None, ge=4, le=300)
+    color: Any = None
+    font_family: Optional[str] = None
+
+
+class AnnotationRequest(BaseModel):
+    page: int
+    kind: str
+    text: Optional[str] = None
+    image_data_url: Optional[str] = None
+    x: float = 72
+    y: float = 72
+    width: float = 240
+    height: Optional[float] = None
+    font_size_pt: float = 12
+    color: Any = None
+
+
+class OrganizePagesRequest(BaseModel):
+    order: Optional[List[int]] = None
+    rotate: Optional[List[Dict[str, Any]]] = None
+    delete: Optional[List[int]] = None
+    merge: Optional[List[str]] = None
+    filename: Optional[str] = None
+
+
 class AgentChatRequest(BaseModel):
     message: str
 
@@ -708,6 +737,61 @@ def remove_staged_op(session_id: str, op_id: str):
 @app.delete("/api/sessions/{session_id}/transaction")
 def clear_transaction_tray(session_id: str):
     return _get_active_session(session_id).clear_transaction()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# HERRAMIENTAS DE DOCUMENTO (H8): archivos nuevos, original intacto
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.post("/api/sessions/{session_id}/typography")
+def edit_typography(session_id: str, req: TypographyRequest):
+    sess = _get_active_session(session_id)
+    return sess.typography_edit(
+        node_id=req.node_id,
+        new_text=req.new_text,
+        font_size_pt=req.font_size_pt,
+        color=req.color,
+        font_family=req.font_family,
+    )
+
+
+@app.post("/api/sessions/{session_id}/annotate")
+def annotate_document(session_id: str, req: AnnotationRequest):
+    sess = _get_active_session(session_id)
+    return sess.annotate_document(
+        page_number=req.page,
+        kind=req.kind,
+        text=req.text,
+        image_data_url=req.image_data_url,
+        x=req.x,
+        y=req.y,
+        width=req.width,
+        height=req.height,
+        font_size_pt=req.font_size_pt,
+        color=req.color,
+    )
+
+
+@app.post("/api/sessions/{session_id}/organize_pages")
+def organize_document_pages(session_id: str, req: OrganizePagesRequest):
+    sess = _get_active_session(session_id)
+    return sess.organize_pages(
+        order=req.order,
+        rotate=req.rotate,
+        delete=req.delete,
+        merge=req.merge,
+        filename=req.filename,
+    )
+
+
+@app.get("/api/sessions/{session_id}/advanced/{token}")
+def download_advanced_output(session_id: str, token: str):
+    sess = _get_active_session(session_id)
+    rec = sess.get_advanced_output(token)
+    if rec is None:
+        raise E.ApiError(404, "ADVANCED_OUTPUT_NOT_FOUND", "Esa copia ya no existe en la sesión.", E.STAGE_EXPORT)
+    return FileResponse(rec["path"], filename=rec["filename"], media_type="application/pdf",
+                        headers={"X-Prometeo-Output-Sha256": rec["sha256"]})
 
 
 # ─────────────────────────────────────────────────────────────────────────────

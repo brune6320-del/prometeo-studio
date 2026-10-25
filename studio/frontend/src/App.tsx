@@ -18,6 +18,7 @@ import { BoardWorkspace } from './components/BoardWorkspace';
 import { Outliner } from './components/Outliner';
 import { Viewport } from './components/Viewport';
 import { Inspector } from './components/Inspector';
+import { DocumentTools } from './components/DocumentTools';
 import { TransactionTray } from './components/TransactionTray';
 import { VerifierPanel } from './components/VerifierPanel';
 import { DiffPanel, textChanges } from './components/DiffPanel';
@@ -68,6 +69,7 @@ const Studio: React.FC<{
 
   const [uiMode, setUiMode] = useState<'user' | 'technical'>('user');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [documentToolsOpen, setDocumentToolsOpen] = useState(false);
   const [selectedOcr, setSelectedOcr] = useState<OCRObservation | null>(null);
   const [nodeDetail, setNodeDetail] = useState<NodeDetail | null>(null);
   const [nodeLoading, setNodeLoading] = useState(false);
@@ -347,6 +349,7 @@ const Studio: React.FC<{
         onOpenFile={openFileGuarded}
         onToggleMode={() => setUiMode((m) => (m === 'user' ? 'technical' : 'user'))}
         onSearch={() => setSearchOpen(true)}
+        onDocumentTools={() => setDocumentToolsOpen(true)}
         onOpenBoard={() => unsaved.guard('open', () => setWorkspaceMode('board'))}
         leftOpen={leftOpen}
         rightOpen={rightOpen}
@@ -578,6 +581,17 @@ const Studio: React.FC<{
           onClose={() => setSearchOpen(false)}
           onPickNode={(id, page) => selectNode(id, page)}
           onPickOcr={selectOcr}
+        />
+      )}
+
+      {documentToolsOpen && sessionId && docs.doc && (
+        <DocumentTools
+          sessionId={sessionId}
+          summary={docs.doc.summary}
+          node={nodeDetail}
+          currentPage={docs.currentPage}
+          pageCount={docs.pageCount}
+          onClose={() => setDocumentToolsOpen(false)}
         />
       )}
 

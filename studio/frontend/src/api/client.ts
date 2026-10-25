@@ -29,6 +29,7 @@ import type {
   StagedOperation,
   TransactionTrayData,
   VerifyAndExportResponse,
+  AdvancedOutput,
 } from '../types';
 
 interface InjectedBackend {
@@ -351,6 +352,36 @@ export const studioApi = {
   },
 
   /** Descarga por el navegador (solo modo web; en escritorio se usa saveVerified). */
+
+  // ── H8 · herramientas de documento (archivos nuevos, original intacto) ──
+  async typography(sessionId: string, payload: { node_id: string; new_text?: string; font_size_pt?: number; color?: string; font_family?: string }): Promise<AdvancedOutput> {
+    return request<AdvancedOutput>(`/api/sessions/${enc(sessionId)}/typography`, { method: 'POST', json: payload, stage: 'EXPORT', timeoutMs: 60_000 });
+  },
+
+  async annotate(sessionId: string, payload: { page: number; kind: 'text' | 'image'; text?: string; image_data_url?: string; x: number; y: number; width: number; height?: number; font_size_pt?: number; color?: string }): Promise<AdvancedOutput> {
+    return request<AdvancedOutput>(`/api/sessions/${enc(sessionId)}/annotate`, { method: 'POST', json: payload, stage: 'EXPORT', timeoutMs: 60_000 });
+  },
+
+  async organizePages(sessionId: string, payload: { order?: number[]; rotate?: Array<{ page: number; degrees: number }>; delete?: number[]; merge?: string[]; filename?: string }): Promise<AdvancedOutput> {
+    return request<AdvancedOutput>(`/api/sessions/${enc(sessionId)}/organize_pages`, { method: 'POST', json: payload, stage: 'EXPORT', timeoutMs: 120_000 });
+  },
+
+  async downloadAdvancedPdf(sessionId: string, token: string): Promise<string> {
+    const res = await request<Response>(`/api/sessions/${enc(sessionId)}/advanced/${enc(token)}`, { raw: true, stage: 'EXPORT', timeoutMs: 60_000 });
+    const blob = await res.blob();
+    const match = (res.headers.get('content-disposition') || '').match(/filename="?([^";]+)"?/);
+    const filename = match?.[1] ?? 'documento-prometeo.pdf';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    return filename;
+  },
+
   async downloadVerifiedPdf(sessionId: string): Promise<string> {
     const res = await request<Response>(`/api/sessions/${enc(sessionId)}/download`, { raw: true, stage: 'EXPORT', timeoutMs: 60_000 });
     const blob = await res.blob();

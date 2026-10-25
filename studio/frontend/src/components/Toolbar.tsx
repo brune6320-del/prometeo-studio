@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { FileUp, LayoutDashboard, PanelLeft, PanelRight, Search, Wrench } from 'lucide-react';
+import { FileText, FileUp, LayoutDashboard, PanelLeft, PanelRight, Search, Wrench } from 'lucide-react';
 import { BrandMark, StatusBadge, type StatusKind } from './ui';
 import type { OpenDocument } from '../hooks/useDocumentSession';
 import type { TxPhase } from '../hooks/useTransaction';
@@ -26,6 +26,7 @@ interface ToolbarProps {
   onOpenFile: (file: File) => void;
   onToggleMode: () => void;
   onSearch: () => void;
+  onDocumentTools: () => void;
   onOpenBoard: () => void;
   leftOpen: boolean;
   rightOpen: boolean;
@@ -45,6 +46,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onOpenFile,
   onToggleMode,
   onSearch,
+  onDocumentTools,
   onOpenBoard,
   leftOpen,
   rightOpen,
@@ -120,6 +122,10 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
         <button className="btn btn-ghost btn-sm" onClick={onOpenBoard} title="Abrir el tablero visual">
           <LayoutDashboard size={15} aria-hidden="true" /> Tablero
+        </button>
+
+        <button className="btn btn-ghost btn-sm" onClick={onDocumentTools} disabled={!doc} title="Capacidades, tipografía, anotaciones y páginas">
+          <FileText size={15} aria-hidden="true" /> Documento
         </button>
 
         <button className="btn btn-ghost btn-icon" onClick={onSearch} disabled={!doc} aria-label="Buscar en el documento (Cmd+F)" title="Buscar (⌘F)">

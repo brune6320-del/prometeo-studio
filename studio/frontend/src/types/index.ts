@@ -382,3 +382,31 @@ export interface ManifiestoResponse {
   modelo?: string;
   lineas?: string[];
 }
+
+/** H8 · salida de una herramienta de documento: siempre un PDF nuevo con SHA-256. */
+export interface AdvancedOutput {
+  ok: boolean;
+  code?: string;
+  reason?: string;
+  filename?: string;
+  token?: string;
+  sha256?: string;
+  download_url?: string;
+  others_unchanged?: boolean;
+  target_span?: {
+    page: number;
+    bbox: number[];
+    old_text: string;
+    new_text: string;
+    font: string;
+    size_pt: number;
+    color: string;
+  };
+  measured_width_pt?: number;
+  available_width_pt?: number;
+  suggested_size_pt?: number;
+  layer?: string;
+  page?: number;
+  kind?: string;
+  pages?: number;
+}

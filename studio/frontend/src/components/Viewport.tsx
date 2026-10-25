@@ -142,7 +142,7 @@ export const Viewport: React.FC<ViewportProps> = (p) => {
         <div className={`page-paper ${p.render.status === 'loading' && opts.interactive ? 'is-loading' : ''}`} style={{ width: w, height: h }}>
           <img src={img.image_data_url} alt={`${opts.label ?? 'Página'} ${p.currentPage + 1}`} width={w} height={h} draggable={false} />
           {opts.interactive && showFrames && (
-            <div aria-hidden="true">
+            <div>
               {selectableNodes.map((n) => {
                 const r = pdfBBoxToViewportRect(n.bbox!, metrics);
                 const cls = [
@@ -159,7 +159,14 @@ export const Viewport: React.FC<ViewportProps> = (p) => {
                     style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
                     onClick={() => p.onSelectNode(n.id)}
                     title={n.text || n.id}
+                    aria-label={n.type === 'TEXT' ? `Texto: ${n.text}` : undefined}
                   >
+                    {n.type === 'TEXT' && n.text && (
+                      <span
+                        className="overlay-text-content"
+                        style={{ fontSize: Math.max(4, r.height * 0.82), lineHeight: 1 }}
+                      >{n.text}</span>
+                    )}
                     {p.showStagedTags && p.stagedNodeIds.has(n.id) && <span className="overlay-tag">Preparado</span>}
                   </div>
                 );

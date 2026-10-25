@@ -26,6 +26,7 @@ import shutil
 import uuid
 import base64
 import hashlib
+import re
 import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -147,6 +148,9 @@ class StudioDocumentSession:
         self.last_exported_filename: Optional[str] = None
         self.last_verifier_result: Optional[Dict[str, Any]] = None
         self.last_diff: Optional[Dict[str, Any]] = None
+        # Salidas de las herramientas de documento (tipografía, anotaciones, páginas):
+        # siempre archivos nuevos, nunca el original ni la copia de trabajo.
+        self.advanced_outputs: Dict[str, str] = {}
         # Ganchos sustituibles en pruebas: aplicación raster y verificador.
         self._raster_apply_fn = apply_raster_transaction
         self._raster_verify_loader = xp.load_raster_verifier
@@ -891,6 +895,309 @@ class StudioDocumentSession:
             "staged_total": len(self.staged_operations),
             "transaction_state": self.transaction_state,
         }
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # HERRAMIENTAS DE DOCUMENTO (H8): tipografía, anotaciones y páginas
+    # Todas producen un archivo NUEVO con su SHA-256; el original nunca se toca.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _save_advanced(self, doc: "pymupdf.Document", prefix: str, filename: Optional[str] = None) -> Dict[str, Any]:
+        folder = os.path.join(self.session_dir, "advanced")
+        os.makedirs(folder, exist_ok=True)
+        token = f"{prefix}_{uuid.uuid4().hex[:12]}.pdf"
+        path = os.path.join(folder, token)
+        doc.save(path, garbage=3, deflate=True)
+        doc.close()
+        digest = sha256_file(path)
+        self.advanced_outputs[token] = path
+        return {
+            "ok": True,
+            "filename": sanitize_filename(filename or token),
+            "token": token,
+            "sha256": digest,
+            "download_url": f"/api/sessions/{self.session_id}/advanced/{token}",
+        }
+
+    def get_advanced_output(self, token: str) -> Optional[Dict[str, Any]]:
+        if not re.fullmatch(r"[a-z]+_[0-9a-f]{12}\.pdf", token):
+            return None
+        path = self.advanced_outputs.get(token)
+        if not path or not os.path.isfile(path):
+            return None
+        return {"path": path, "filename": os.path.basename(path), "sha256": sha256_file(path)}
+
+    @staticmethod
+    def _span_signature(span: Dict[str, Any]) -> Tuple[Any, ...]:
+        bbox = tuple(round(float(value), 2) for value in span.get("bbox", (0, 0, 0, 0)))
+        return (
+            bbox,
+            str(span.get("text", "")),
+            str(span.get("font", "")),
+            round(float(span.get("size", 0)), 2),
+            int(span.get("color", 0)),
+        )
+
+    @staticmethod
+    def _spans(page: "pymupdf.Page") -> List[Dict[str, Any]]:
+        spans: List[Dict[str, Any]] = []
+        data = page.get_text("dict")
+        for block in data.get("blocks", []):
+            if block.get("type") != 0:
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    if str(span.get("text", "")).strip():
+                        spans.append(span)
+        return spans
+
+    @staticmethod
+    def _font_name(requested: Optional[str], original: str) -> str:
+        candidato = (requested or "").strip().lower()
+        if candidato in {"helv", "hebo", "heit", "hebi", "times", "tibo", "tito", "tibi", "cour", "cobo", "coit", "cobi"}:
+            return candidato
+        if "mono" in candidato or "courier" in candidato:
+            return "cour"
+        if "times" in candidato or "serif" in candidato:
+            return "times"
+        if "bold" in candidato and "italic" in candidato:
+            return "hebi"
+        if "bold" in candidato:
+            return "hebo"
+        if "italic" in candidato:
+            return "heit"
+        if "times" in original.lower() or "serif" in original.lower():
+            return "times"
+        if "courier" in original.lower() or "mono" in original.lower():
+            return "cour"
+        return "helv"
+
+    @staticmethod
+    def _color_rgb(value: Any) -> Optional[Tuple[float, float, float]]:
+        if isinstance(value, str):
+            limpio = value.strip().lstrip("#")
+            if re.fullmatch(r"[0-9a-fA-F]{6}", limpio):
+                return tuple(int(limpio[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+            return None
+        if isinstance(value, (list, tuple)) and len(value) == 3 and all(isinstance(item, (int, float)) for item in value):
+            return tuple(max(0.0, min(1.0, float(item))) for item in value)
+        return None
+
+    def typography_edit(
+        self,
+        node_id: str,
+        new_text: Optional[str] = None,
+        font_size_pt: Optional[float] = None,
+        color: Any = None,
+        font_family: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Cambia texto/tamaño/color/fuente de un span solo si otro texto queda intacto y cabe.
+
+        Es una edición verificada de ida: se aplica en memoria, se compara cada span
+        restante de la página y, solo si todos son idénticos, se escribe un PDF nuevo.
+        """
+        self._assert_original_unmodified()
+        node = self.graph.get_node(node_id)
+        if node is None or node.node_type != NodeType.TEXT.value:
+            return {"ok": False, "code": "NOT_TEXT", "reason": "El nodo no es un texto editable."}
+        if node.page is None or node.bbox is None:
+            return {"ok": False, "code": "NO_GEOMETRY", "reason": "El texto no tiene página o caja."}
+        doc = pymupdf.open(self.working_copy_path)
+        try:
+            page = doc[node.page]
+            spans = self._spans(page)
+            objetivo = None
+            mejor_distancia = None
+            for span in spans:
+                bbox = span.get("bbox") or (0, 0, 0, 0)
+                if str(span.get("text", "")) != node.text:
+                    continue
+                centro = ((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
+                nodo_centro = ((node.bbox[0] + node.bbox[2]) / 2, (node.bbox[1] + node.bbox[3]) / 2)
+                distancia = abs(centro[0] - nodo_centro[0]) + abs(centro[1] - nodo_centro[1])
+                if mejor_distancia is None or distancia < mejor_distancia:
+                    objetivo = span
+                    mejor_distancia = distancia
+            if objetivo is None:
+                return {"ok": False, "code": "SPAN_NOT_FOUND", "reason": "No se encontró el span exacto en el archivo de trabajo."}
+            bbox = tuple(float(value) for value in objetivo["bbox"])
+            texto = (new_text if new_text is not None else str(objetivo.get("text", ""))).strip()
+            if not texto:
+                return {"ok": False, "code": "EMPTY_TEXT", "reason": "El texto nuevo no puede quedar vacío."}
+            tamano = float(font_size_pt) if font_size_pt is not None else float(objetivo.get("size", 11))
+            if tamano < 4 or tamano > 300:
+                return {"ok": False, "code": "SIZE_OUT_OF_RANGE", "reason": "El tamaño debe estar entre 4 y 300 pt."}
+            fuente = self._font_name(font_family, str(objetivo.get("font", "")))
+            color_rgb = self._color_rgb(color)
+            ancho_disponible = max(0.0, bbox[2] - bbox[0])
+            alto_disponible = max(0.0, bbox[3] - bbox[1])
+            try:
+                ancho_texto = pymupdf.Font(fontname=fuente).text_length(texto, tamano)
+            except Exception:
+                ancho_texto = pymupdf.get_text_length(texto, fontname=fuente, fontsize=tamano)
+            if ancho_texto > ancho_disponible + 0.75:
+                sugerido = max(4.0, min(tamano, tamano * (ancho_disponible / max(ancho_texto, 0.1))))
+                return {
+                    "ok": False,
+                    "code": "TYPOGRAPHY_DOES_NOT_FIT",
+                    "reason": f"El texto no cabe: necesita {ancho_texto:.1f} pt y hay {ancho_disponible:.1f} pt.",
+                    "measured_width_pt": round(ancho_texto, 2),
+                    "available_width_pt": round(ancho_disponible, 2),
+                    "suggested_size_pt": round(sugerido, 1),
+                }
+            if tamano > alto_disponible * 1.45:
+                return {
+                    "ok": False,
+                    "code": "TYPOGRAPHY_TOO_TALL",
+                    "reason": f"El tamaño {tamano:.1f} pt no cabe en una caja de {alto_disponible:.1f} pt de alto.",
+                    "available_height_pt": round(alto_disponible, 2),
+                }
+            antes = [self._span_signature(span) for span in spans if span is not objetivo]
+            rect = pymupdf.Rect(bbox[0] - 0.4, bbox[1] - 0.4, bbox[2] + 0.4, bbox[3] + 0.4)
+            page.add_redact_annot(rect)
+            page.apply_redactions(images=pymupdf.PDF_REDACT_IMAGE_NONE, graphics=pymupdf.PDF_REDACT_LINE_ART_NONE)
+            origen = objetivo.get("origin") or (bbox[0], bbox[3] - max(1.0, (bbox[3] - bbox[1]) * 0.2))
+            page.insert_text(
+                (float(origen[0]), float(origen[1])),
+                texto,
+                fontname=fuente,
+                fontsize=tamano,
+                color=color_rgb or pymupdf.sRGB_to_pdf(int(objetivo.get("color", 0))),
+                overlay=True,
+            )
+            despues_spans = self._spans(page)
+            target_area = pymupdf.Rect(bbox[0] - 2, bbox[1] - 2, bbox[2] + 2, bbox[3] + 2)
+            despues = [
+                self._span_signature(span)
+                for span in despues_spans
+                if not (str(span.get("text", "")).strip() == texto and target_area.contains(pymupdf.Rect(span["bbox"])))
+            ]
+            from collections import Counter
+            if Counter(antes) != Counter(despues):
+                return {
+                    "ok": False,
+                    "code": "NEIGHBORS_CHANGED",
+                    "reason": "La edición habría cambiado otros objetos de texto de la página. No se guardó nada.",
+                    "other_spans_before": len(antes),
+                    "other_spans_after": len(despues),
+                }
+            salida = self._save_advanced(doc, "tipografia", f"{self.source_filename.rsplit('.', 1)[0]}-tipografia.pdf")
+            doc = None
+            salida.update({
+                "others_unchanged": True,
+                "target_span": {
+                    "page": node.page + 1,
+                    "bbox": [round(value, 2) for value in bbox],
+                    "old_text": node.text,
+                    "new_text": texto,
+                    "font": fuente,
+                    "size_pt": round(tamano, 2),
+                    "color": "#" + "".join(f"{round(canal * 255):02x}" for canal in (color_rgb or pymupdf.sRGB_to_pdf(int(objetivo.get("color", 0))))),
+                },
+            })
+            return salida
+        finally:
+            if doc is not None:
+                doc.close()
+
+    def annotate_document(
+        self,
+        page_number: int,
+        kind: str,
+        text: Optional[str] = None,
+        image_data_url: Optional[str] = None,
+        x: float = 72,
+        y: float = 72,
+        width: float = 240,
+        height: Optional[float] = None,
+        font_size_pt: float = 12,
+        color: Any = None,
+    ) -> Dict[str, Any]:
+        """Añade texto o imagen en una capa de anotación; el archivo resultante es nuevo."""
+        self._assert_original_unmodified()
+        doc = pymupdf.open(self.working_copy_path)
+        try:
+            if page_number < 1 or page_number > doc.page_count:
+                return {"ok": False, "code": "PAGE_OUT_OF_RANGE", "reason": "La página no existe."}
+            page = doc[page_number - 1]
+            ocg = doc.add_ocg("Prometeo · anotaciones", on=1)
+            rect = pymupdf.Rect(x, y, x + max(20.0, width), y + max(20.0, height or max(20.0, font_size_pt * 2.2)))
+            if rect.x1 > page.rect.width or rect.y1 > page.rect.height or rect.x0 < 0 or rect.y0 < 0:
+                return {"ok": False, "code": "ANNOTATION_OUT_OF_PAGE", "reason": "La anotación cae fuera de la página."}
+            if kind == "text":
+                contenido = (text or "").strip()
+                if not contenido:
+                    return {"ok": False, "code": "EMPTY_TEXT", "reason": "La anotación de texto está vacía."}
+                rgb = self._color_rgb(color) or (0.1, 0.1, 0.1)
+                sobrante = page.insert_textbox(rect, contenido, fontsize=float(font_size_pt), fontname="helv", color=rgb, align=0, oc=ocg)
+                if sobrante < 0:
+                    return {"ok": False, "code": "ANNOTATION_DOES_NOT_FIT", "reason": "El texto no cabe en la caja indicada.", "overflow_pt": round(abs(sobrante), 2)}
+            elif kind == "image":
+                if not image_data_url or "," not in image_data_url:
+                    return {"ok": False, "code": "MISSING_IMAGE", "reason": "Falta la imagen de la anotación."}
+                try:
+                    stream = base64.b64decode(image_data_url.split(",", 1)[1], validate=True)
+                except Exception:
+                    return {"ok": False, "code": "BAD_IMAGE", "reason": "La imagen no es base64 válido."}
+                if len(stream) > 12 * 1024 * 1024:
+                    return {"ok": False, "code": "IMAGE_TOO_LARGE", "reason": "La imagen supera 12 MB."}
+                page.insert_image(rect, stream=stream, keep_proportion=True, overlay=True, oc=ocg)
+            else:
+                return {"ok": False, "code": "UNKNOWN_ANNOTATION", "reason": "Tipo de anotación no soportado."}
+            salida = self._save_advanced(doc, "anotacion", f"{self.source_filename.rsplit('.', 1)[0]}-anotado.pdf")
+            doc = None
+            salida.update({"layer": "Prometeo · anotaciones", "page": page_number, "kind": kind})
+            return salida
+        finally:
+            if doc is not None:
+                doc.close()
+
+    def organize_pages(
+        self,
+        order: Optional[List[int]] = None,
+        rotate: Optional[List[Dict[str, Any]]] = None,
+        delete: Optional[List[int]] = None,
+        merge: Optional[List[str]] = None,
+        filename: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Reordena, rota, quita y une PDFs; siempre produce un archivo nuevo."""
+        self._assert_original_unmodified()
+        doc = pymupdf.open(self.working_copy_path)
+        try:
+            for data_url in merge or []:
+                if not data_url or "," not in data_url:
+                    return {"ok": False, "code": "BAD_MERGE", "reason": "Un PDF para unir no llegó como data URL."}
+                try:
+                    stream = base64.b64decode(data_url.split(",", 1)[1], validate=True)
+                except Exception:
+                    return {"ok": False, "code": "BAD_MERGE", "reason": "El PDF para unir no es base64 válido."}
+                if len(stream) > 200 * 1024 * 1024:
+                    return {"ok": False, "code": "MERGE_TOO_LARGE", "reason": "El PDF para unir supera 200 MB."}
+                with pymupdf.open(stream=stream, filetype="pdf") as otro:
+                    doc.insert_pdf(otro)
+            for numero in sorted(set(delete or []), reverse=True):
+                if 1 <= numero <= doc.page_count:
+                    doc.delete_page(numero - 1)
+            for item in rotate or []:
+                numero = int(item.get("page", 0))
+                grados = int(item.get("degrees", 0))
+                if 1 <= numero <= doc.page_count and grados % 90 == 0:
+                    page = doc[numero - 1]
+                    page.set_rotation((page.rotation + grados) % 360)
+            if order:
+                if sorted(order) != list(range(1, doc.page_count + 1)):
+                    return {"ok": False, "code": "BAD_ORDER", "reason": "El orden debe incluir cada página existente exactamente una vez."}
+                nuevo = pymupdf.open()
+                for numero in order:
+                    nuevo.insert_pdf(doc, from_page=numero - 1, to_page=numero - 1)
+                doc.close()
+                doc = nuevo
+            salida = self._save_advanced(doc, "paginas", filename or f"{self.source_filename.rsplit('.', 1)[0]}-paginas.pdf")
+            doc = None
+            salida.update({"pages": len(order) if order else None})
+            return salida
+        finally:
+            if doc is not None:
+                doc.close()
 
     # ─────────────────────────────────────────────────────────────────────────
     # EXPORTACIÓN VERIFICADA: PREPARE → STAGING → VERIFY → PUBLISH (PA-002/003/004)
