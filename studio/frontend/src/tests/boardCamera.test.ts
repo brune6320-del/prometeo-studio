@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIT_MIN_ZOOM, fitBoardCamera } from '../board/camera';
+import { FIT_MIN_ZOOM, fitBoardCamera, factorDePellizco, screenToWorld, zoomAtPoint, ZOOM_PINCH_K } from '../board/camera';
 import type { BoardCard } from '../board/model';
 
 function card(id: string, x: number, y: number, width = 260): BoardCard {
@@ -34,5 +34,33 @@ describe('encuadre del tablero (Visual V1 · L1)', () => {
     const right = camera.pan.x + (6000 + 260) * camera.zoom;
     expect(left).toBeGreaterThanOrEqual(0);
     expect(right).toBeLessThanOrEqual(viewport.width);
+  });
+});
+
+describe('T-1 · pellizco 1:1', () => {
+  it('la constante vive en un solo sitio y un pellizco normal duplica el zoom', () => {
+    expect(ZOOM_PINCH_K).toBeGreaterThanOrEqual(0.01);
+    expect(ZOOM_PINCH_K).toBeLessThanOrEqual(0.02);
+    // Un gesto normal de trackpad Mac acumula alrededor de −58 px de deltaY.
+    expect(factorDePellizco(-58)).toBeGreaterThan(1.9);
+    expect(factorDePellizco(-58)).toBeLessThan(2.1);
+  });
+
+  it('el mundo bajo el cursor no se mueve al aplicar el factor', () => {
+    const camera = { pan: { x: 120, y: 80 }, zoom: 0.9 };
+    const cursor = { x: 733, y: 412 };
+    const antes = screenToWorld(cursor, camera);
+    const siguiente = zoomAtPoint(camera, camera.zoom * factorDePellizco(-24), cursor);
+    const despues = screenToWorld(cursor, siguiente);
+    expect(despues.x).toBeCloseTo(antes.x, 6);
+    expect(despues.y).toBeCloseTo(antes.y, 6);
+  });
+
+  it('el delta se aplica sin muelle: dos eventos seguidos multiplican de inmediato', () => {
+    const camera = { pan: { x: 10, y: 20 }, zoom: 1 };
+    const cursor = { x: 400, y: 300 };
+    const uno = zoomAtPoint(camera, camera.zoom * factorDePellizco(-10), cursor);
+    const dos = zoomAtPoint(uno, uno.zoom * factorDePellizco(-10), cursor);
+    expect(dos.zoom).toBeCloseTo(factorDePellizco(-20), 6);
   });
 });

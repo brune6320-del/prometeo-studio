@@ -21,6 +21,18 @@ export const MAX_BOARD_ZOOM = 2.4;
 /** «Ajustar» debe poder alejar más que el zoom de navegación para incluir todo el contenido. */
 export const FIT_MIN_ZOOM = 0.02;
 
+/**
+ * Sensibilidad del pellizco de trackpad (ctrl + rueda). Único sitio donde vive.
+ * Un pellizco normal de Mac acumula unos −58 px de deltaY: exp(0.012 · 58) ≈ 2,
+ * es decir, duplica el zoom en un solo gesto.
+ */
+export const ZOOM_PINCH_K = 0.012;
+
+/** Factor de zoom de un evento de pellizco, sin muelle ni suavizado. */
+export function factorDePellizco(deltaY: number): number {
+  return Math.exp(-deltaY * ZOOM_PINCH_K);
+}
+
 export function screenToWorld(point: Point, camera: BoardCamera): Point {
   return {
     x: (point.x - camera.pan.x) / camera.zoom,

@@ -498,6 +498,21 @@
   will-change: transform;
 }
 
+/*
+ * T-1 · mientras hay gesto (rueda, pellizco, arrastre o estirado) ninguna
+ * transición CSS puede retrasar el transform del mundo ni de las piezas.
+ * La clase la pone el DOM en BoardWorkspace; React no se toca por evento.
+ */
+.board-viewport.gesto-activo .board-stage,
+.board-viewport.gesto-activo .board-card,
+.board-viewport.gesto-activo .board-free-media,
+.board-viewport.gesto-activo .board-frame,
+.board-viewport.gesto-activo .board-column,
+.board-viewport.gesto-activo .mesa-piece {
+  transition: none !important;
+  animation: none !important;
+}
+
 .board-card {
   position: absolute;
   z-index: 1;
@@ -3250,14 +3265,25 @@
 
 .board-free-media-handle {
   position: absolute;
-  width: 13px;
-  height: 13px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.board-free-media-handle::after {
+  content: '';
+  width: 11px;
+  height: 11px;
   border: 1.5px solid var(--surface-paper);
   border-radius: var(--radius-pill);
   background: var(--accent);
   box-shadow: var(--shadow-1);
-  opacity: 0;
-  pointer-events: none;
 }
 
 .board-free-media:hover .board-free-media-handle,
@@ -3267,10 +3293,10 @@
   pointer-events: auto;
 }
 
-.board-free-media-handle.nw { top: -7px; left: -7px; cursor: nwse-resize; }
-.board-free-media-handle.ne { top: -7px; right: -7px; cursor: nesw-resize; }
-.board-free-media-handle.sw { bottom: -7px; left: -7px; cursor: nesw-resize; }
-.board-free-media-handle.se { right: -7px; bottom: -7px; cursor: nwse-resize; }
+.board-free-media-handle.nw { top: -11px; left: -11px; cursor: nwse-resize; }
+.board-free-media-handle.ne { top: -11px; right: -11px; cursor: nesw-resize; }
+.board-free-media-handle.sw { bottom: -11px; left: -11px; cursor: nesw-resize; }
+.board-free-media-handle.se { right: -11px; bottom: -11px; cursor: nwse-resize; }
 
 .board-stage[data-lod='min'] .board-free-media-caption,
 .board-stage[data-lod='min'] .board-free-media-play,

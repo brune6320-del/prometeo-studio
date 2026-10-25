@@ -42,8 +42,8 @@ import { normalizarVistaPrevia } from '../board/vistaPrevia';
 import { borrarPlantillasLegacy, crearPlantilla, leerPlantillasLegacy, listarPlantillas, materializar, type Plantilla } from '../board/plantillas';
 import { ABRIR_TABLERO_EVENT } from '../board/tools/tablero';
 import { studioApi } from '../api/client';
-import { fitBoardCamera, MAX_BOARD_ZOOM, MIN_BOARD_ZOOM, zoomAtPoint, screenToWorld } from '../board/camera';
-import { movimientoReducido, pasoInercia, resortar, seguir, TAU, velocidadDeMuestras, type MuestraInercia } from '../motion/muelle';
+import { factorDePellizco, fitBoardCamera, zoomAtPoint, screenToWorld } from '../board/camera';
+import { movimientoReducido, pasoInercia, velocidadDeMuestras, type MuestraInercia } from '../motion/muelle';
 import { alignCards, distributeCards, snapPosition, type Alignment, type CardSize, type DistributionAxis } from '../board/geometry';
 import { imanDeCaja, inclinacionPorVelocidad, type GuiasIman } from '../board/iman';
 import { esMediaLibre, medirMedio } from '../board/medio';
@@ -169,6 +169,12 @@ function liberarPuntero(element: HTMLElement | null, pointerId: number): void {
   }
 }
 
+/** Normaliza deltaMode (píxel, línea o página) a píxeles de pantalla. */
+function deltaDeRueda(event: WheelEvent, altoViewport: number): { x: number; y: number } {
+  const escala = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? altoViewport : 1;
+  return { x: event.deltaX * escala, y: event.deltaY * escala };
+}
+
 function downloadText(filename: string, content: string, mimeType: string): void {
   const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
   const anchor = document.createElement('a');
@@ -273,10 +279,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const cameraRef = useRef({ pan: { x: 0, y: 0 }, zoom: 1 });
   const paintRaf = useRef(0);
   const inertiaRaf = useRef(0);
-  const returnZoomRaf = useRef(0);
   const syncTimer = useRef<number | null>(null);
-  const wheelIdle = useRef<number | null>(null);
-  const wheelVelocity = useRef({ vx: 0, vy: 0, t: 0 });
+  /** Timer que retira `.gesto-activo` cuando dejan de llegar eventos de gesto. */
+  const gestoVisualTimer = useRef<number | null>(null);
   const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; samples: MuestraInercia[]; captureEl: HTMLElement | null } | null>(null);
   const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; sizes: Map<string, CardSize>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null; lastX: number; lastY: number; lastT: number; altKey: boolean; duplicated: boolean } | null>(null);
   /** Rectángulo de selección (⇧ + arrastrar el fondo), en coordenadas de pantalla. */
@@ -289,8 +294,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [settlingIds, setSettlingIds] = useState<string[]>([]);
   const [dropFrameId, setDropFrameId] = useState<string | null>(null);
   const dropFrameIdRef = useRef<string | null>(null);
-  const frameResize = useRef<{ pointerId: number; cardId: string; startX: number; startY: number; width: number; height: number; startBoard: BoardDocument; captureEl: HTMLElement | null } | null>(null);
-  const freeResize = useRef<{ pointerId: number; cardId: string; corner: EsquinaMedia; startX: number; startY: number; x: number; y: number; width: number; height: number; ratio: number; startBoard: BoardDocument; captureEl: HTMLElement | null } | null>(null);
+  const frameResize = useRef<{ pointerId: number; cardId: string; startX: number; startY: number; width: number; height: number; startBoard: BoardDocument; captureEl: HTMLElement | null; elemento: HTMLElement | null; raf: number; ultimo: { width: number; height: number } } | null>(null);
+  const freeResize = useRef<{ pointerId: number; cardId: string; corner: EsquinaMedia; startX: number; startY: number; x: number; y: number; width: number; height: number; ratio: number; startBoard: BoardDocument; captureEl: HTMLElement | null; elemento: HTMLElement | null; raf: number; ultimo: { x: number; y: number; width: number; height: number } | null } | null>(null);
   const settleTimer = useRef<number | null>(null);
   const frameDraw = useRef<{ pointerId: number; start: { x: number; y: number }; captureEl: HTMLElement | null } | null>(null);
   const wheelHandlerRef = useRef<(event: WheelEvent) => void>(() => {});
@@ -522,8 +527,34 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     syncTimer.current = window.setTimeout(() => {
       syncTimer.current = null;
       sincronizarCamara();
-    }, 140);
+    }, 150);
   }, [sincronizarCamara]);
+
+  /**
+   * Mientras hay gesto, ninguna transición CSS puede tocar transform/scale de las
+   * tarjetas ni del mundo. La clase vive en el DOM (no en React) para no re-renderizar.
+   */
+  const marcarGestoVisual = useCallback((duracionMs = 0) => {
+    viewportRef.current?.classList.add('gesto-activo');
+    if (gestoVisualTimer.current) {
+      window.clearTimeout(gestoVisualTimer.current);
+      gestoVisualTimer.current = null;
+    }
+    if (duracionMs > 0) {
+      gestoVisualTimer.current = window.setTimeout(() => {
+        gestoVisualTimer.current = null;
+        viewportRef.current?.classList.remove('gesto-activo');
+      }, duracionMs);
+    }
+  }, []);
+
+  const terminarGestoVisual = useCallback(() => {
+    if (gestoVisualTimer.current) {
+      window.clearTimeout(gestoVisualTimer.current);
+      gestoVisualTimer.current = null;
+    }
+    viewportRef.current?.classList.remove('gesto-activo');
+  }, []);
 
   const detenerInercia = useCallback(() => {
     if (inertiaRaf.current) {
@@ -552,45 +583,6 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     inertiaRaf.current = requestAnimationFrame(paso);
   }, [detenerInercia, pintarCamara, programarSincronizacion]);
 
-  const detenerRetornoZoom = useCallback(() => {
-    if (returnZoomRaf.current) {
-      cancelAnimationFrame(returnZoomRaf.current);
-      returnZoomRaf.current = 0;
-    }
-  }, []);
-
-  /** Si el pellizco empujó el zoom fuera de los topes, vuelve con banda elástica. */
-  const volverAZoom = useCallback(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const actual = cameraRef.current;
-    const destino = Math.max(MIN_BOARD_ZOOM, Math.min(MAX_BOARD_ZOOM, actual.zoom));
-    if (Math.abs(destino - actual.zoom) < 0.0005) return;
-    detenerRetornoZoom();
-    const focal = { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
-    const mundo = screenToWorld(focal, actual);
-    let zoomActual = actual.zoom;
-    let ultimo = performance.now();
-    const paso = (ahora: number) => {
-      const dt = Math.min(0.05, Math.max(0, (ahora - ultimo) / 1000));
-      ultimo = ahora;
-      zoomActual = seguir(zoomActual, destino, dt, TAU.rubber, 0.0005);
-      cameraRef.current = {
-        zoom: zoomActual,
-        pan: { x: focal.x - mundo.x * zoomActual, y: focal.y - mundo.y * zoomActual },
-      };
-      pintarCamara();
-      if (Math.abs(destino - zoomActual) > 0.0005) returnZoomRaf.current = requestAnimationFrame(paso);
-      else {
-        returnZoomRaf.current = 0;
-        cameraRef.current = { ...cameraRef.current, zoom: destino };
-        pintarCamara();
-        programarSincronizacion();
-      }
-    };
-    returnZoomRaf.current = requestAnimationFrame(paso);
-  }, [detenerRetornoZoom, pintarCamara, programarSincronizacion]);
-
   const limpiarInclinacion = useCallback(() => {
     viewportRef.current?.style.removeProperty('--drag-tilt');
   }, []);
@@ -598,10 +590,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   /** Un gesto nuevo o una pérdida de foco no deja capturas, clases ni timers colgados. */
   const cancelarGestos = useCallback(() => {
     detenerInercia();
-    detenerRetornoZoom();
-    if (wheelIdle.current) {
-      window.clearTimeout(wheelIdle.current);
-      wheelIdle.current = null;
+    if (gestoVisualTimer.current) {
+      window.clearTimeout(gestoVisualTimer.current);
+      gestoVisualTimer.current = null;
     }
     if (settleTimer.current) {
       window.clearTimeout(settleTimer.current);
@@ -614,13 +605,32 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const draw = frameDraw.current;
     if (draw) liberarPuntero(draw.captureEl, draw.pointerId);
     const resize = frameResize.current;
-    if (resize) liberarPuntero(resize.captureEl, resize.pointerId);
+    if (resize) {
+      liberarPuntero(resize.captureEl, resize.pointerId);
+      if (resize.raf) cancelAnimationFrame(resize.raf);
+      if (resize.elemento) {
+        resize.elemento.style.width = `${resize.width}px`;
+        resize.elemento.style.height = `${resize.height}px`;
+      }
+    }
+    const free = freeResize.current;
+    if (free) {
+      liberarPuntero(free.captureEl, free.pointerId);
+      if (free.raf) cancelAnimationFrame(free.raf);
+      if (free.elemento) {
+        free.elemento.style.left = `${free.x}px`;
+        free.elemento.style.top = `${free.y}px`;
+        free.elemento.style.width = `${free.width}px`;
+        free.elemento.style.height = `${free.height}px`;
+      }
+    }
     const marquesina = marqueeDrag.current;
     if (marquesina) liberarPuntero(marquesina.captureEl, marquesina.pointerId);
     panDrag.current = null;
     cardDrag.current = null;
     frameDraw.current = null;
     frameResize.current = null;
+    freeResize.current = null;
     marqueeDrag.current = null;
     connectOrigin.current = null;
     setConnectDraft(null);
@@ -633,7 +643,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setMarquee(null);
     setGuias({});
     limpiarInclinacion();
-  }, [detenerInercia, detenerRetornoZoom, limpiarInclinacion]);
+    terminarGestoVisual();
+  }, [detenerInercia, limpiarInclinacion, terminarGestoVisual]);
 
   useLayoutEffect(() => {
     aplicarCamara();
@@ -649,9 +660,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   useEffect(() => () => {
     if (paintRaf.current) cancelAnimationFrame(paintRaf.current);
     if (inertiaRaf.current) cancelAnimationFrame(inertiaRaf.current);
-    if (returnZoomRaf.current) cancelAnimationFrame(returnZoomRaf.current);
     if (syncTimer.current) window.clearTimeout(syncTimer.current);
-    if (wheelIdle.current) window.clearTimeout(wheelIdle.current);
+    if (gestoVisualTimer.current) window.clearTimeout(gestoVisualTimer.current);
   }, []);
 
   // El tablero cambia de vista o de documento: nada del gesto anterior debe sobrevivir.
@@ -996,46 +1006,23 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
     detenerInercia();
-    detenerRetornoZoom();
-    if (wheelIdle.current) {
-      window.clearTimeout(wheelIdle.current);
-      wheelIdle.current = null;
-    }
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
+    // El gesto anula transiciones CSS de transform mientras dura; el DOM, no React.
+    marcarGestoVisual(160);
     const actual = cameraRef.current;
+    const delta = deltaDeRueda(event, rect.height);
     if (event.metaKey || event.ctrlKey) {
       const focal = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-      const pedido = actual.zoom * Math.exp(-event.deltaY * 0.0012);
-      // Fuera de los topes el zoom cede (rubber-band) y vuelve solo: nunca un corte seco.
-      const conBanda = resortar(pedido, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM);
-      const siguiente = Math.max(MIN_BOARD_ZOOM * 0.72, Math.min(MAX_BOARD_ZOOM * 1.12, conBanda));
-      const mundo = screenToWorld(focal, actual);
-      cameraRef.current = {
-        zoom: siguiente,
-        pan: { x: focal.x - mundo.x * siguiente, y: focal.y - mundo.y * siguiente },
-      };
-      wheelIdle.current = window.setTimeout(() => {
-        wheelIdle.current = null;
-        volverAZoom();
-      }, 90);
+      // 1:1 con el delta del trackpad: sin muelle, sin lerp y sin inercia propia.
+      cameraRef.current = zoomAtPoint(actual, actual.zoom * factorDePellizco(delta.y), focal);
     } else {
-      cameraRef.current = { ...actual, pan: { x: actual.pan.x - event.deltaX, y: actual.pan.y - event.deltaY } };
-      const factor = 18;
-      wheelVelocity.current = {
-        vx: Math.max(-2400, Math.min(2400, -event.deltaX * factor)),
-        vy: Math.max(-2400, Math.min(2400, -event.deltaY * factor)),
-        t: performance.now(),
-      };
-      wheelIdle.current = window.setTimeout(() => {
-        wheelIdle.current = null;
-        const v = wheelVelocity.current;
-        if (performance.now() - v.t < 220) iniciarInercia(v.vx, v.vy);
-      }, 90);
+      cameraRef.current = { ...actual, pan: { x: actual.pan.x - delta.x, y: actual.pan.y - delta.y } };
     }
-    pintarCamara();
+    // Se escribe en el transform en el mismo frame; rAF solo se usa para el arrastre.
+    aplicarCamara();
     programarSincronizacion();
-  }, [detenerInercia, detenerRetornoZoom, iniciarInercia, pintarCamara, programarSincronizacion, volverAZoom]);
+  }, [aplicarCamara, detenerInercia, marcarGestoVisual, programarSincronizacion]);
 
   useEffect(() => {
     wheelHandlerRef.current = handleWheel;
@@ -1053,40 +1040,35 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   /**
    * Safari y WKWebView no siempre entregan el pellizco como ctrl+wheel. Los eventos
    * `gesture*` se cancelan para que el WebView no haga zoom de página y se traducen
-   * al mismo zoom de cámara. No hay API pública de 120 Hz: se deja a rAF.
+   * al mismo zoom de cámara, sin muelle y en el mismo frame.
    */
   useEffect(() => {
     const element = viewportRef.current;
     if (!element) return;
-    let base: { zoom: number; focal: { x: number; y: number }; mundo: { x: number; y: number } } | null = null;
+    let base: { zoom: number; pan: { x: number; y: number }; focal: { x: number; y: number } } | null = null;
     const start = (event: Event) => {
       const gesto = event as GestoWebKit;
       if (typeof gesto.scale !== 'number') return;
       event.preventDefault();
       detenerInercia();
-      detenerRetornoZoom();
+      marcarGestoVisual();
       const rect = element.getBoundingClientRect();
       const focal = { x: (gesto.clientX ?? rect.left + rect.width / 2) - rect.left, y: (gesto.clientY ?? rect.top + rect.height / 2) - rect.top };
-      base = { zoom: cameraRef.current.zoom, focal, mundo: screenToWorld(focal, cameraRef.current) };
+      base = { zoom: cameraRef.current.zoom, pan: cameraRef.current.pan, focal };
     };
     const change = (event: Event) => {
       const gesto = event as GestoWebKit;
       if (!base || typeof gesto.scale !== 'number') return;
       event.preventDefault();
-      const pedido = base.zoom * gesto.scale;
-      const siguiente = Math.max(MIN_BOARD_ZOOM * 0.72, Math.min(MAX_BOARD_ZOOM * 1.12, resortar(pedido, MIN_BOARD_ZOOM, MAX_BOARD_ZOOM)));
-      cameraRef.current = {
-        zoom: siguiente,
-        pan: { x: base.focal.x - base.mundo.x * siguiente, y: base.focal.y - base.mundo.y * siguiente },
-      };
-      pintarCamara();
+      cameraRef.current = zoomAtPoint({ zoom: base.zoom, pan: base.pan }, base.zoom * gesto.scale, base.focal);
+      aplicarCamara();
     };
     const end = (event: Event) => {
       if (!base) return;
       event.preventDefault();
       base = null;
+      terminarGestoVisual();
       programarSincronizacion();
-      volverAZoom();
     };
     element.addEventListener('gesturestart', start, { passive: false });
     element.addEventListener('gesturechange', change, { passive: false });
@@ -1096,7 +1078,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       element.removeEventListener('gesturechange', change);
       element.removeEventListener('gestureend', end);
     };
-  }, [detenerInercia, detenerRetornoZoom, loaded, pintarCamara, programarSincronizacion, volverAZoom]);
+  }, [aplicarCamara, detenerInercia, loaded, marcarGestoVisual, programarSincronizacion, terminarGestoVisual]);
 
   const zoomBy = (factor: number) => {
     const { width, height } = viewportSize;
@@ -1112,7 +1094,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const rect = viewportRef.current?.getBoundingClientRect();
     if (!rect) return;
     detenerInercia();
-    detenerRetornoZoom();
+    marcarGestoVisual();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     marqueeDrag.current = { pointerId: event.pointerId, startX: x, startY: y, captureEl: event.currentTarget };
@@ -1167,8 +1149,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const beginPan = (event: React.PointerEvent<HTMLDivElement>, force = false) => {
     if (event.button !== 0 || (!force && (event.target as HTMLElement).closest('.board-card, .board-frame, .board-free-media, .board-controls, .board-dialog, button, input, select, a, .board-empty'))) return;
     detenerInercia();
-    detenerRetornoZoom();
-    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
+    marcarGestoVisual();
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
     setSettlingIds([]);
     setGuias({});
@@ -1210,6 +1191,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       window.setTimeout(() => { suppressViewportClick.current = false; }, 0);
     }
     const velocidad = velocidadDeMuestras(drag.samples, 90);
+    terminarGestoVisual();
     programarSincronizacion();
     iniciarInercia(velocidad.x, velocidad.y);
   };
@@ -1224,8 +1206,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (event.button !== 0 || !frameToolId) return;
     if ((event.target as HTMLElement).closest('button, input, select, textarea, a, .board-free-media, .board-zoom-controls, .board-empty, .board-controls')) return;
     detenerInercia();
-    detenerRetornoZoom();
-    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
+    marcarGestoVisual();
     const start = viewportWorldPoint(event);
     frameDraw.current = { pointerId: event.pointerId, start, captureEl: event.currentTarget };
     setFrameDraft(rectFromPoints(start, start));
@@ -1243,6 +1224,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (!drag || drag.pointerId !== event.pointerId) return;
     const rect = rectFromPoints(drag.start, viewportWorldPoint(event));
     frameDraw.current = null;
+    terminarGestoVisual();
     liberarPuntero(drag.captureEl, event.pointerId);
     suppressViewportClick.current = true;
     window.setTimeout(() => { suppressViewportClick.current = false; }, 0);
@@ -1295,9 +1277,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLElement>) => {
     detenerInercia();
-    detenerRetornoZoom();
-    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
     if (spaceHeld.current || event.button !== 0 || event.detail > 1 || frameToolId || connectMode || card.locked || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
+    marcarGestoVisual();
     suppressCardClick.current = false;
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
     setSettlingIds([]);
@@ -1534,6 +1515,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (drag.moved) asentar(drag.ids);
     else limpiarInclinacion();
     cardDrag.current = null;
+    terminarGestoVisual();
   };
 
   const startFrameResize = (card: BoardCard, event: React.PointerEvent<HTMLButtonElement>) => {
@@ -1541,17 +1523,21 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     event.preventDefault();
     event.stopPropagation();
     detenerInercia();
-    detenerRetornoZoom();
-    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
+    marcarGestoVisual();
+    if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
+    const alto = readFrameData(card).alto;
     frameResize.current = {
       pointerId: event.pointerId,
       cardId: card.id,
       startX: event.clientX,
       startY: event.clientY,
       width: card.width,
-      height: readFrameData(card).alto,
+      height: alto,
       startBoard: activeBoard,
       captureEl: event.currentTarget,
+      elemento: viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`) ?? null,
+      raf: 0,
+      ultimo: { width: card.width, height: alto },
     };
     setDraggingIds([card.id]);
     setSettlingIds([]);
@@ -1564,25 +1550,36 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const escala = cameraRef.current.zoom;
     const ancho = Math.max(FRAME_MIN_SIZE, drag.width + (event.clientX - drag.startX) / escala);
     const alto = Math.max(FRAME_MIN_SIZE, drag.height + (event.clientY - drag.startY) / escala);
-    updateBoard((board) => ({
-      ...board,
-      cards: board.cards.map((item) => item.id === drag.cardId
-        ? { ...item, width: ancho, datos: { ...item.datos, ...readFrameData(item), alto } }
-        : item),
-    }), { recordHistory: false });
+    drag.ultimo = { width: Math.round(ancho * 10) / 10, height: Math.round(alto * 10) / 10 };
+    // Ref + rAF: se escribe en el DOM y React solo se entera al soltar.
+    if (drag.raf) return;
+    drag.raf = requestAnimationFrame(() => {
+      drag.raf = 0;
+      if (frameResize.current !== drag) return;
+      if (drag.elemento) {
+        drag.elemento.style.width = `${drag.ultimo.width}px`;
+        drag.elemento.style.height = `${drag.ultimo.height}px`;
+      }
+    });
   };
 
   const endFrameResize = (event: React.PointerEvent<HTMLButtonElement>) => {
     const drag = frameResize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.raf) {
+      cancelAnimationFrame(drag.raf);
+      drag.raf = 0;
+    }
     frameResize.current = null;
     liberarPuntero(drag.captureEl, event.pointerId);
+    terminarGestoVisual();
     setDraggingIds([]);
     const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
     const marco = tablero?.cards.find((item) => item.id === drag.cardId);
     if (!tablero || !marco) return;
+    const { width, height } = drag.ultimo;
     const datos = readFrameData(marco);
-    const rect: FrameRect = { x: marco.x, y: marco.y, width: marco.width, height: datos.alto };
+    const rect: FrameRect = { x: marco.x, y: marco.y, width, height };
     const hijos = esMarcoEntropia(marco)
       ? datos.hijos
       : cardsInsideFrame(tablero.cards, rect, measureCardSizes()).filter((id) => id !== marco.id);
@@ -1590,7 +1587,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       ...tablero,
       updatedAt: new Date().toISOString(),
       cards: tablero.cards.map((item) => item.id === marco.id
-        ? { ...item, datos: { ...item.datos, ...datos, hijos } }
+        ? { ...item, width, datos: { ...item.datos, ...datos, alto: height, hijos } }
         : item),
     };
     setBoardHistories((current) => ({
@@ -1602,16 +1599,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     asentar([marco.id]);
   };
 
-  /** Redimensionar una imagen o vídeo desde cualquier esquina; Shift libera la proporción. */
+  /** Redimensionar una imagen o vídeo desde cualquier esquina; Shift mantiene la proporción. */
   const startFreeResize = (card: BoardCard, corner: EsquinaMedia, event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || !activeBoard) return;
     event.preventDefault();
     event.stopPropagation();
     detenerInercia();
-    detenerRetornoZoom();
-    if (wheelIdle.current) { window.clearTimeout(wheelIdle.current); wheelIdle.current = null; }
+    marcarGestoVisual();
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
-    const elemento = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`);
+    const elemento = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`) ?? null;
     const alto = card.height ?? (elemento ? elemento.getBoundingClientRect().height / cameraRef.current.zoom : Math.round(card.width * 0.75));
     freeResize.current = {
       pointerId: event.pointerId,
@@ -1626,6 +1622,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       ratio: card.width / Math.max(1, alto),
       startBoard: activeBoard,
       captureEl: event.currentTarget,
+      elemento,
+      raf: 0,
+      ultimo: { x: card.x, y: card.y, width: card.width, height: alto },
     };
     setSelectedCardIds([card.id]);
     setSettlingIds([]);
@@ -1644,7 +1643,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const brutoAlto = norte ? drag.height - dy : drag.height + dy;
     let ancho = Math.max(80, brutoAncho);
     let alto = Math.max(60, brutoAlto);
-    if (!event.shiftKey) {
+    // Shift = proporción. Sin Shift, la esquina sigue al dedo en ambos ejes.
+    if (event.shiftKey) {
       const mandaAncho = Math.abs(brutoAncho - drag.width) >= Math.abs(brutoAlto - drag.height);
       if (mandaAncho) {
         ancho = Math.max(80, brutoAncho);
@@ -1658,23 +1658,47 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
     const x = oeste ? drag.x + (drag.width - ancho) : drag.x;
     const y = norte ? drag.y + (drag.height - alto) : drag.y;
-    updateBoard((board) => ({
-      ...board,
-      cards: board.cards.map((item) => item.id === drag.cardId
-        ? { ...item, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, width: Math.round(ancho * 10) / 10, height: Math.round(alto * 10) / 10 }
-        : item),
-    }), { recordHistory: false });
+    drag.ultimo = {
+      x: Math.round(x * 10) / 10,
+      y: Math.round(y * 10) / 10,
+      width: Math.round(ancho * 10) / 10,
+      height: Math.round(alto * 10) / 10,
+    };
+    // Ref + rAF: durante el gesto solo cambia el DOM; React recibe el tamaño al soltar.
+    if (drag.raf) return;
+    drag.raf = requestAnimationFrame(() => {
+      drag.raf = 0;
+      if (freeResize.current !== drag || !drag.elemento || !drag.ultimo) return;
+      const { x: left, y: top, width, height } = drag.ultimo;
+      drag.elemento.style.left = `${left}px`;
+      drag.elemento.style.top = `${top}px`;
+      drag.elemento.style.width = `${width}px`;
+      drag.elemento.style.height = `${height}px`;
+    });
   };
 
   const endFreeResize = (event: React.PointerEvent<HTMLElement>) => {
     const drag = freeResize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (drag.raf) {
+      cancelAnimationFrame(drag.raf);
+      drag.raf = 0;
+    }
     freeResize.current = null;
     liberarPuntero(drag.captureEl, event.pointerId);
+    terminarGestoVisual();
     const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
     const card = tablero?.cards.find((item) => item.id === drag.cardId);
     if (!tablero || !card) return;
-    const final: BoardDocument = { ...tablero, updatedAt: new Date().toISOString() };
+    const tamano = drag.ultimo;
+    if (!tamano) return;
+    const final: BoardDocument = {
+      ...tablero,
+      updatedAt: new Date().toISOString(),
+      cards: tablero.cards.map((item) => item.id === drag.cardId
+        ? { ...item, x: tamano.x, y: tamano.y, width: tamano.width, height: tamano.height }
+        : item),
+    };
     setBoardHistories((current) => ({
       ...current,
       [drag.startBoard.id]: recordBoardChange(current[drag.startBoard.id] ?? emptyBoardHistory(), drag.startBoard, final, newBoardId('resize-media')),

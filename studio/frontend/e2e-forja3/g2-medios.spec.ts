@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { abrirTableroCon, capturar, tarjeta } from './helpers';
+import { ZOOM_PINCH_K } from '../src/board/camera';
 
 const VIDEO = path.resolve('e2e-forja3/fixtures/video-1920.mp4');
 const IMAGEN = path.resolve('e2e-forja3/fixtures/imagen-1920.png');
@@ -22,7 +23,7 @@ async function zoomAl200(page: Page) {
     const stage = document.querySelector<HTMLElement>('.board-stage');
     return stage ? new DOMMatrixReadOnly(getComputedStyle(stage).transform).a : 1;
   });
-  const deltaY = -Math.log(2 / zoom) / 0.0012;
+  const deltaY = -Math.log(2 / zoom) / ZOOM_PINCH_K;
   const caja = await page.locator('.board-viewport').boundingBox();
   if (!caja) throw new Error('Sin viewport');
   await page.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
@@ -71,10 +72,12 @@ test.describe('G2 · imagen y vídeo libres', () => {
     await media.hover();
     const cajaHandle = await handle.boundingBox();
     if (!cajaHandle) throw new Error('Sin tirador SE');
+    await page.keyboard.down('Shift');
     await page.mouse.move(cajaHandle.x + cajaHandle.width / 2, cajaHandle.y + cajaHandle.height / 2);
     await page.mouse.down();
     await page.mouse.move(cajaHandle.x + cajaHandle.width / 2 + 120, cajaHandle.y + cajaHandle.height / 2 + 40, { steps: 8 });
     await page.mouse.up();
+    await page.keyboard.up('Shift');
     await page.waitForTimeout(120);
     const redimensionada = await media.boundingBox();
     expect(redimensionada).not.toBeNull();
@@ -148,12 +151,10 @@ test.describe('G2 · imagen y vídeo libres', () => {
     const handle = segunda.locator('.board-free-media-handle.se');
     const cajaHandle = await handle.boundingBox();
     if (!cajaHandle) throw new Error('Sin tirador SE');
-    await page.keyboard.down('Shift');
     await page.mouse.move(cajaHandle.x + cajaHandle.width / 2, cajaHandle.y + cajaHandle.height / 2);
     await page.mouse.down();
     await page.mouse.move(cajaHandle.x + cajaHandle.width / 2 + 80, cajaHandle.y + cajaHandle.height / 2 + 10, { steps: 6 });
     await page.mouse.up();
-    await page.keyboard.up('Shift');
     await page.waitForTimeout(120);
     const despues = await segunda.boundingBox();
     if (!despues) throw new Error('Sin segunda imagen después');
