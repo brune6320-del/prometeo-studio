@@ -65,3 +65,12 @@ describe('proyectos y referencias PDF (L2)', () => {
     expect(markdown).not.toContain('/Users/');
   });
 });
+
+describe('H7 · proyectos archivados', () => {
+  it('conserva la marca de archivado y la descarta si es falsa', () => {
+    const base = createBoardProject('Estudio');
+    expect(normalizeBoardProject({ ...base, archivado: true })?.archivado).toBe(true);
+    expect(normalizeBoardProject({ ...base, archivado: false })?.archivado).toBeUndefined();
+    expect(normalizeBoardProject(base)?.archivado).toBeUndefined();
+  });
+});

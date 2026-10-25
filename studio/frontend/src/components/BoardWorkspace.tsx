@@ -14,6 +14,7 @@ import {
   List,
   Lock,
   LockOpen,
+  MoreHorizontal,
   Pencil,
   Plus,
   Search,
@@ -128,11 +129,14 @@ import {
   deleteProjectPlantilla,
   loadProjectWorkspace,
   removeBoardProjectLink,
+  removeProjectRecord,
   renameProject,
+  saveProjectRecord,
   savePdfReference,
   saveProjectGustos,
   saveProjectPlantilla,
   setActiveProject,
+  setProjectArchived,
 } from '../board/projectStorage';
 import { useBoardWrites } from '../hooks/useBoardWrites';
 import { BoardCardItem } from './BoardCardItem';
@@ -246,6 +250,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [projectName, setProjectName] = useState('');
   const [renamingProject, setRenamingProject] = useState(false);
   const [projectDraft, setProjectDraft] = useState('');
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
+  const [moveDialog, setMoveDialog] = useState(false);
+  const [moveTargetId, setMoveTargetId] = useState('');
+  const [deleteProjectId, setDeleteProjectId] = useState<string | null>(null);
+  const [deleteProjectDraft, setDeleteProjectDraft] = useState('');
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [spacePanActive, setSpacePanActive] = useState(false);
   const spaceHeld = useRef(false);
@@ -375,12 +385,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const lastPointerWorld = useRef<{ x: number; y: number } | null>(null);
   const cardHandlers = useRef<CardHandlers | null>(null);
   const dialogRef = useRef<HTMLElement>(null);
-  const algunDialogoAbierto = shortcutsOpen || nestedDialog || templateDialog || linkDialog || projectDialog || pdfReferenceDialog || archiveOpen || Boolean(archiveFullscreenId);
+  const algunDialogoAbierto = shortcutsOpen || nestedDialog || templateDialog || linkDialog || projectDialog || pdfReferenceDialog || archiveOpen || moveDialog || Boolean(archiveFullscreenId);
   useFocusTrap(algunDialogoAbierto, dialogRef);
 
   const projectBoards = activeProjectId
     ? boards.filter((board) => projectIdByBoardId.get(board.id) === activeProjectId)
     : boards;
+  const projectOptions = projects.filter((project) => !project.archivado);
+  const archivedProjects = projects.filter((project) => project.archivado);
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
   const activeProjectReferences = projectReferences.filter((reference) => reference.projectId === activeProjectId);
   const activeBoard = projectBoards.find((board) => board.id === activeBoardId) ?? projectBoards[0] ?? null;
@@ -510,11 +522,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         if (!current) return;
         setProjects(workspace.projects);
         setProjectIdByBoardId(workspace.projectIdByBoardId);
-        setActiveProjectId(workspace.activeProjectId);
         setProjectReferences(workspace.references);
+        const proyectoActivo = workspace.projects.find((project) => project.id === workspace.activeProjectId) ?? null;
+        const destinoId = proyectoActivo && !proyectoActivo.archivado
+          ? workspace.activeProjectId
+          : workspace.projects.find((project) => !project.archivado)?.id ?? workspace.activeProjectId;
+        setActiveProjectId(destinoId);
+        if (destinoId !== workspace.activeProjectId) void setActiveProject(destinoId).catch(() => undefined);
         const selected = boards.find((board) =>
-          board.id === activeBoardId && workspace.projectIdByBoardId.get(board.id) === workspace.activeProjectId,
-        ) ?? boards.find((board) => workspace.projectIdByBoardId.get(board.id) === workspace.activeProjectId);
+          board.id === activeBoardId && workspace.projectIdByBoardId.get(board.id) === destinoId,
+        ) ?? boards.find((board) => workspace.projectIdByBoardId.get(board.id) === destinoId);
         if (selected) setActiveBoardId(selected.id);
         setProjectError(null);
         if (workspace.skipped.length) {
@@ -1201,6 +1218,37 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     aplicarCamara();
     sincronizarCamara();
   };
+
+  const zoomTo = (value: number) => {
+    const { width, height } = viewportSize;
+    cameraRef.current = zoomAtPoint(cameraRef.current, value, { x: width / 2, y: height / 2 });
+    aplicarCamara();
+    sincronizarCamara();
+  };
+
+  /** ⇧2 · encuadra solo la selección, con el mismo techo de 800 %. */
+  const fitSelection = useCallback(() => {
+    if (!selectedCards.length || !viewportSize.width || !viewportSize.height) {
+      setNotice('Selecciona al menos una tarjeta para ajustar el zoom a la selección.');
+      return;
+    }
+    const sizes = measureCardSizes();
+    const cajas = selectedCards.map((card) => rectDeTarjeta(card, sizes.get(card.id)));
+    const minX = Math.min(...cajas.map((caja) => caja.x));
+    const minY = Math.min(...cajas.map((caja) => caja.y));
+    const maxX = Math.max(...cajas.map((caja) => caja.x + caja.width));
+    const maxY = Math.max(...cajas.map((caja) => caja.y + caja.height));
+    const zoom = Math.max(0.25, Math.min(8, (viewportSize.width - 80) / Math.max(1, maxX - minX), (viewportSize.height - 100) / Math.max(1, maxY - minY)));
+    cameraRef.current = {
+      zoom,
+      pan: {
+        x: viewportSize.width / 2 - ((minX + maxX) / 2) * zoom,
+        y: viewportSize.height / 2 - ((minY + maxY) / 2) * zoom,
+      },
+    };
+    aplicarCamara();
+    sincronizarCamara();
+  }, [aplicarCamara, measureCardSizes, selectedCards, sincronizarCamara, viewportSize.height, viewportSize.width]);
 
   const fitBoard = () => centerCamera(activeBoard);
 
@@ -2259,16 +2307,17 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   }, [locked]);
 
   useEffect(() => {
-    if (!exportMenuOpen && !libraryMenuOpen) return;
+    if (!exportMenuOpen && !libraryMenuOpen && !projectMenuOpen) return;
     const cerrar = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (exportMenuRef.current?.contains(target) || libraryMenuRef.current?.contains(target)) return;
+      if (exportMenuRef.current?.contains(target) || libraryMenuRef.current?.contains(target) || projectMenuRef.current?.contains(target)) return;
       setExportMenuOpen(false);
       setLibraryMenuOpen(false);
+      setProjectMenuOpen(false);
     };
     window.addEventListener('pointerdown', cerrar);
     return () => window.removeEventListener('pointerdown', cerrar);
-  }, [exportMenuOpen, libraryMenuOpen]);
+  }, [exportMenuOpen, libraryMenuOpen, projectMenuOpen]);
 
   const handleCardSelection = (cardId: string, event: Modificadores) => {
     if (spaceHeld.current) return;
@@ -2596,6 +2645,113 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
   };
 
+  const archivarProyecto = async () => {
+    if (!activeProject) return;
+    try {
+      const archivado = await setProjectArchived(activeProject.id, true);
+      const restantes = projects.map((project) => project.id === archivado.id ? archivado : project);
+      const siguiente = restantes.find((project) => !project.archivado);
+      if (siguiente) {
+        await setActiveProject(siguiente.id);
+        setActiveProjectId(siguiente.id);
+        const nextBoard = boards.find((board) => projectIdByBoardId.get(board.id) === siguiente.id);
+        if (nextBoard) setActiveBoardId(nextBoard.id);
+        else await createBoardInProject(siguiente.id, 'Mi tablero');
+        setProjects(restantes);
+      } else {
+        const nuevo = await createProject('Proyecto general');
+        await setActiveProject(nuevo.id);
+        setProjects([...restantes, nuevo]);
+        setActiveProjectId(nuevo.id);
+        await createBoardInProject(nuevo.id, 'Mi tablero');
+      }
+      setSelectedCardIds([]);
+      setNotice(`Proyecto «${archivado.name}» archivado. Está en Archivo y se puede recuperar.`);
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : 'No se pudo archivar el proyecto.');
+    }
+  };
+
+  const restaurarProyecto = async (projectId: string) => {
+    try {
+      const restaurado = await setProjectArchived(projectId, false);
+      setProjects((current) => current.map((project) => project.id === restaurado.id ? restaurado : project));
+      setNotice(`Proyecto «${restaurado.name}» restaurado.`);
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : 'No se pudo restaurar el proyecto.');
+    }
+  };
+
+  const moverTableroAProyecto = async () => {
+    if (!activeBoard || !moveTargetId) return;
+    try {
+      await assignBoardToProject(activeBoard.id, moveTargetId);
+      setProjectIdByBoardId((current) => new Map(current).set(activeBoard.id, moveTargetId));
+      await setActiveProject(moveTargetId);
+      setActiveProjectId(moveTargetId);
+      setMoveDialog(false);
+      setSelectedCardIds([]);
+      setNotice('Tablero movido de proyecto sin copiar sus tarjetas.');
+    } catch (error) {
+      setProjectError(error instanceof Error ? error.message : 'No se pudo mover el tablero.');
+    }
+  };
+
+  /** Borrar definitivamente exige el nombre escrito y deja 30 días de memoria. */
+  const borrarProyectoDefinitivo = async (projectId: string) => {
+    const project = projects.find((item) => item.id === projectId);
+    if (!project) return;
+    if (deleteProjectDraft.trim() !== project.name) {
+      setArchiveError('Escribe el nombre exacto del proyecto para borrarlo definitivamente.');
+      return;
+    }
+    setArchiveError(null);
+    const projectBoardIds = boards.filter((board) => projectIdByBoardId.get(board.id) === project.id).map((board) => board.id);
+    const projectBoardDocs = boards.filter((board) => projectBoardIds.includes(board.id));
+    const links = projectBoardIds.map((boardId) => ({ boardId, projectId: project.id }));
+    await recordarBorrado({
+      kind: 'project',
+      label: `Proyecto «${project.name}»`,
+      payload: { project: { project, boards: projectBoardDocs, links } },
+    });
+    try {
+      for (const boardId of projectBoardIds) {
+        await removeBoardFromStore(boardId);
+        try { await removeBoardProjectLink(boardId); } catch { /* el vínculo huérfano no bloquea */ }
+      }
+      await removeProjectRecord(project.id);
+      const restantes = projects.filter((item) => item.id !== project.id);
+      const siguiente = restantes.find((item) => !item.archivado);
+      setProjects(restantes);
+      setBoards((current) => current.filter((board) => !projectBoardIds.includes(board.id)));
+      setProjectIdByBoardId((current) => {
+        const next = new Map(current);
+        projectBoardIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      setDeleteProjectId(null);
+      setDeleteProjectDraft('');
+      if (siguiente) {
+        await setActiveProject(siguiente.id);
+        setActiveProjectId(siguiente.id);
+        const nextBoard = boards.find((board) => projectIdByBoardId.get(board.id) === siguiente.id && !projectBoardIds.includes(board.id));
+        if (nextBoard) setActiveBoardId(nextBoard.id);
+        else await createBoardInProject(siguiente.id, 'Mi tablero');
+      } else {
+        const nuevo = await createProject('Proyecto general');
+        setProjects([...restantes, nuevo]);
+        await setActiveProject(nuevo.id);
+        setActiveProjectId(nuevo.id);
+        await createBoardInProject(nuevo.id, 'Mi tablero');
+      }
+      setSelectedCardIds([]);
+      setNotice(`Proyecto «${project.name}» borrado. Queda 30 días en Archivo.`);
+      await refrescarArchivo();
+    } catch (error) {
+      setArchiveError(error instanceof Error ? error.message : 'No se pudo borrar el proyecto.');
+    }
+  };
+
   const renameBoard = (title: string) => {
     updateBoard((board) => ({ ...board, title: title.slice(0, 120) }));
   };
@@ -2724,7 +2880,22 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         // Las relaciones externas a las tarjetas borradas ya no existen; se conservan solo las internas.
         setNotice(`${cards.length} ${cards.length === 1 ? 'tarjeta recuperada' : 'tarjetas recuperadas'} en su tablero.`);
       } else if (tomado.kind === 'project' && tomado.payload.project) {
-        setNotice(`El proyecto «${tomado.payload.project.name}» se recupera desde su menú (H7).`);
+        const { project, boards: tablerosBorrados, links } = tomado.payload.project;
+        await saveProjectRecord(project);
+        setProjects((current) => current.some((item) => item.id === project.id) ? current : [...current, project]);
+        for (const board of tablerosBorrados) {
+          setBoards((current) => current.some((item) => item.id === board.id) ? current : [board, ...current]);
+          enqueueBoardSave(board, { immediate: true });
+        }
+        for (const link of links) {
+          try {
+            await assignBoardToProject(link.boardId, link.projectId);
+            setProjectIdByBoardId((current) => new Map(current).set(link.boardId, link.projectId));
+          } catch {
+            /* la memoria conserva el proyecto aunque un vínculo no se pueda rehacer */
+          }
+        }
+        setNotice(`Proyecto «${project.name}» recuperado con ${tablerosBorrados.length} ${tablerosBorrados.length === 1 ? 'tablero' : 'tableros'}.`);
       }
       setBorrados((current) => current.filter((item) => item.id !== entry.id));
       await refrescarArchivo();
@@ -3304,6 +3475,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       setProjectDialog(false);
       return true;
     }
+    if (moveDialog) {
+      event.preventDefault();
+      setMoveDialog(false);
+      return true;
+    }
     if (pdfReferenceDialog) {
       event.preventDefault();
       setPdfReferenceDialog(false);
@@ -3400,6 +3576,38 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       event.preventDefault();
       if (indexOpen) cerrarIndice(true);
       else abrirIndice();
+      return;
+    }
+    if (atajo.accion === 'renombrarProyecto') {
+      if (!activeProject) return;
+      event.preventDefault();
+      setProjectDraft(activeProject.name);
+      setRenamingProject(true);
+      return;
+    }
+    if (atajo.accion === 'zoom100') {
+      event.preventDefault();
+      zoomTo(1);
+      return;
+    }
+    if (atajo.accion === 'zoomIn') {
+      event.preventDefault();
+      zoomBy(1.2);
+      return;
+    }
+    if (atajo.accion === 'zoomOut') {
+      event.preventDefault();
+      zoomBy(1 / 1.2);
+      return;
+    }
+    if (atajo.accion === 'zoomFit') {
+      event.preventDefault();
+      fitBoard();
+      return;
+    }
+    if (atajo.accion === 'zoomSelection') {
+      event.preventDefault();
+      fitSelection();
       return;
     }
     if (atajo.accion === 'deshacer') {
@@ -3766,10 +3974,29 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                 }}
                 aria-label="Elegir proyecto"
                 title="Doble clic para renombrar el proyecto"
-                disabled={!projects.length}
+                disabled={!projectOptions.length}
               >
-                {projects.length ? projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>) : <option value="">Proyectos no disponibles</option>}
+                {projectOptions.length ? projectOptions.map((project) => <option key={project.id} value={project.id}>{project.name}</option>) : <option value="">Proyectos no disponibles</option>}
               </select>
+              <div className="board-menu-wrap" ref={projectMenuRef}>
+                <button
+                  type="button"
+                  className="board-icon-button"
+                  onClick={() => setProjectMenuOpen((open) => !open)}
+                  aria-haspopup="menu"
+                  aria-expanded={projectMenuOpen}
+                  aria-label="Menú del proyecto"
+                  title="Menú del proyecto"
+                ><MoreHorizontal size={16} /></button>
+                {projectMenuOpen && (
+                  <div className="board-menu" role="menu" aria-label="Proyecto">
+                    <button type="button" role="menuitem" onClick={() => { setProjectMenuOpen(false); if (activeProject) { setProjectDraft(activeProject.name); setRenamingProject(true); } }} disabled={!activeProject}>Renombrar (F2)</button>
+                    <button type="button" role="menuitem" onClick={() => { setProjectMenuOpen(false); setMoveTargetId(projectOptions.find((project) => project.id !== activeProjectId)?.id ?? ''); setMoveDialog(true); }} disabled={!activeBoard || projectOptions.length < 2}>Mover tablero a otro proyecto…</button>
+                    <button type="button" role="menuitem" onClick={() => { setProjectMenuOpen(false); void archivarProyecto(); }} disabled={!activeProject}>Archivar proyecto</button>
+                    <button type="button" role="menuitem" onClick={() => { setProjectMenuOpen(false); void abrirArchivo(); }}>Borrar definitivamente… (Archivo)</button>
+                  </div>
+                )}
+              </div>
             </>
           )}
           <span className="board-identity-separator" aria-hidden="true">·</span>
@@ -4494,6 +4721,57 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                 </ul>
               )}
             </section>
+            <section className="board-archive-section" aria-labelledby="board-archive-projects">
+              <div className="board-archive-section-head">
+                <h3 id="board-archive-projects">Proyectos archivados</h3>
+                <span>{archivedProjects.length}</span>
+              </div>
+              {archivedProjects.length === 0 ? (
+                <p className="board-archive-empty">No hay proyectos archivados.</p>
+              ) : (
+                <ul className="board-archive-list">
+                  {archivedProjects.map((project) => (
+                    <li key={project.id} className="board-archive-item">
+                      <span className="board-archive-kind">Proyecto</span>
+                      <div className="board-archive-copy"><strong>{project.name}</strong><small>Fuera del selector; sus datos siguen guardados.</small></div>
+                      <button type="button" className="board-tool primary" onClick={() => void restaurarProyecto(project.id)}>Restaurar</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+            <section className="board-archive-section" aria-labelledby="board-archive-delete">
+              <div className="board-archive-section-head">
+                <h3 id="board-archive-delete">Borrar definitivamente</h3>
+              </div>
+              <p className="board-dialog-hint">Solo desde Archivo y escribiendo el nombre. El proyecto, sus tableros y vínculos quedan 30 días en la memoria.</p>
+              <label className="board-archive-delete-label">
+                Proyecto
+                <select
+                  value={deleteProjectId ?? ''}
+                  onChange={(event) => { setDeleteProjectId(event.target.value || null); setDeleteProjectDraft(''); setArchiveError(null); }}
+                  aria-label="Proyecto a borrar definitivamente"
+                >
+                  <option value="">Elige un proyecto</option>
+                  {projectOptions.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                </select>
+              </label>
+              {deleteProjectId && (() => {
+                const project = projects.find((item) => item.id === deleteProjectId);
+                if (!project) return null;
+                return (
+                  <div className="board-archive-delete-confirm">
+                    <input
+                      value={deleteProjectDraft}
+                      onChange={(event) => setDeleteProjectDraft(event.target.value)}
+                      placeholder={`Escribe «${project.name}»`}
+                      aria-label="Nombre del proyecto para confirmar el borrado"
+                    />
+                    <button type="button" className="board-tool danger" onClick={() => void borrarProyectoDefinitivo(project.id)}>Borrar definitivamente</button>
+                  </div>
+                );
+              })()}
+            </section>
             <div className="board-dialog-actions">
               <button type="button" className="board-tool primary" onClick={() => setArchiveOpen(false)}>Cerrar</button>
             </div>
@@ -4600,6 +4878,25 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             {linkError && <p className="board-dialog-error" role="alert">{linkError}</p>}
             <div className="board-dialog-actions"><button type="button" className="board-tool" onClick={() => setLinkDialog(false)}>Cancelar</button><button type="submit" className="board-tool primary">Agregar enlace</button></div>
           </form>
+        </div>
+      )}
+
+      {moveDialog && (
+        <div className="board-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setMoveDialog(false); }}>
+          <div ref={(element) => { dialogRef.current = element; }} className="board-dialog" role="dialog" aria-modal="true" aria-labelledby="board-move-title">
+            <div className="board-dialog-heading"><h2 id="board-move-title">Mover tablero a otro proyecto</h2><button type="button" onClick={() => setMoveDialog(false)} aria-label="Cerrar"><X size={16} /></button></div>
+            <p className="board-dialog-hint">El tablero conserva sus tarjetas, referencias y memoria de gusto. No se copia: cambia de proyecto.</p>
+            <label>Proyecto destino
+              <select value={moveTargetId} onChange={(event) => setMoveTargetId(event.target.value)} aria-label="Proyecto destino">
+                <option value="">Elige un proyecto</option>
+                {projectOptions.filter((project) => project.id !== activeProjectId).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+            </label>
+            <div className="board-dialog-actions">
+              <button type="button" className="board-tool" onClick={() => setMoveDialog(false)}>Cancelar</button>
+              <button type="button" className="board-tool primary" onClick={() => void moverTableroAProyecto()} disabled={!moveTargetId}>Mover tablero</button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -35,7 +35,13 @@ export type AccionLienzo =
   | 'agrupar'
   | 'desagrupar'
   | 'buscar'
-  | 'indice';
+  | 'indice'
+  | 'renombrarProyecto'
+  | 'zoom100'
+  | 'zoomIn'
+  | 'zoomOut'
+  | 'zoomFit'
+  | 'zoomSelection';
 
 export type GrupoAyuda = 'Selección' | 'Edición' | 'Mover' | 'Orden' | 'Lienzo' | 'Vistas' | 'Herramientas';
 
@@ -193,6 +199,15 @@ export const ATAJOS_LIENZO: AtajoLienzo[] = [
   { id: 'ayuda', tipo: 'tecla', tecla: '?', modificadores: {}, accion: 'ayuda', descripcion: 'Abrir o cerrar este panel', grupo: 'Herramientas' },
   { id: 'buscar', tipo: 'tecla', tecla: 'f', modificadores: { primario: true }, accion: 'buscar', descripcion: 'Buscar en el tablero, el proyecto o la biblioteca', grupo: 'Selección' },
   { id: 'indice', tipo: 'tecla', tecla: 'l', modificadores: {}, accion: 'indice', descripcion: 'Abrir el índice de objetos en orden de pintado', grupo: 'Selección' },
+  { id: 'renombrar-proyecto', tipo: 'tecla', tecla: 'f2', modificadores: {}, accion: 'renombrarProyecto', descripcion: 'Renombrar el proyecto en el sitio', grupo: 'Herramientas' },
+  { id: 'zoom-100', tipo: 'tecla', tecla: '0', modificadores: { primario: true }, accion: 'zoom100', descripcion: 'Zoom al 100 %', grupo: 'Lienzo' },
+  { id: 'zoom-mas', tipo: 'tecla', tecla: '=', modificadores: { primario: true }, accion: 'zoomIn', descripcion: 'Acercar por pasos', grupo: 'Lienzo', repetible: true },
+  { id: 'zoom-mas-signo', tipo: 'tecla', tecla: '+', modificadores: { primario: true, shift: true }, accion: 'zoomIn', descripcion: 'Acercar por pasos', grupo: 'Lienzo', repetible: true, oculto: true },
+  { id: 'zoom-menos', tipo: 'tecla', tecla: '-', modificadores: { primario: true }, accion: 'zoomOut', descripcion: 'Alejar por pasos', grupo: 'Lienzo', repetible: true },
+  { id: 'zoom-ajustar', tipo: 'tecla', tecla: '1', modificadores: { shift: true }, accion: 'zoomFit', descripcion: 'Ajustar todo el tablero', grupo: 'Lienzo' },
+  { id: 'zoom-ajustar-signo', tipo: 'tecla', tecla: '!', modificadores: { shift: true }, accion: 'zoomFit', descripcion: 'Ajustar todo el tablero', grupo: 'Lienzo', oculto: true },
+  { id: 'zoom-seleccion', tipo: 'tecla', tecla: '2', modificadores: { shift: true }, accion: 'zoomSelection', descripcion: 'Ajustar a la selección', grupo: 'Lienzo' },
+  { id: 'zoom-seleccion-signo', tipo: 'tecla', tecla: '@', modificadores: { shift: true }, accion: 'zoomSelection', descripcion: 'Ajustar a la selección', grupo: 'Lienzo', oculto: true },
 ];
 
 export interface GrupoDeAyuda {

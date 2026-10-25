@@ -14,6 +14,8 @@ export interface BoardProject {
   gustos: Gustos;
   /** Plantillas guardadas por la persona, dentro del proyecto. */
   plantillas: Plantilla[];
+  /** Archivado: desaparece del selector pero conserva sus datos. */
+  archivado?: boolean;
 }
 
 export interface BoardProjectLink {
@@ -140,6 +142,7 @@ export function normalizeBoardProject(value: unknown): BoardProject | null {
     updatedAt: validTimestamp(value.updatedAt),
     gustos: normalizarGustos(value.gustos),
     plantillas: normalizarPlantillas(value.plantillas),
+    ...(value.archivado === true ? { archivado: true } : {}),
   };
 }
 

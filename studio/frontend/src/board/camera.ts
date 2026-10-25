@@ -17,7 +17,7 @@ export interface ViewportSize {
 }
 
 export const MIN_BOARD_ZOOM = 0.25;
-export const MAX_BOARD_ZOOM = 2.4;
+export const MAX_BOARD_ZOOM = 8;
 /** «Ajustar» debe poder alejar más que el zoom de navegación para incluir todo el contenido. */
 export const FIT_MIN_ZOOM = 0.02;
 

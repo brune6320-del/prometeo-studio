@@ -32,7 +32,7 @@ interface ViewportProps {
   showStagedTags: boolean;
 }
 
-const ZOOMS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5];
+const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
 
 export const Viewport: React.FC<ViewportProps> = (p) => {
   const [zoom, setZoom] = useState(1);
@@ -65,8 +65,56 @@ export const Viewport: React.FC<ViewportProps> = (p) => {
     if (!el || !data) return;
     const columns = p.viewMode === 'compare' ? 2 : 1;
     const available = (el.clientWidth - 64 - (columns - 1) * 32) / columns;
-    setZoom(Math.max(0.25, Math.min(3, available / data.width_pt)));
+    setZoom(Math.max(0.25, Math.min(8, available / data.width_pt)));
   };
+
+  /** ⇧2 en PDF: encuadra el nodo seleccionado; sin nodo, la página completa. */
+  const fitSelection = () => {
+    const el = scrollRef.current;
+    const nodo = p.nodesOnPage.find((item) => item.id === p.selectedNodeId && item.bbox);
+    if (!el || !nodo?.bbox) {
+      fitWidth();
+      return;
+    }
+    const ancho = Math.max(1, nodo.bbox[2] - nodo.bbox[0]);
+    const alto = Math.max(1, nodo.bbox[3] - nodo.bbox[1]);
+    setZoom(Math.max(0.25, Math.min(8, (el.clientWidth - 80) / ancho, (el.clientHeight - 100) / alto)));
+  };
+
+  // H7 · zoom del documento: ⌘0 100 %, ⌘+/- por pasos, ⇧1 ajustar, ⇧2 selección.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      const meta = event.metaKey || event.ctrlKey;
+      if (meta && event.key === '0') {
+        event.preventDefault();
+        setZoom(1);
+        return;
+      }
+      if (meta && (event.key === '=' || event.key === '+')) {
+        event.preventDefault();
+        step(1);
+        return;
+      }
+      if (meta && event.key === '-') {
+        event.preventDefault();
+        step(-1);
+        return;
+      }
+      if (event.shiftKey && (event.key === '!' || event.key === '1')) {
+        event.preventDefault();
+        fitWidth();
+        return;
+      }
+      if (event.shiftKey && (event.key === '@' || event.key === '2')) {
+        event.preventDefault();
+        fitSelection();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   // Al entrar en Comparar, ajustar para que quepan las dos páginas.
   const prevMode = useRef(p.viewMode);

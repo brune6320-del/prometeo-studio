@@ -551,3 +551,48 @@ export async function deletePdfReference(id: string): Promise<void> {
   transaction.objectStore(PDF_REFERENCES_STORE).delete(id);
   await finished;
 }
+
+/** Archiva o desarchiva sin borrar nada. El proyecto sale del selector, no de IndexedDB. */
+export async function setProjectArchived(projectId: string, archivado: boolean): Promise<BoardProject> {
+  const database = await openDatabase();
+  const transaction = database.transaction(PROJECTS_STORE, 'readwrite');
+  const finished = transactionFinished(transaction);
+  const store = transaction.objectStore(PROJECTS_STORE);
+  const request = store.get(projectId);
+  let missing = false;
+  let updated: BoardProject | null = null;
+  request.onsuccess = () => {
+    const project = normalizeBoardProject(request.result);
+    if (!project) {
+      missing = true;
+      try { transaction.abort(); } catch { /* transaction already closed */ }
+      return;
+    }
+    updated = { ...project, ...(archivado ? { archivado: true } : { archivado: undefined }), updatedAt: new Date().toISOString() };
+    store.put(updated);
+  };
+  try {
+    await finished;
+  } catch (error) {
+    if (missing) throw new Error('El proyecto ya no existe en el almacenamiento local.');
+    throw error;
+  }
+  if (!updated) throw new Error('No se pudo archivar el proyecto.');
+  return updated;
+}
+
+/** Reinserta un proyecto exacto (recuperación desde la memoria de 30 días). */
+export async function saveProjectRecord(project: BoardProject): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(PROJECTS_STORE, 'readwrite');
+  transaction.objectStore(PROJECTS_STORE).put(project);
+  await transactionFinished(transaction);
+}
+
+/** Quita el registro del proyecto; los vínculos y tableros se deciden fuera. */
+export async function removeProjectRecord(projectId: string): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(PROJECTS_STORE, 'readwrite');
+  transaction.objectStore(PROJECTS_STORE).delete(projectId);
+  await transactionFinished(transaction);
+}

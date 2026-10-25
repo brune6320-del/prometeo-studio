@@ -56,6 +56,12 @@ describe('T-1 · pellizco 1:1', () => {
     expect(despues.y).toBeCloseTo(antes.y, 6);
   });
 
+  it('H7 · el zoom de inspección llega a 800 % y no pasa', () => {
+    const camera = zoomAtPoint({ pan: { x: 0, y: 0 }, zoom: 1 }, 20, { x: 400, y: 300 });
+    expect(camera.zoom).toBe(8);
+    expect(zoomAtPoint(camera, 0.01, { x: 400, y: 300 }).zoom).toBe(0.25);
+  });
+
   it('el delta se aplica sin muelle: dos eventos seguidos multiplican de inmediato', () => {
     const camera = { pan: { x: 10, y: 20 }, zoom: 1 };
     const cursor = { x: 400, y: 300 };

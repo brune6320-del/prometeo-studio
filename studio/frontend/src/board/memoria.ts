@@ -8,7 +8,7 @@
  */
 import type { BoardDocument } from './model';
 import type { BoardHistory } from './history';
-import type { PdfReference } from './projectModel';
+import type { BoardProject, PdfReference } from './projectModel';
 
 const DATABASE_NAME = 'prometeo-studio-memoria';
 const DATABASE_VERSION = 1;
@@ -25,7 +25,7 @@ export interface BorradoPayload {
   projectId?: string;
   reference?: PdfReference;
   cards?: { boardId: string; cards: BoardDocument['cards']; relations: BoardDocument['relations'] };
-  project?: { name: string };
+  project?: { project: BoardProject; boards: BoardDocument[]; links: Array<{ boardId: string; projectId: string }> };
 }
 
 export interface BorradoEntry {
