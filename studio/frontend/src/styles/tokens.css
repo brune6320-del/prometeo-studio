@@ -147,6 +147,7 @@
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-emphasis: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring-firm: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --ease-spring-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-tau-seco: 35ms;
   --motion-tau-suave: 160ms;
   --motion-tau-anim: 85ms;

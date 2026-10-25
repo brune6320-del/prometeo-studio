@@ -1851,7 +1851,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
               <button
                 key={toolId}
                 type="button"
-                className={`board-rail-tool ${frameToolId === toolId ? 'active' : ''}`}
+                className={`board-rail-tool ${toolId === 'note' ? 'primary' : ''} ${frameToolId === toolId ? 'active' : ''}`}
                 onClick={() => chooseTool(toolId)}
                 draggable
                 onDragStart={startToolDrag(toolId)}
@@ -1914,6 +1914,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   key={card.id}
                   data-card-id={card.id}
                   data-marco={esEntropia ? 'entropia' : 'libre'}
+                  tabIndex={0}
+                  aria-label={`Marco: ${card.title || 'sin título'}`}
                   className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''} ${draggingIds.includes(card.id) ? 'dragging' : ''} ${settlingIds.includes(card.id) ? 'settling' : ''} ${dropFrameId === card.id ? 'drop-target' : ''}`}
                   style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
                   onClick={(event) => handleCardSelection(card.id, event)}

@@ -51,6 +51,8 @@ export const BoardCardItem = React.memo(function BoardCardItem({
     <article
       data-card-id={card.id}
       data-card-type={card.type}
+      tabIndex={0}
+      aria-label={`Tarjeta: ${card.title || 'sin título'}`}
       className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''}`}
       style={{ left: card.x, top: card.y, width: card.width }}
       onClick={(event) => {

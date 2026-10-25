@@ -3176,3 +3176,210 @@
 .board-card[data-card-type='referente'] .board-card-title {
   display: none;
 }
+
+/* ── F6 · pulido Apple: estados, chrome discreto y muelle suave ─────────── */
+
+.board-icon-button,
+.board-bar-button,
+.board-rail-tool,
+.board-selection-button,
+.board-tool,
+.board-frame-view select {
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    opacity var(--duration-fast) var(--ease-standard);
+}
+
+.board-icon-button:active:not(:disabled),
+.board-bar-button:active:not(:disabled),
+.board-selection-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.board-icon-button.active {
+  border-color: var(--accent-ring);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+/* El marco no compite: línea discreta, sin velo naranja permanente. */
+.board-frame {
+  border: 1px solid var(--line-subtle);
+  background: transparent;
+  transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard);
+}
+
+.board-frame:hover {
+  border-color: var(--line-control);
+}
+
+.board-frame.selected {
+  border-color: var(--accent);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  background: var(--accent-soft);
+}
+
+.board-frame-head {
+  border-bottom: 1px solid var(--line-subtle);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+}
+
+.board-frame-title:focus {
+  border-color: var(--accent);
+  background: var(--state-hover);
+}
+
+.board-frame-view select {
+  border-color: var(--line-control);
+  background: var(--surface-2);
+}
+
+.board-frame-delete:hover {
+  color: var(--st-failed);
+  background: var(--st-failed-soft);
+}
+
+/* Selección ≠ foco. La selección es un anillo sólido; el foco, doble anillo. */
+.board-card:focus-visible,
+.board-frame:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 4px var(--accent), var(--shadow-paper);
+}
+
+.board-card.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Chrome de tarjeta solo al hover, foco o selección. */
+.board-card-delete,
+.board-connect-button,
+.board-card-color-row {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.board-card:hover .board-card-delete,
+.board-card:focus-within .board-card-delete,
+.board-card.selected .board-card-delete {
+  opacity: 0.75;
+  pointer-events: auto;
+}
+
+.board-card:hover .board-connect-button,
+.board-card:focus-within .board-connect-button,
+.board-card.selected .board-connect-button,
+.board-connect-button.visible {
+  opacity: 0.75;
+  pointer-events: auto;
+}
+
+.board-card:hover .board-card-color-row,
+.board-card:focus-within .board-card-color-row,
+.board-card.selected .board-card-color-row {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.board-drag-grip {
+  opacity: 0.25;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.board-card:hover .board-drag-grip,
+.board-frame:hover .board-drag-grip {
+  opacity: 0.7;
+}
+
+/* Controles del marco solo al hover, foco o selección. */
+.board-frame-view,
+.board-frame-publish,
+.board-frame-delete {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.board-frame:hover .board-frame-view,
+.board-frame:hover .board-frame-publish,
+.board-frame:hover .board-frame-delete,
+.board-frame:focus-within .board-frame-view,
+.board-frame:focus-within .board-frame-publish,
+.board-frame:focus-within .board-frame-delete,
+.board-frame.selected .board-frame-view,
+.board-frame.selected .board-frame-publish,
+.board-frame.selected .board-frame-delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* El vacío de imagen ya no es un bloque muerto: es una acción. */
+.board-referente-noimg { min-height: var(--board-empty-h); }
+
+/* Entradas con muelle suave: solo transform y opacity, interrumpibles. */
+.board-menu,
+.board-add-panel,
+.board-dialog,
+.board-reference-panel,
+.board-referente-editor {
+  animation: board-entrada-suave var(--duration-base) var(--ease-spring-soft);
+  transform-origin: top center;
+}
+
+@keyframes board-entrada-suave {
+  from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-menu,
+  .board-add-panel,
+  .board-dialog,
+  .board-reference-panel,
+  .board-referente-editor {
+    animation: none;
+  }
+
+  .board-icon-button,
+  .board-bar-button,
+  .board-rail-tool,
+  .board-selection-button,
+  .board-tool,
+  .board-frame,
+  .board-card-delete,
+  .board-connect-button,
+  .board-card-color-row,
+  .board-frame-view,
+  .board-frame-publish,
+  .board-frame-delete,
+  .board-drag-grip,
+  .board-card-text,
+  .board-inline-text {
+    transition: none;
+  }
+}
+
+/* Una sola acción primaria: la nota. El resto es secundario. */
+.board-rail-tool.primary {
+  border-color: var(--accent);
+  color: var(--on-accent);
+  background: var(--accent);
+  font-weight: 600;
+}
+
+.board-rail-tool.primary:hover {
+  color: var(--on-accent);
+  background: var(--accent);
+  filter: brightness(1.06);
+}
+
+.board-rail-tool.primary.active {
+  border-color: var(--accent);
+  color: var(--on-accent);
+  background: var(--accent);
+}
