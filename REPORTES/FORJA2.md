@@ -18,7 +18,7 @@
 | F4 · Marcos | `cb4bcb6` | mover con hijas, redimensionar, drop con resalte, asentado |
 | F5 · Edición | `a2d3b7a` | edición en el sitio, Enter/blur/Escape, un paso de Deshacer |
 | F6 · Pulido | `64c3b0c` | estados, chrome discreto, foco, muelle suave, P-D cerrados |
-| F7 · Caza | `__HASH_F7__` | bugs encontrados en el recorrido, soak y reporte final |
+| F7 · Caza | `77650a8` | bugs encontrados en el recorrido, soak y reporte final |
 
 ## 2. F0 · Física
 
