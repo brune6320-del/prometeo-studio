@@ -20,7 +20,7 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
 ```
 
-La primera ejecución necesita conexión para descargar los pesos. Para fotogramas de video instala además `opencv-python-headless>=4.8,<5`.
+La primera ejecución necesita conexión para descargar los pesos. Para fotogramas de video instala además `opencv-python-headless==4.11.0.86`. Las versiones en `requirements.txt` son las verificadas aquí con Python 3.9.6 en macOS ARM.
 
 ## Indexar
 
@@ -59,3 +59,11 @@ nice -n 15 .venv/bin/python exportar.py salidas/mi-indice --gustos /ruta/a/gusto
 `gustos.json` se abre **solo para lectura**. Si no se indica, se busca junto a la carpeta de medios o al índice. El formato actual de Studio guarda pesos en `referentes`: peso >1 se interpreta como ♥ acumulado y peso <1 como ✕ acumulado; 1 queda sin etiqueta. También se aceptan entradas explícitas `items` con `voto: "♥"/"✕"`. Solo se vinculan claves que coincidan con SHA-256, ID o ruta relativa de un elemento indexado. El manifiesto muestra las claves sin vincular; no se inventan correspondencias para `reglas`, `herramientas` o `pares`.
 
 Se escriben `train.jsonl`, `holdout.jsonl`, `sin_etiqueta.jsonl`, `holdout.json` y `manifest.json`, sin copiar imágenes ni pesos. La asignación train/holdout depende del SHA-256 del **archivo fuente**, el porcentaje y una sal fija; `holdout.json` conserva la asignación y rechaza cambios de política. Reencuadres o duplicados visuales con bytes distintos podrían caer en ambos conjuntos: revisar antes de entrenar. Este exportador no entrena nada.
+
+## Verificación en esta Mac
+
+- Peso `model.safetensors` descargado en caché local y SHA-256 recalculado: `2c63cb7d1f2e95ba501893cbb8faeb4ea9a3af295498d35097126228659c2af8`, coincide con el publicado.
+- Cuatro pruebas con imágenes, video y vectores sintéticos: correctas.
+- `medir.py --n 6 --lote 1 --dispositivo cpu`, 18 consultas sintéticas: recall@1 **0,9444** y recall@5 **1,0**. Por transformación, recorte 0,8333/1,0; giro 1,0/1,0; color 1,0/1,0.
+- Índice real SigLIP de seis imágenes sintéticas y búsqueda de un recorte externo: el original `ref-00.png` quedó primero (coseno 0,97216).
+- No se midió calidad sobre referentes reales ni escala de miles de archivos.

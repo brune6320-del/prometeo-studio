@@ -59,7 +59,7 @@ class ModeloVisual:
             cache_dir=cache_dir,
             allow_patterns=["*.json", "*.txt", WEIGHTS_FILE],
         )
-        self.procesador = AutoImageProcessor.from_pretrained(local, local_files_only=True)
+        self.procesador = AutoImageProcessor.from_pretrained(local, local_files_only=True, use_fast=False)
         self.modelo = AutoModel.from_pretrained(local, local_files_only=True, use_safetensors=True)
         self.modelo.to(dispositivo).eval()
 

@@ -28,6 +28,31 @@ class CodificadorFalso:
 
 
 class IndiceSinteticoTest(unittest.TestCase):
+    def test_fotogramas_video_sintetico(self):
+        try:
+            import cv2
+        except ImportError:
+            self.skipTest("opencv-python-headless opcional no instalado")
+        cache = Path(__file__).parent / ".cache"
+        cache.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=cache) as temporal:
+            base = Path(temporal)
+            video = base / "muestra.mp4"
+            writer = cv2.VideoWriter(str(video), cv2.VideoWriter_fourcc(*"mp4v"), 2.0, (32, 32))
+            self.assertTrue(writer.isOpened())
+            try:
+                for color in ((0, 0, 255), (0, 255, 0), (255, 0, 0), (255, 255, 0)):
+                    writer.write(np.full((32, 32, 3), color, dtype=np.uint8))
+            finally:
+                writer.release()
+            indice = construir_indice(base, base / "indice", CodificadorFalso(),
+                                     cada_segundos=1, max_fotogramas=2)
+            self.assertEqual(len(indice["items"]), 2)
+            self.assertTrue(all(x["tipo"] == "fotograma" and x["ruta"] == "muestra.mp4"
+                                for x in indice["items"]))
+            self.assertEqual({x["fotograma"] for x in indice["items"]}, {0, 2})
+            self.assertEqual(len({x["sha256_archivo"] for x in indice["items"]}), 1)
+
     def test_indexar_buscar_y_duplicados(self):
         cache = Path(__file__).parent / ".cache"
         cache.mkdir(exist_ok=True)

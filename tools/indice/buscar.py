@@ -76,7 +76,7 @@ def duplicados(vectores: np.ndarray, indice: dict, distancia_hash: int = 6,
             mismo_archivo = (primero["tipo"] == segundo["tipo"] == "imagen"
                              and primero["sha256_archivo"] == segundo["sha256_archivo"])
             mismo_visual = primero["sha256_visual"] == segundo["sha256_visual"]
-            distancia = (huellas[i] ^ huellas[j]).bit_count()
+            distancia = bin(huellas[i] ^ huellas[j]).count("1")
             similitud = float(vectores[i] @ vectores[j])
             cercano = distancia <= distancia_hash and similitud >= similitud_minima
             if mismo_archivo or mismo_visual or cercano:
