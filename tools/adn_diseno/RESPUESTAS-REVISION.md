@@ -1,111 +1,53 @@
-# D-11 · Respuestas a la Revisión de Claude (`RESPUESTAS-REVISION.md`)
+# D-11 / D-11b · Respuestas a la Revisión de Claude y Registro de Cambios (`RESPUESTAS-REVISION.md`)
 
-Este documento responde de forma directa y verificable a los tres puntos solicitados para la revisión de código de `studio/adn-diseno` (`ec366d8`), sin alterar el código congelado de los 4 commits anteriores.
-
----
-
-## 1. ¿La «confianza» (`0,96` / `0,90` / `0,76` …) sale de un cálculo sobre la imagen o es un valor fijo por bloque?
-
-**Respuesta honesta (Ley 8): Son valores fijos / escalones discretos codificados por condicionales (`if/else`), NO una métrica continua calculada a partir del residuo o la incertidumbre sobre la imagen. Según la Ley 8, un número fijo o por escalón binario no es una confianza real.**
-
-A continuación se indican exactamente los archivos y líneas donde se asignan en `ec366d8`:
-
-1. **`tools/adn_diseno/color_lab.py`, línea 343:**
-   ```python
-   confianza = 0.96 if n_col >= 2 else 0.85
-   ```
-   Devuelve siempre `0.96` si `k-means` extrae $\ge 2$ colores y `0.85` si queda 1 solo clúster, sin medir el error de cuantización $\Delta E_{2000}$ de los píxeles respecto a sus centroides.
-2. **`tools/adn_diseno/composicion.py`, línea 459 (`_analizar_escala_tipografica`):**
-   ```python
-   confianza = 0.90 if datos_adn_tipo is not None else (0.76 if hay_texto else 0.65)
-   ```
-   Usa tres constantes fijas (`0.90`, `0.76` o `0.65`) según exista `tools/adn_tipo` o se hayan detectado bandas de gradiente.
-3. **`tools/adn_diseno/composicion.py`, líneas 651–656 (`estudiar_composicion`):**
-   ```python
-   confianzas = {
-       "reticula": 0.90 if (ejes_v or ejes_h) else 0.75,
-       "escala_tipografica": conf_escala,
-       "vacio": 0.94,
-       "jerarquia": 0.92 if len(niveles_jer) >= 2 else 0.78,
-   }
-   ```
-   `vacio` es una constante literal (`0.94`), `reticula` vale `0.90` o `0.75`, y `jerarquia` vale `0.92` o `0.78`.
-4. **`tools/adn_diseno/saliencia.py`, línea 266 (`estudiar_saliencia`):**
-   ```python
-   return bloque_saliencia, 0.91
-   ```
-   Es una constante literal (`0.91`).
-
-### Cómo debe sustituirse en cuanto autorices tocar el código (fórmula real basada en datos):
-* **`paleta`:** $C_{\text{paleta}} = \max(0, 1 - \overline{\Delta E_{2000}}(\text{píxel}, \text{centroide asignado}) / 15.0)$.
-* **`reticula`:** $C_{\text{retícula}} = \text{media}(\text{fuerza\_picos\_ejes}, \text{regularidad\_columnas}, \max(\text{afinidad\_tercios}, \text{afinidad\_áurea}))$.
-* **`vacio`:** margen de separación bimodal entre el histograma de $\Delta E_{2000}(\text{píxel}, \text{fondo})$ del soporte y el de la figura.
-* **`jerarquia`:** fracción del peso visual total explicada por las $K$ regiones segmentadas frente al ruido no agrupado.
-* **`saliencia`:** relación pico-a-media (SNR espacial) del mapa de saliencia $64 \times 64$.
+Este documento conserva las respuestas honestas entregadas en `e55c4fd` y registra la implementación autorizada en **D-11b** sobre la rama `studio/adn-diseno` (`schema_version: "1.1.0"`).
 
 ---
 
-## 2. Comprobación de contenido real sobre el corpus D-3 (capaz de fallar: residuo $\Delta E_{2000} < 5,0$)
+## 1. Confianza calculada de forma continua (Ley 8 — ningún número fijo)
 
-Tal como señalas, en `medir.py` (`lineas 371–401`, `probar_corpus_editorial_d3`) solo se llamaba a `validar_estudio(est)` (validez estructural del esquema JSON).
+* **Diagnóstico en `2264309` / `e55c4fd`:** Los 6 bloques devolvían constantes o escalones condicionales (`0.96/0.85`, `0.90/0.75`, `0.90/0.76/0.65`, `0.94`, `0.92/0.78`, `0.91`).
+* **Implementación en D-11b (0 constantes fijas):**
+  1. **`paleta` (`color_lab.py`):**
+     $$C_{\text{paleta}} = \exp\left(-\frac{\overline{\Delta E_{2000}}_{\text{px}}}{9,5}\right) \cdot \left(0,70 + \frac{0,30}{1 + \sigma(\Delta E_{2000,\text{px}})/10,0}\right)$$
+  2. **`reticula` (`composicion.py`):** Producto continuo de la fracción lisa del soporte ($F_{\text{liso}}$, píxeles con $\|\nabla L^*\| < 4,5$), la relación señal-a-ruido de los perfiles de borde proyectados ($CV_{\text{bordes}} / (CV_{\text{bordes}} + 0,45)$), la regularidad de columnas y la afinidad geométrica ($\max(\text{tercios}, \text{áurea})$).
+  3. **`escala_tipografica` (`composicion.py`):** Producto continuo de $F_{\text{liso}}$ y el contraste pico-a-mediana de las bandas horizontales de gradiente ($0,50 + 0,50 \cdot \text{SNR}_{\text{bandas}}$).
+  4. **`vacio` (`composicion.py`):** Combinación continua de la contigüidad espacial de los 4 vecinos del aire ($0,55 \cdot C_{\text{contig}}$) y la separabilidad bimodal figura/fondo ($0,45 \cdot S_{\text{bimodal}} \cdot F_{\text{liso}}$).
+  5. **`jerarquia` (`composicion.py`):** Fracción del peso visual activo explicada por componentes conexas coherentes ($\Delta E_{2000} < 14$) multiplicada por la pureza del soporte y el contraste medio de las regiones.
+  6. **`saliencia` (`saliencia.py`):** Producto continuo de la coherencia espacial local de la rejilla $64 \times 64$ ($1 / (1 + (\overline{\Delta E}_{\text{vecinos}}/7,5)^{1,5})$) por la combinación de SNR espacial ($(P_{95} - P_{50}) / (P_{95} + 0,5 P_{50} + 1)$) y concentración espacial.
 
-Si añadimos la comprobación de contenido propuesta —**que los píxeles reales asignados a cada color de la paleta (tras reconvertir el centroide Lab $\to$ sRGB $\to$ Lab) estén a una distancia media $\Delta E_{2000} < 5,0$**—, el resultado medido sobre los 5 carteles de `~/Desktop/REFERENTES/corpus-editorial/muestras/` es el siguiente:
+### Resultado medido en la Prueba 6 de `medir.py` (`confianza_continua_ruido_vs_3_colores_planos`):
 
-| Cartel del corpus D-3 | $\Delta E_{2000}$ máx. de ida y vuelta centroide (`Lab -> sRGB -> Lab`) | $\Delta E_{2000}$ medio de píxeles reales a su color de paleta reconvertido a sRGB | ¿Cumple criterio estricto $\overline{\Delta E_{2000}} < 5,0$ con $K=5$? |
+| Bloque | Imagen de ruido aleatorio uniforme (`ruido_aleatorio`) | Imagen limpia de 3 colores planos (`tres_colores_planos`) | Diferencia ($\Delta$ Confianza) |
 |---|---|---|---|
-| `cma_1934_29.jpg` | `0.521` | **`5.661`** | **FALLA** ($5,661 \ge 5,0$; cartel con degradados y medios tonos que con $K=5$ supera el umbral) |
-| `cma_1950_455.jpg` | `0.291` | **`2.261`** | **OK** ($< 5,0$) |
-| `cma_1952_10.jpg` | `0.431` | **`3.046`** | **OK** ($< 5,0$) |
-| `cma_1966_352.jpg` | `0.451` | **`2.492`** | **OK** ($< 5,0$) |
-| `cma_1968_257.jpg` | `0.498` | **`6.464`** | **FALLA** ($6,464 \ge 5,0$; cartel policromático donde $K=5$ clústeres son insuficientes para bajar de $\Delta E_{2000} = 5$) |
-
-### Código exacto de la comprobación (listo para integrar en `medir.py` tras la revisión):
-```python
-def comprobar_fidelidad_cromatica_real(ruta_img: Path, umbral_de00: float = 5.0) -> dict:
-    lienzo = cargar_referente(ruta_img, max_dim_analisis=160)
-    est = estudiar_referente(ruta_img, max_dim_analisis=160)
-    centroides_srgb_lab = []
-    for c in est["paleta"]["colores"]:
-        lab_c = (c["lab"]["L"], c["lab"]["a"], c["lab"]["b"])
-        r_u8, g_u8, b_u8 = lab_a_srgb_u8(*lab_c)
-        centroides_srgb_lab.append(srgb_a_lab(r_u8, g_u8, b_u8))
-
-    pxs = [px for fila in lienzo.pixeles_lab for px in fila]
-    errores_px = [
-        min(delta_e2000(px, c_rt) for c_rt in centroides_srgb_lab)
-        for px in pxs
-    ]
-    de_medio = sum(errores_px) / max(1, len(errores_px))
-    return {
-        "archivo": ruta_img.name,
-        "delta_e2000_medio_píxeles_vs_paleta_srgb": round(de_medio, 3),
-        "pasa_umbral_5": de_medio < umbral_de00,
-    }
-```
+| **`global`** | **`0.0421`** | **`0.7503`** | **`+0.7082`** (SUBE) |
+| `paleta` | `0.2265` ($K=10, \overline{\Delta E_{00}}=12.913$, `insuf=true`) | `1.0000` ($K=3, \overline{\Delta E_{00}}=0.000$, `insuf=false`) | `+0.7735` |
+| `reticula` | `0.0002` | `0.8133` | `+0.8131` |
+| `escala_tipografica` | `0.0002` | `0.4776` | `+0.4774` |
+| `vacio` | `0.0024` | `0.9051` | `+0.9027` |
+| `jerarquia` | `0.0000` | `0.8940` | `+0.8940` |
+| `saliencia` | `0.0233` | `0.4117` | `+0.3884` |
 
 ---
 
-## 3. ¿La rama nació de `origin/studio/collage` o es una historia nueva (`git init`)?
+## 2. $K$ adaptativo ($3 \dots 10$) para degradados y tabla Antes ($K=5$) vs Después ($K$ adaptativo)
 
-**Respuesta honesta: Es una historia nueva (`git init` con commit raíz `546f18e`).**
+En `color_lab.py` (`_kmeans_lab_adaptativo`), $K$ arranca en `3` y crece hasta `10` deteniéndose en el primer $K$ donde la $\Delta E_{2000}$ media de todos los píxeles frente a su color de paleta reconvertido a sRGB (`Lab -> sRGB -> Lab`) es $< 5,0$. Si en $K=10$ sigue $\ge 5,0$, declara `"paleta_insuficiente": true`.
 
-* **Motivo:** El repositorio `https://github.com/brune6320-del/prometeo-studio.git` es privado y el sandbox de ejecución en esta sesión no tiene credenciales de GitHub (`fatal: could not read Username for 'https://github.com': Device not configured`), por lo que no existía clon previo en `~/Projects/` ni fue posible ejecutar `git clone` / `git fetch` desde dentro del sandbox.
-* **Salida actual de `git log --oneline -3 --graph` en local:**
-  ```text
-  * ec366d8 D-11 Parte 4: medir.py (pares sintéticos y cambio de contenido) y colab.ipynb autocontenido
-  * d461655 D-11 Parte 3: aplicar.py — propuesta no destructiva de paleta Lab, retícula y jerarquía sobre tablero.json
-  * e4db490 D-11 Parte 2: Motor de estudio de ADN de diseño (Lab + ΔE2000, composición, saliencia)
-  ```
-  *(Y un commit más abajo está el commit raíz `546f18e D-11 Parte 1: Contrato de salida estable ESQUEMA.md y validador esquema.py (v1.0.0)`).*
+### Tabla comparativa sobre los 5 carteles de D-3 (más los negativos en $K=10$ del corpus completo):
 
-* **Qué ocurrirá cuando Bruno haga `git fetch origin` y ejecute `git merge-base HEAD origin/studio/collage`:**
-  * Antes de rebasar, `git merge-base HEAD origin/studio/collage` devolverá **vacío (exit code 1)** porque `546f18e` es un commit raíz independiente.
-  * Para injertar limpiamente los commits de `studio/adn-diseno` sobre `origin/studio/collage` antes del push para que compartan ancestro común (`merge-base == origin/studio/collage`), Bruno solo tiene que ejecutar en su terminal:
-    ```bash
-    cd /Users/gladys/.gemini/users/user1/Projects/prometeo-adn-diseno
-    git fetch origin
-    git rebase --onto origin/studio/collage --root studio/adn-diseno
-    git log --oneline -3 --graph
-    git merge-base HEAD origin/studio/collage
-    git push -u origin studio/adn-diseno
-    ```
+| Cartel del corpus D-3 | Antes ($K=5$ fijo en D-11): $\overline{\Delta E_{2000}}$ | Antes ($K=5$ con semillas D-11b): $\overline{\Delta E_{2000}}$ | Después ($K$ adaptativo $3..10$): $K$ elegido | Después ($K$ adaptativo): $\overline{\Delta E_{2000}}$ | `paleta_insuficiente` | Confianza `paleta` / `global` | Estado final ($\overline{\Delta E_{2000}} < 5,0$) |
+|---|---|---|---|---|---|---|---|
+| `cma_1934_29.jpg` | `5.661` (FALLA) | `5.373` (FALLA) | **`K = 7`** | **`4.804`** | `false` | `0.5655` / `0.4311` | **OK** (rescatado en $K=7$) |
+| `cma_1950_455.jpg` | `2.261` (OK) | `1.702` (OK) | **`K = 3`** | **`2.352`** | `false` | `0.7211` / `0.5751` | **OK** (converge en $K=3$) |
+| `cma_1952_10.jpg` | `3.046` (OK) | `3.010` (OK) | **`K = 3`** | **`3.596`** | `false` | `0.6237` / `0.5942` | **OK** (converge en $K=3$) |
+| `cma_1966_352.jpg` | `2.492` (OK) | `2.465` (OK) | **`K = 3`** | **`3.331`** | `false` | `0.6589` / `0.5980` | **OK** (converge en $K=3$) |
+| `cma_1968_257.jpg` | `6.464` (FALLA) | `6.044` (FALLA) | **`K = 6`** | **`4.838`** | `false` | `0.5545` / `0.4797` | **OK** (rescatado en $K=6$) |
+| *`met_335536.jpg` (Moulin Rouge, salpicadura litográfica)* | `8.042` (FALLA) | `7.118` (FALLA) | **`K = 10` (tope)** | **`5.797`** | **`true`** | `0.4939` / `0.3831` | **NEGATIVO HONESTO (`paleta_insuficiente: true`)** |
+| *`wikimedia_ed_03.jpg` (Casino de Paris, degradado arcoíris Chéret)* | `8.915` (FALLA) | `8.112` (FALLA) | **`K = 10` (tope)** | **`6.775`** | **`true`** | `0.4468` / `0.2949` | **NEGATIVO HONESTO (`paleta_insuficiente: true`)** |
+
+---
+
+## 3. Genealogía de la rama verificada sobre `origin/studio/collage`
+
+Tras el rebase realizado por Bruno, `studio/adn-diseno` desciende directamente de `origin/studio/collage` (`e9fa572 studio: cierre de Forja 4`), y los commits de D-11b se apoyan encima de `e55c4fd`.

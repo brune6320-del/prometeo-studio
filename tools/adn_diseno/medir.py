@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""medir.py — Batería de pruebas y validación relacional de ADN de Diseño (D-11).
+"""medir.py — Batería de pruebas y validación relacional de ADN de Diseño (D-11 / D-11b).
 
-Verifica:
-1. Exactitud matemática de CIEDE2000 (ΔE2000, Sharma et al. 2005) y contrato ESQUEMA.md.
+Verifica (7/7 pruebas):
+1. Exactitud matemática de CIEDE2000 (ΔE2000, Sharma et al. 2005) y contrato ESQUEMA.md v1.1.0.
 2. Par sintético 1 (Mismo diseño, otra paleta): reconoce que cambió la paleta Lab (ΔE2000 alto)
    y que NO cambiaron la retícula, el vacío ni la jerarquía.
 3. Par sintético 2 (Mismo diseño, desplazado): reconoce que NO cambió la paleta Lab (ΔE2000 ~ 0)
    ni las razones de tamaño, y que SÍ cambiaron la retícula, márgenes, centro de peso y saliencia.
 4. La prueba que de verdad importa (Cambio de contenido: título más largo + imagen vertical):
    al proponer ajustes con aplicar.py sobre un contenido nuevo (título largo e imagen vertical),
-   las relaciones del referente (paleta Lab, contraste ΔE2000, jerarquía de tamaños, márgenes y
-   proporción de aire) se mantienen mientras la imagen sigue siendo vertical y el título largo cabe.
-5. Validación sobre muestras reales del corpus abierto D-3 (~/Desktop/REFERENTES/corpus-editorial/).
+   las relaciones del referente se mantienen mientras la imagen sigue siendo vertical y el título largo cabe.
+5. Validación estructural del contrato v1.1.0 sobre muestras reales del corpus abierto D-3.
+6. [D-11b Nuevo] Confianza continua (Ley 8, ningún número fijo): comprueba que la confianza BAJA
+   en los 6 bloques con una imagen de ruido aleatorio y SUBE con una imagen limpia de 3 colores planos.
+7. [D-11b Nuevo] Fidelidad cromática con K adaptativo (3..10) y registro de negativos ("paleta_insuficiente"):
+   compara K=5 fijo vs K adaptativo (3..10) sobre los 5 carteles de D-3 y verifica que cuando un cartel
+   con degradados continuos/salpicadura supera ΔE2000=5.0 incluso en K=10 (p.ej. met_335536.jpg / wikimedia_ed_03.jpg),
+   se declara explícitamente "paleta_insuficiente": true como negativo sin esconderlo.
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ import argparse
 import copy
 import json
 import math
+import random
 import sys
 import tempfile
 from pathlib import Path
@@ -29,7 +35,7 @@ from .aplicar import proponer_cambios
 from .color_lab import delta_e2000
 from .esquema import validar_estudio
 from .estudiar import estudiar_lienzo, estudiar_referente
-from .lector import LienzoLab, escribir_bmp_desde_lab
+from .lector import LienzoLab, escribir_bmp_desde_lab, srgb_a_lab
 
 
 def _crear_lienzo_sintetico(
@@ -73,7 +79,7 @@ def _crear_lienzo_sintetico(
 
 
 def probar_ciede2000_sharma() -> Dict[str, Any]:
-    """Comprueba la fórmula ΔE2000 frente a los pares de referencia de Sharma et al. (2005) Tabla 1."""
+    """1. Comprueba la fórmula ΔE2000 frente a los pares de referencia de Sharma et al. (2005) Tabla 1."""
     casos = [
         ((50.0000, 2.6772, -79.7751), (50.0000, 0.0000, -82.7485), 2.0425),
         ((50.0000, 3.1571, -77.2803), (50.0000, 0.0000, -82.7485), 2.8615),
@@ -95,7 +101,7 @@ def probar_ciede2000_sharma() -> Dict[str, Any]:
 
 
 def probar_par_sintetico_paleta() -> Dict[str, Any]:
-    """Par sintético 1: Mismo diseño geométrico con dos paletas opuestas (cálida vs fría)."""
+    """2. Par sintético 1: Mismo diseño geométrico con dos paletas opuestas (cálida vs fría)."""
     ancho, alto = 128, 160
     fondo_calido = (88.0, 2.0, 16.0)
     bloques_calidos = [
@@ -175,16 +181,14 @@ def probar_par_sintetico_paleta() -> Dict[str, Any]:
 
 
 def probar_par_sintetico_desplazado() -> Dict[str, Any]:
-    """Par sintético 2: Misma paleta y mismos tamaños de bloque, pero desplazados de lugar."""
+    """3. Par sintético 2: Misma paleta y mismos tamaños de bloque, pero desplazados de lugar."""
     ancho, alto = 128, 160
     fondo = (88.0, 2.0, 16.0)
 
-    # Diseño A: bloques arriba a la izquierda
     bloques_a = [
         {"x_rel": 0.08, "y_rel": 0.08, "w_rel": 0.50, "h_rel": 0.42, "lab": (38.0, 44.0, 26.0)},
         {"x_rel": 0.08, "y_rel": 0.54, "w_rel": 0.32, "h_rel": 0.16, "lab": (18.0, 2.0, 2.0)},
     ]
-    # Diseño B: mismos tamaños exactos y mismos colores Lab, pero desplazados abajo a la derecha
     bloques_b = [
         {"x_rel": 0.42, "y_rel": 0.32, "w_rel": 0.50, "h_rel": 0.42, "lab": (38.0, 44.0, 26.0)},
         {"x_rel": 0.60, "y_rel": 0.78, "w_rel": 0.32, "h_rel": 0.16, "lab": (18.0, 2.0, 2.0)},
@@ -240,7 +244,7 @@ def probar_par_sintetico_desplazado() -> Dict[str, Any]:
 
 
 def probar_transferencia_contenido_cambiado() -> Dict[str, Any]:
-    """LA PRUEBA QUE DE VERDAD IMPORTA:
+    """4. LA PRUEBA QUE DE VERDAD IMPORTA:
     Cambiar el contenido (título mucho más largo + imagen vertical en lugar de horizontal)
     y comprobar que aplicar.py propone una composición que mantiene las relaciones del referente.
     """
@@ -386,7 +390,7 @@ def probar_transferencia_contenido_cambiado() -> Dict[str, Any]:
 
 
 def probar_corpus_editorial_d3(dir_corpus: Path) -> Dict[str, Any]:
-    """Ejecuta el estudio sobre muestras reales del corpus D-3 y valida el contrato ESQUEMA.md."""
+    """5. Ejecuta el estudio sobre los 5 carteles del corpus D-3 y valida el contrato ESQUEMA.md v1.1.0."""
     dir_muestras = dir_corpus / "muestras"
     archivos = sorted(dir_muestras.glob("*.jpg"))[:5] if dir_muestras.is_dir() else []
     resultados: List[Dict[str, Any]] = []
@@ -402,7 +406,10 @@ def probar_corpus_editorial_d3(dir_corpus: Path) -> Dict[str, Any]:
                 "archivo": ruta_img.name,
                 "contrato_valido": ok,
                 "errores": errs,
+                "k_elegido": est["paleta"]["k_elegido"],
                 "num_colores_lab": est["paleta"]["num_colores"],
+                "delta_e2000_cuantizacion_media": est["paleta"]["delta_e2000_cuantizacion_media"],
+                "paleta_insuficiente": est["paleta"]["paleta_insuficiente"],
                 "armonia": est["paleta"]["armonia"]["tipo"],
                 "porcentaje_aire": est["vacio"]["porcentaje_aire"],
                 "sistema_reticula": est["reticula"]["proporciones_geometricas"]["sistema_dominante"],
@@ -418,6 +425,163 @@ def probar_corpus_editorial_d3(dir_corpus: Path) -> Dict[str, Any]:
     }
 
 
+def probar_confianza_ruido_vs_planos() -> Dict[str, Any]:
+    """6. [D-11b Punto 1] Comprueba que la confianza continua (Ley 8) BAJA con una imagen de
+    ruido aleatorio y SUBE con una imagen limpia de 3 colores planos en los 6 bloques.
+    """
+    ancho, alto = 96, 120
+    rng = random.Random(42)
+
+    # A. Imagen de ruido cromático/tonal aleatorio uniforme
+    mat_ruido = [
+        [
+            srgb_a_lab(
+                rng.randint(0, 255),
+                rng.randint(0, 255),
+                rng.randint(0, 255),
+            )
+            for _ in range(ancho)
+        ]
+        for _ in range(alto)
+    ]
+    est_ruido = estudiar_lienzo(
+        LienzoLab("ruido_aleatorio", "imagen", "0" * 64, ancho, alto, ancho, alto, mat_ruido, {})
+    )
+
+    # B. Imagen limpia de 3 colores planos dentro del gamut sRGB (papel crema, bloque bermellón, bloque azul marino)
+    col_papel = srgb_a_lab(242, 234, 214)
+    col_rojo = srgb_a_lab(198, 48, 42)
+    col_azul = srgb_a_lab(24, 38, 92)
+
+    mat_planos = [[col_papel for _ in range(ancho)] for _ in range(alto)]
+    for y in range(12, 56):
+        for x in range(12, 84):
+            mat_planos[y][x] = col_rojo
+    for y in range(68, 102):
+        for x in range(12, 60):
+            mat_planos[y][x] = col_azul
+
+    est_planos = estudiar_lienzo(
+        LienzoLab("tres_colores_planos", "imagen", "0" * 64, ancho, alto, ancho, alto, mat_planos, {})
+    )
+
+    c_ruido = est_ruido["confianza"]
+    c_planos = est_planos["confianza"]
+
+    bloques = ("paleta", "reticula", "escala_tipografica", "vacio", "jerarquia", "saliencia")
+    sube_en_todos = all(
+        c_planos["por_bloque"][b] > c_ruido["por_bloque"][b] + 0.25 for b in bloques
+    )
+    baja_en_ruido = (c_ruido["global"] < 0.12) and (est_ruido["paleta"]["paleta_insuficiente"] is True)
+    sube_en_planos = (
+        c_planos["global"] > 0.72
+        and c_planos["por_bloque"]["paleta"] > 0.95
+        and est_planos["paleta"]["k_elegido"] == 3
+        and est_planos["paleta"]["paleta_insuficiente"] is False
+    )
+
+    return {
+        "prueba": "confianza_continua_ruido_vs_3_colores_planos",
+        "exito": bool(sube_en_todos and baja_en_ruido and sube_en_planos),
+        "sube_en_los_6_bloques": bool(sube_en_todos),
+        "baja_con_ruido": bool(baja_en_ruido),
+        "sube_con_3_colores_planos": bool(sube_en_planos),
+        "confianza_ruido": {
+            "global": c_ruido["global"],
+            "por_bloque": c_ruido["por_bloque"],
+            "k_elegido": est_ruido["paleta"]["k_elegido"],
+            "delta_e2000_medio": est_ruido["paleta"]["delta_e2000_cuantizacion_media"],
+            "paleta_insuficiente": est_ruido["paleta"]["paleta_insuficiente"],
+        },
+        "confianza_3_colores_planos": {
+            "global": c_planos["global"],
+            "por_bloque": c_planos["por_bloque"],
+            "k_elegido": est_planos["paleta"]["k_elegido"],
+            "delta_e2000_medio": est_planos["paleta"]["delta_e2000_cuantizacion_media"],
+            "paleta_insuficiente": est_planos["paleta"]["paleta_insuficiente"],
+        },
+    }
+
+
+def probar_fidelidad_cromatica_k_adaptativo_d3(dir_corpus: Path) -> Dict[str, Any]:
+    """7. [D-11b Puntos 2 y 3] Compara antes (K=5 fijo) vs después (K adaptativo 3..10) en los 5
+    carteles de D-3 y verifica que cuando un cartel policromático con salpicadura/degradado continuo
+    (p.ej. met_335536.jpg) sigue en ΔE2000 > 5.0 con K=10, se reporta como negativo ("paleta_insuficiente": true).
+    """
+    dir_muestras = dir_corpus / "muestras"
+    archivos_5 = sorted(dir_muestras.glob("*.jpg"))[:5] if dir_muestras.is_dir() else []
+
+    tabla_comparativa: List[Dict[str, Any]] = []
+    for ruta_img in archivos_5:
+        est_k5 = estudiar_referente(ruta_img, num_colores=5, max_dim_analisis=160)
+        est_ad = estudiar_referente(ruta_img, num_colores=None, max_dim_analisis=160)
+        p5 = est_k5["paleta"]
+        pa = est_ad["paleta"]
+
+        tabla_comparativa.append(
+            {
+                "archivo": ruta_img.name,
+                "antes_k5": {
+                    "k": 5,
+                    "delta_e2000_medio": p5["delta_e2000_cuantizacion_media"],
+                    "pasa_umbral_5": not p5["paleta_insuficiente"],
+                },
+                "despues_k_adaptativo": {
+                    "k_elegido": pa["k_elegido"],
+                    "num_colores": pa["num_colores"],
+                    "delta_e2000_medio": pa["delta_e2000_cuantizacion_media"],
+                    "paleta_insuficiente": pa["paleta_insuficiente"],
+                    "pasa_umbral_5": not pa["paleta_insuficiente"],
+                    "confianza_paleta": est_ad["confianza"]["por_bloque"]["paleta"],
+                    "confianza_global": est_ad["confianza"]["global"],
+                },
+            }
+        )
+
+    # Verificar que los carteles que fallaban con K=5 (cma_1934_29 y cma_1968_257) suben K y bajan de 5.0,
+    # logrando que los 5 carteles cumplan ΔE2000 < 5.0 con K adaptativo (3..10)
+    rescata_degradados = all(
+        fila["despues_k_adaptativo"]["pasa_umbral_5"]
+        and fila["despues_k_adaptativo"]["delta_e2000_medio"] < 5.0
+        for fila in tabla_comparativa
+    ) and any(
+        (not fila["antes_k5"]["pasa_umbral_5"]) and fila["despues_k_adaptativo"]["pasa_umbral_5"]
+        for fila in tabla_comparativa
+    )
+
+    # Verificar también que un negativo real del corpus D-3 (met_335536.jpg o wikimedia_ed_03.jpg)
+    # que con K=10 sigue > 5.0 declara honestamente "paleta_insuficiente": true
+    negativos_declarados: List[Dict[str, Any]] = []
+    for nombre_neg in ("met_335536.jpg", "wikimedia_ed_03.jpg"):
+        ruta_neg = dir_muestras / nombre_neg
+        if ruta_neg.exists():
+            est_neg = estudiar_referente(ruta_neg, num_colores=None, max_dim_analisis=160)
+            p_neg = est_neg["paleta"]
+            negativos_declarados.append(
+                {
+                    "archivo": nombre_neg,
+                    "k_elegido": p_neg["k_elegido"],
+                    "delta_e2000_medio": p_neg["delta_e2000_cuantizacion_media"],
+                    "paleta_insuficiente": p_neg["paleta_insuficiente"],
+                    "confianza_paleta": est_neg["confianza"]["por_bloque"]["paleta"],
+                }
+            )
+
+    negativo_honesto = all(
+        n["k_elegido"] == 10 and n["paleta_insuficiente"] is True and n["delta_e2000_medio"] >= 5.0
+        for n in negativos_declarados
+    )
+
+    return {
+        "prueba": "fidelidad_cromatica_k_adaptativo_d3",
+        "exito": bool(rescata_degradados and negativo_honesto and len(tabla_comparativa) == 5),
+        "rescata_degradados_con_k_adaptativo": bool(rescata_degradados),
+        "declara_negativos_paleta_insuficiente_k10": bool(negativo_honesto),
+        "tabla_5_carteles_d3": tabla_comparativa,
+        "negativos_en_k10_corpus_d3": negativos_declarados,
+    }
+
+
 def ejecutar_suite_completa(dir_corpus: Optional[Path] = None) -> Dict[str, Any]:
     if dir_corpus is None:
         dir_corpus = Path.home() / "Desktop" / "REFERENTES" / "corpus-editorial"
@@ -428,6 +592,8 @@ def ejecutar_suite_completa(dir_corpus: Optional[Path] = None) -> Dict[str, Any]
         probar_par_sintetico_desplazado(),
         probar_transferencia_contenido_cambiado(),
         probar_corpus_editorial_d3(dir_corpus),
+        probar_confianza_ruido_vs_planos(),
+        probar_fidelidad_cromatica_k_adaptativo_d3(dir_corpus),
     ]
     todas_ok = all(p["exito"] for p in pruebas)
     return {
@@ -440,7 +606,7 @@ def ejecutar_suite_completa(dir_corpus: Optional[Path] = None) -> Dict[str, Any]
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="medir.py (D-11): ejecuta las pruebas de pares sintéticos y transferencia con cambio de contenido."
+        description="medir.py (D-11b): ejecuta las 7 pruebas (5 originales + confianza ruido/planos + K adaptativo D-3)."
     )
     parser.add_argument(
         "--corpus",
