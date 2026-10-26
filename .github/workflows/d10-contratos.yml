@@ -1,0 +1,43 @@
+name: D-10 contratos sin entrenamiento
+
+on:
+  push:
+    paths:
+      - 'tools/adn_tipo/**'
+      - '.github/workflows/d10-contratos.yml'
+  pull_request:
+    paths:
+      - 'tools/adn_tipo/**'
+      - '.github/workflows/d10-contratos.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CUBLAS_WORKSPACE_CONFIG: ':4096:8'
+      OMP_NUM_THREADS: '2'
+      MKL_NUM_THREADS: '2'
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dependencias CPU fijadas en requirements.txt
+        run: |
+          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install numpy==1.26.4 Pillow==11.3.0 scikit-image==0.25.2
+      - name: Pooling, backward, color y selección interna; sin humo de entrenamiento
+        working-directory: tools/adn_tipo
+        run: |
+          python -m unittest -v test_modelo test_color_v3 \
+            test_v3.V3Test.test_grupo_fuente_caracter_y_orden_independiente \
+            test_v3.V3Test.test_documento_completo_no_cruza_particion \
+            test_v3.V3Test.test_no_reubica_grupos_si_falta_clase \
+            test_v3.V3Test.test_no_acepta_copia_cruzada \
+            test_v3.V3Test.test_parada_empate_y_no_finito

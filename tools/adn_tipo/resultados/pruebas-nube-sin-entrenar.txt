@@ -1,0 +1,19 @@
+test_backward_determinista_cpu (test_modelo.PoolDeterministaTest.test_backward_determinista_cpu) ... ok
+test_backward_determinista_cuda (test_modelo.PoolDeterministaTest.test_backward_determinista_cuda) ... skipped 'CUDA no disponible'
+test_pool_valor_y_gradiente_cpu (test_modelo.PoolDeterministaTest.test_pool_valor_y_gradiente_cpu) ... ok
+test_rechaza_tamano_no_equivalente (test_modelo.PoolDeterministaTest.test_rechaza_tamano_no_equivalente) ... ok
+test_red_y_pesos_anteriores_compatibles (test_modelo.PoolDeterministaTest.test_red_y_pesos_anteriores_compatibles) ... ok
+test_cabeza_lineal_preserva_signo_lab_y_unidades_de_inferencia (test_color_v3.ColorV3Test.test_cabeza_lineal_preserva_signo_lab_y_unidades_de_inferencia) ... ok
+test_pesos_y_gradientes_de_la_perdida_prerregistrada (test_color_v3.ColorV3Test.test_pesos_y_gradientes_de_la_perdida_prerregistrada) ... ok
+test_prerregistros_sellados (test_color_v3.ColorV3Test.test_prerregistros_sellados) ... ok
+test_validacion_mide_color_en_lab_fisico_no_en_normalizado (test_color_v3.ColorV3Test.test_validacion_mide_color_en_lab_fisico_no_en_normalizado) ... ok
+test_grupo_fuente_caracter_y_orden_independiente (test_v3.V3Test.test_grupo_fuente_caracter_y_orden_independiente) ... ok
+test_documento_completo_no_cruza_particion (test_v3.V3Test.test_documento_completo_no_cruza_particion) ... ok
+test_no_reubica_grupos_si_falta_clase (test_v3.V3Test.test_no_reubica_grupos_si_falta_clase) ... ok
+test_no_acepta_copia_cruzada (test_v3.V3Test.test_no_acepta_copia_cruzada) ... ok
+test_parada_empate_y_no_finito (test_v3.V3Test.test_parada_empate_y_no_finito) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.587s
+
+OK (skipped=1)
