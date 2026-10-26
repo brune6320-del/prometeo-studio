@@ -1,5 +1,5 @@
-"""Ejecuta Claude: etiquetas de A y rasterización con ruido de PDFs propios de Bruno.
-Este script no se ejecuta sobre el examen durante el desarrollo de D-10.
+"""Preparador de TRAIN nativo exclusivamente. Para examen: examen/preparar.py.
+La generación persistente de holdout está deshabilitada por el protocolo v2.
 """
 from __future__ import annotations
 import argparse
@@ -14,8 +14,9 @@ from nativo import comprobar_documento, extraer, nombre_limpio
 from generar_sintetico import GLIFOS
 
 def preparar(plan_path,salida,modo,propio=False):
+    if modo != 'train':
+        raise ValueError('Holdout persistente deshabilitado: usar medir_examen.py en Colab')
     plan=leer(plan_path); salida=Path(salida)
-    if modo not in ('train','holdout'): raise ValueError('Modo inválido')
     if not propio: raise ValueError('Claude debe verificar autoría y ausencia de firmas/sellos de terceros')
     docs=plan['documentos']
     if len({d['sha256'] for d in docs})!=len(docs): raise ValueError('Origen repetido en plan; riesgo de fuga')
@@ -63,21 +64,14 @@ def preparar(plan_path,salida,modo,propio=False):
     manifest=dict(version=1,dominio='nativo_train' if modo=='train' else 'real_rasterizado',
         sha256_plan=sha256(plan_path),origenes=[d['sha256'] for d in elegidos],n=len(rows),omitidos=omitidos,
         advertencia='Rasterización con ruido; NO es impresión/escáner físico. Examen de glifos con transcripción A conocida.')
-    if modo=='train':
-        guardar(salida/'train.json',rows,exclusivo=True);manifest['train_sha256']=sha256(salida/'train.json')
-    else:
-        guardar(salida/'holdout.json',dict(version=1,dominio='real_rasterizado',muestras=rows),exclusivo=True)
-        manifest['holdout_sha256']=sha256(salida/'holdout.json')
-        guardar(salida/'SELLO.json',dict(sellador='Claude',sha256_plan=sha256(plan_path),
-            sha256_holdout=manifest['holdout_sha256'],origenes=manifest['origenes'],
-            archivos={r['archivo']:r['sha256'] for r in rows}),exclusivo=True)
-        manifest['sello_sha256']=sha256(salida/'SELLO.json')
+    guardar(salida/'train.json',rows,exclusivo=True)
+    manifest['train_sha256']=sha256(salida/'train.json')
     guardar(salida/'manifest.json',manifest,exclusivo=True)
     print(manifest)
     return manifest
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('plan',type=Path)
-    p.add_argument('--salida',type=Path,required=True);p.add_argument('--modo',choices=['train','holdout'],required=True)
+    p.add_argument('--salida',type=Path,required=True);p.add_argument('--modo',choices=['train'],required=True)
     p.add_argument('--propios-bruno-sin-firmas-ni-sellos',action='store_true');a=p.parse_args()
     preparar(a.plan,a.salida,a.modo,a.propios_bruno_sin_firmas_ni_sellos)

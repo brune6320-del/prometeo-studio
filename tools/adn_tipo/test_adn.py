@@ -85,7 +85,7 @@ class ADNTest(unittest.TestCase):
     def test_plan_rechaza_origen_en_ambos_splits_sin_abrir_pdf(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);guardar(root/'plan.json',{'documentos':[{'sha256':'a','split':'train'},{'sha256':'a','split':'holdout'}]})
-            with self.assertRaisesRegex(ValueError,'repetido'):preparar(root/'plan.json',root/'out','holdout',True)
+            with self.assertRaisesRegex(ValueError,'repetido'):preparar(root/'plan.json',root/'out','train',True)
     def test_maestro_train_propio_sin_abrir_examen(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td); pdf=root/'fixture.pdf'

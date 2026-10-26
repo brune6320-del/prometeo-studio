@@ -74,7 +74,8 @@ un secreto `GITHUB_TOKEN` de solo lectura, genera datos, mide vecino, entrena
 20 épocas GPU, guarda en Drive pesos/métricas/commit/dependencias y muestra SHA
 de pesos y holdout. Opcionalmente afina 5 épocas con `NATIVO_TRAIN`, creado con
 etiquetas A y sin fuentes ni documentos del examen. Añadir tarifa USD/h de
-Bruno o conservar coste desconocido. El notebook no abre el examen real.
+Bruno o conservar coste desconocido. El notebook de entrenamiento no abre el examen real; el cuaderno separado
+`evaluar_examen_colab.ipynb` lo ejecuta Bruno una sola vez, con pesos congelados.
 Cada entrenamiento guarda el último checkpoint; no selecciona por holdout.
 
 ```sh
@@ -118,12 +119,21 @@ no atribuir la diferencia a un cambio del modelo. Evidencia en su propia rama.
 
 ## Examen real y límites pendientes
 
-[EXAMEN-CLAUDE.md](EXAMEN-CLAUDE.md) y `preparar_examen.py` preparan la alternativa
-permitida de PDFs propios rasterizados con ruido. Claude selecciona por origen,
-separa familias, ejecuta A, sella con SHA y conserva el examen sin mostrárnoslo.
-El preparador se probó solo con un PDF artificial para **train**, no con el examen.
-No se recibieron PDFs propios de Bruno ni sello de Claude; el examen real aún
-no está construido. Reportar por separado vecino, CNN sintética y afinada A.
+[EXAMEN-CLAUDE.md](EXAMEN-CLAUDE.md) documenta el protocolo v2 de Drive:
+Claude sella únicamente SHA-256, número de páginas y tipo de los 10–20 PDF de
+`d10-examen`. Codex solo recibe ese JSON. `examen/preparar.py` exige coincidencia
+exacta de la carpeta; `medir_examen.py` evalúa tres métodos en una pasada en el
+Colab de Bruno, sin guardar texto ni imágenes. Un marcador persistente impide
+repetir el mismo conjunto por accidente. `preparar_examen.py` queda solo para
+TRAIN; el antiguo holdout persistente está deshabilitado.
+
+Prerregistro v2 publicado antes del sellado en `b0de0bf`; SHA-256:
+`16b5a933c466c04eaa9a28e06dcb62ceb4be2c66b73e1391b1a16d546637d776`.
+Los umbrales son los mismos de v1, conservada en `examen/PRERREGISTRO-v1.md`.
+No recibí ni abrí PDFs reales. Escaneados sin nativo emparejado no tienen
+etiquetas de estilo verificables: contados como NO EVALUABLE, métricas null.
+La parte nativa se mide con rasterización ruidosa y segmentación A conocida;
+se reportan exclusiones y cobertura sin hacer pasar el subconjunto por el total.
 
 **NO VERIFICADO:** Colab/GPU/Drive reales, afinado A, examen real de Bruno,
 impresión/escáner físico, benchmark OCR, calibración de confianza, ICC/tintas

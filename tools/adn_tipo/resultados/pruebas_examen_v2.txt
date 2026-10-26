@@ -1,0 +1,36 @@
+test_cajas_vacias_y_lab_invalido (test_adn.ADNTest.test_cajas_vacias_y_lab_invalido) ... ok
+test_embebida_y_rotacion (test_adn.ADNTest.test_embebida_y_rotacion) ... ok
+test_evaluacion_rechaza_familia_vista (test_adn.ADNTest.test_evaluacion_rechaza_familia_vista) ... ok
+test_familia_normalizada_y_estilos_mismo_split (test_adn.ADNTest.test_familia_normalizada_y_estilos_mismo_split) ... ok
+test_lab_y_ortografia_no_corrige (test_adn.ADNTest.test_lab_y_ortografia_no_corrige) ... ok
+test_maestro_train_propio_sin_abrir_examen (test_adn.ADNTest.test_maestro_train_propio_sin_abrir_examen) ... ok
+test_nativo_caracter_fuente_y_pixeles (test_adn.ADNTest.test_nativo_caracter_fuente_y_pixeles) ... ok
+test_pdf_mixto_enruta_y_preserva_pagina (test_adn.ADNTest.test_pdf_mixto_enruta_y_preserva_pagina) ... ok
+test_plan_rechaza_origen_en_ambos_splits_sin_abrir_pdf (test_adn.ADNTest.test_plan_rechaza_origen_en_ambos_splits_sin_abrir_pdf) ... ok
+test_rechaza_firmas_sellos_y_sin_declaracion (test_adn.ADNTest.test_rechaza_firmas_sellos_y_sin_declaracion) ... ok
+test_rechaza_fuga_train_antes_de_gradientes (test_adn.ADNTest.test_rechaza_fuga_train_antes_de_gradientes) ... ok
+test_sha_de_imagen_y_holdout (test_adn.ADNTest.test_sha_de_imagen_y_holdout) ... ok
+test_sintetico_tamano_efectivo_y_semilla (test_adn.ADNTest.test_sintetico_tamano_efectivo_y_semilla) ... ok
+test_abstencion_cuenta_como_fallo (test_examen.ExamenTest.test_abstencion_cuenta_como_fallo) ... ok
+test_afinado_distinto_y_familia_holdout_rechazados (test_examen.ExamenTest.test_afinado_distinto_y_familia_holdout_rechazados) ... ok
+test_cambio_entre_inventario_y_apertura_rechazado (test_examen.ExamenTest.test_cambio_entre_inventario_y_apertura_rechazado) ... ok
+test_catalogo_real_congelado (test_examen.ExamenTest.test_catalogo_real_congelado) ... ok
+test_excepcion_no_filtra_datos_ni_traceback (test_examen.ExamenTest.test_excepcion_no_filtra_datos_ni_traceback) ... ok
+test_fuga_origen_y_pesos_distintos_rechazan_antes_de_pdf (test_examen.ExamenTest.test_fuga_origen_y_pesos_distintos_rechazan_antes_de_pdf) ... ok
+test_holdout_antiguo_deshabilitado_antes_de_leer_plan (test_examen.ExamenTest.test_holdout_antiguo_deshabilitado_antes_de_leer_plan) ... ok
+test_metadata_incorrecta_gasta_intento_y_no_publica_parcial (test_examen.ExamenTest.test_metadata_incorrecta_gasta_intento_y_no_publica_parcial) ... ok
+test_prerregistro_alterado_no_lee_carpeta (test_examen.ExamenTest.test_prerregistro_alterado_no_lee_carpeta) ... ok
+test_rechaza_faltante_sobrante_duplicado_y_archivo_no_pdf (test_examen.ExamenTest.test_rechaza_faltante_sobrante_duplicado_y_archivo_no_pdf) ... ok
+test_rechaza_hash_sello_alterado_y_enlaces (test_examen.ExamenTest.test_rechaza_hash_sello_alterado_y_enlaces) ... ok
+test_rechaza_repeticion_incluso_sello_reordenado (test_examen.ExamenTest.test_rechaza_repeticion_incluso_sello_reordenado) ... ok
+test_rechaza_sello_duplicado_paginas_boolean_y_cantidad (test_examen.ExamenTest.test_rechaza_sello_duplicado_paginas_boolean_y_cantidad) ... ok
+test_rechaza_tipo_de_sello_incorrecto (test_examen.ExamenTest.test_rechaza_tipo_de_sello_incorrecto) ... ok
+test_sello_solo_metadatos_y_carpeta_exacta (test_examen.ExamenTest.test_sello_solo_metadatos_y_carpeta_exacta) ... ok
+test_sin_referencia_no_fabrica_metricas (test_examen.ExamenTest.test_sin_referencia_no_fabrica_metricas) ... ok
+test_una_apertura_por_pdf_solo_agregados_sin_temporales (test_examen.ExamenTest.test_una_apertura_por_pdf_solo_agregados_sin_temporales) ... ok
+
+----------------------------------------------------------------------
+Ran 30 tests in 1.311s
+
+OK
+{'version': 1, 'dominio': 'nativo_train', 'sha256_plan': '771bc58500b882f7416a78c037247787b5d40ea6792ee0eefdcb243f117b7ee2', 'origenes': ['bbaacefbff1b90ca1adef466bd7493ac1549086632a8840788deaec3bbef4e4b'], 'n': 4, 'omitidos': 0, 'advertencia': 'Rasterización con ruido; NO es impresión/escáner físico. Examen de glifos con transcripción A conocida.', 'train_sha256': 'c309f1399359133d89e427d10fddec87da75c0b618f9398e2c846a9081638231'}
