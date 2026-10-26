@@ -1,0 +1,245 @@
+{
+  "schema_version": "1.0.0",
+  "id_neurona": "neurona_238",
+  "canal_indice": 238,
+  "modelo": "convnext_tiny",
+  "etapa": "features.7",
+  "modalidad_corpus": "piloto_reducido",
+  "etiqueta": "trazo puntiagudo y denso (recorte claroscuro) frente a campo liso y redondeado (transición suave)",
+  "etiquetador": "Argon",
+  "confirmada": false,
+  "fecha": "2026-10-26",
+  "sha256_pesos": "983f1562536e84ff750a1576fb08e54de751dbf2e17c0d8a4a13704341fdcd3d",
+  "licencia_pesos": "BSD-3-Clause (https://github.com/pytorch/vision/blob/main/LICENSE)",
+  "sha256_prerregistro": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
+  "sha256_mosaico_local": "c6e0ddb9d2809303bcc0b375617056801b04723bc4b36033c1f27c06ae8c08d1",
+  "prueba_apagado": {
+    "etapa_siguiente": "classifier (LayerNorm2d(768) -> Linear(768, 1000))",
+    "unidad_excitada_k": 87,
+    "peso_conexion_w_kc": 0.0978,
+    "caida_media_top9": 0.037557,
+    "caida_media_control9": 0.022895,
+    "ratio_top9_vs_control9": 1.6404,
+    "umbral_ratio_minimo": 2.0,
+    "confirmada": false
+  },
+  "discriminadores_visuales_d_cohen": {
+    "agudeza_borde": 1.0747,
+    "contraste_tonal": 0.8056,
+    "luminosidad": 0.7602,
+    "saturacion": 0.0309,
+    "calidez": -0.0452,
+    "anisotropia_vert": 0.6885
+  },
+  "polo_pos": [
+    {
+      "rango": 1,
+      "id_pieza": "d3_20",
+      "sha256_imagen": "bea839ffbb373aeaf4014e59d64931e72b1db7a3f7f45b79b998a60a9d4ee349",
+      "activacion_media": 0.60742,
+      "activacion_max_celda_7x7": 1.3836,
+      "celda_7x7": [
+        0,
+        5
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.05275
+    },
+    {
+      "rango": 2,
+      "id_pieza": "d3_09",
+      "sha256_imagen": "177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb",
+      "activacion_media": 0.4645,
+      "activacion_max_celda_7x7": 1.3849,
+      "celda_7x7": [
+        1,
+        5
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.04653
+    },
+    {
+      "rango": 3,
+      "id_pieza": "d3_06",
+      "sha256_imagen": "9e3543d5f66bc7370df89ffa64db2619ea8406361d53b2452b1d603a08ff48b1",
+      "activacion_media": 0.4136,
+      "activacion_max_celda_7x7": 1.36445,
+      "celda_7x7": [
+        6,
+        0
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.0332
+    },
+    {
+      "rango": 4,
+      "id_pieza": "d3_12",
+      "sha256_imagen": "014818d39c9dc3589c112bf6bcd7a657c3959cc5bd81481692f51a8745759507",
+      "activacion_media": 0.36108,
+      "activacion_max_celda_7x7": 1.83385,
+      "celda_7x7": [
+        2,
+        1
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.04582
+    },
+    {
+      "rango": 5,
+      "id_pieza": "d3_19",
+      "sha256_imagen": "169726bd0361e88243d37bf9bfeb2ef525deacd39c255fa314fe191b5ce24422",
+      "activacion_media": 0.34041,
+      "activacion_max_celda_7x7": 1.26424,
+      "celda_7x7": [
+        1,
+        4
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.03885
+    },
+    {
+      "rango": 6,
+      "id_pieza": "d3_10",
+      "sha256_imagen": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6",
+      "activacion_media": 0.33217,
+      "activacion_max_celda_7x7": 1.06282,
+      "celda_7x7": [
+        2,
+        4
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.03172
+    },
+    {
+      "rango": 7,
+      "id_pieza": "d3_16",
+      "sha256_imagen": "4320a2a836a7408de4a666db1cd28d4d1f8327e15f937ffacfdb67a34e55fccb",
+      "activacion_media": 0.32523,
+      "activacion_max_celda_7x7": 0.84476,
+      "celda_7x7": [
+        0,
+        1
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.03927
+    },
+    {
+      "rango": 8,
+      "id_pieza": "d3_11",
+      "sha256_imagen": "1c227d456917abc52b3237911b65a8c21ce703e7d4c2f8dfecf7d80c8e8e576f",
+      "activacion_media": 0.28983,
+      "activacion_max_celda_7x7": 1.62938,
+      "celda_7x7": [
+        0,
+        3
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.02302
+    },
+    {
+      "rango": 9,
+      "id_pieza": "d3_08",
+      "sha256_imagen": "ef9512f92f6d579e5dc75af59a5a4b1b8b47d2eda89e00b954d44520e5369027",
+      "activacion_media": 0.28742,
+      "activacion_max_celda_7x7": 0.83327,
+      "celda_7x7": [
+        1,
+        4
+      ],
+      "caida_etapa_siguiente_al_apagar": 0.02687
+    }
+  ],
+  "polo_neg": [
+    {
+      "rango": 1,
+      "id_pieza": "d3_15",
+      "sha256_imagen": "7a26ff28f246e4b73407dd224b7c9b2c274497345b9b2e27192be163eb0a75c8",
+      "activacion_media": -0.2913,
+      "activacion_min_celda_7x7": -1.28698,
+      "celda_7x7": [
+        3,
+        3
+      ]
+    },
+    {
+      "rango": 2,
+      "id_pieza": "d3_17",
+      "sha256_imagen": "13311d1cbf4a1b897354735482c541be07431facf1bab0d44f95bc52c6333c9f",
+      "activacion_media": -0.21741,
+      "activacion_min_celda_7x7": -2.4874,
+      "celda_7x7": [
+        3,
+        4
+      ]
+    },
+    {
+      "rango": 3,
+      "id_pieza": "d3_04",
+      "sha256_imagen": "55207aa597a71ee6df82e2babf85156ef26fb8315a3071cf0b9e7439bd9c15c2",
+      "activacion_media": -0.15344,
+      "activacion_min_celda_7x7": -1.2085,
+      "celda_7x7": [
+        0,
+        3
+      ]
+    },
+    {
+      "rango": 4,
+      "id_pieza": "d3_01",
+      "sha256_imagen": "a85c7a5f496e6830fe15eb238498f097e6caa282804c385be1fa35ec64ad5045",
+      "activacion_media": -0.04679,
+      "activacion_min_celda_7x7": -0.94727,
+      "celda_7x7": [
+        1,
+        6
+      ]
+    },
+    {
+      "rango": 5,
+      "id_pieza": "d3_13",
+      "sha256_imagen": "fdd76328c77a2f3b535c2b57ca3ee3ed738b122bd87e1fb854203f5ebc2c49b8",
+      "activacion_media": 0.0276,
+      "activacion_min_celda_7x7": -1.20403,
+      "celda_7x7": [
+        0,
+        0
+      ]
+    },
+    {
+      "rango": 6,
+      "id_pieza": "d3_22",
+      "sha256_imagen": "33fd7f0f7168a65f741b4fc39f2ee1d471a2a6147dcaf45a2d7e07a472b39d81",
+      "activacion_media": 0.10278,
+      "activacion_min_celda_7x7": -1.96376,
+      "celda_7x7": [
+        1,
+        3
+      ]
+    },
+    {
+      "rango": 7,
+      "id_pieza": "d3_02",
+      "sha256_imagen": "7a5578467a4116c7e9667cadd98029937629b2662d0564e87d87625a4b388f57",
+      "activacion_media": 0.10632,
+      "activacion_min_celda_7x7": -0.88219,
+      "celda_7x7": [
+        2,
+        2
+      ]
+    },
+    {
+      "rango": 8,
+      "id_pieza": "d3_05",
+      "sha256_imagen": "f62c68d6a390f72d533b087ecdca1137b2b87376f4cbb76d97edc37ef0a9f905",
+      "activacion_media": 0.10732,
+      "activacion_min_celda_7x7": -0.99478,
+      "celda_7x7": [
+        2,
+        4
+      ]
+    },
+    {
+      "rango": 9,
+      "id_pieza": "d3_18",
+      "sha256_imagen": "f1063b43da990dd6aceff9c482e5f362631c47f56684fe6e956c88e58004e997",
+      "activacion_media": 0.13974,
+      "activacion_min_celda_7x7": -0.84456,
+      "celda_7x7": [
+        5,
+        3
+      ]
+    }
+  ]
+}
