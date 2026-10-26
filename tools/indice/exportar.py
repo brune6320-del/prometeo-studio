@@ -81,11 +81,47 @@ def _escribir_atomico(path: Path, contenido: str) -> None:
         temporal.unlink(missing_ok=True)
 
 
+def origenes_indice(indice: dict, manifiesto: Path | None = None) -> dict[str, str]:
+    """Linaje por hashes; piezas.json del recortador o mapa explícito para otros derivados."""
+    enlaces = {}
+    def agregar(hijo, padre):
+        split_sha(hijo, 20, "validar")
+        split_sha(padre, 20, "validar")
+        if hijo in enlaces and enlaces[hijo] != padre:
+            raise ValueError(f"Procedencia contradictoria: {hijo}")
+        enlaces[hijo] = padre
+    if manifiesto:
+        for hijo, padre in json.loads(manifiesto.read_text()).items():
+            agregar(hijo, padre)
+    for raiz in indice.get("raices", {"carpeta": indice["raiz"]}).values():
+        for path in sorted(Path(raiz).rglob("piezas.json")):
+            datos = json.loads(path.read_text())
+            for pieza in datos.get("piezas", []):
+                agregar(pieza["sha256_png"], pieza["sha256_imagen_origen"])
+    for item in indice["items"]:
+        if item.get("sha256_origen"):
+            agregar(item["sha256_archivo"], item["sha256_origen"])
+    resultado = {}
+    for item in indice["items"]:
+        sha = item["sha256_archivo"]
+        if item.get("origen") == "recortador" and sha not in enlaces:
+            raise ValueError(f"Recorte sin procedencia: {item['ruta']}; aporta piezas.json o --origenes")
+        actual, vistos = sha, set()
+        while actual in enlaces and enlaces[actual] != actual:
+            if actual in vistos:
+                raise ValueError("Ciclo en la procedencia")
+            vistos.add(actual)
+            actual = enlaces[actual]
+        resultado[sha] = actual
+    return resultado
+
+
 def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
-            porcentaje: int = 20, sal: str = "prometeo-indice-v1") -> dict:
+            porcentaje: int = 20, sal: str = "prometeo-indice-v1", origenes: Path | None = None) -> dict:
     indice_dir = indice_dir.expanduser().resolve()
     salida = salida.expanduser().resolve()
     _, indice = cargar_indice(indice_dir)
+    linaje = origenes_indice(indice, origenes)
     if gustos is None:
         for candidato in (Path(indice["raiz"]) / "gustos.json", indice_dir / "gustos.json",
                           Path(__file__).resolve().parents[2] / "gustos.json"):
@@ -100,6 +136,8 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
     protegidos = {indice_dir / "indice.json", indice_dir / "vectores.npz"}
     if gustos is not None:
         protegidos.add(gustos)
+    if origenes is not None:
+        protegidos.add(origenes.resolve())
     nombres = {"holdout.json", "train.jsonl", "holdout.jsonl", "sin_etiqueta.jsonl", "manifest.json"}
     if any((salida / nombre).resolve() in protegidos for nombre in nombres):
         raise ValueError("La salida sobrescribiría una entrada de solo lectura")
@@ -107,8 +145,12 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
     congelado_path = salida / "holdout.json"
     if congelado_path.exists():
         congelado = json.loads(congelado_path.read_text(encoding="utf-8"))
-        if congelado.get("version") != 1 or congelado.get("porcentaje") != porcentaje or congelado.get("sal") != sal:
+        if congelado.get("version") != 2 or congelado.get("porcentaje") != porcentaje or congelado.get("sal") != sal:
             raise ValueError("El holdout existente usa otra política; no se puede reasignar")
+        for hijo, padre in congelado.get("linaje", {}).items():
+            if hijo in linaje and linaje[hijo] != padre:
+                raise ValueError("El origen de un archivo congelado cambió")
+        linaje = {**congelado.get("linaje", {}), **linaje}
         asignaciones = congelado.get("asignaciones", {})
         if not isinstance(asignaciones, dict):
             raise ValueError("holdout.json inválido")
@@ -121,11 +163,12 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
     colecciones: dict[str, list[dict]] = {"train": [], "holdout": [], "sin_etiqueta": []}
     for item in indice["items"]:
         sha = item["sha256_archivo"]
-        calculado = split_sha(sha, porcentaje, sal)
-        split = asignaciones.setdefault(sha, calculado)
+        sha_origen = linaje[sha]
+        calculado = split_sha(sha_origen, porcentaje, sal)
+        split = asignaciones.setdefault(sha_origen, calculado)
         if split != calculado:
             raise ValueError(f"Asignación congelada inconsistente para {sha}")
-        coincidencias = [(clave, etiquetas[clave]) for clave in (sha, item["id"], item["ruta"])
+        coincidencias = [(clave, etiquetas[clave]) for clave in (sha, sha_origen, item["id"], item["ruta"])
                          if clave in etiquetas]
         if len({valor[0] for _, valor in coincidencias}) > 1:
             raise ValueError(f"Etiquetas contradictorias para {item['ruta']}")
@@ -135,6 +178,7 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
         registro = {
             "id": item["id"],
             "sha256_archivo": sha,
+            "sha256_origen": sha_origen,
             "sha256_visual": item["sha256_visual"],
             "ruta": item["ruta"],
             "ruta_fuente": item.get("ruta_fuente", item["ruta"]),
@@ -147,8 +191,8 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
             "peso_gusto": peso,
         }
         colecciones[split if etiqueta else "sin_etiqueta"].append(registro)
-    congelado = {"version": 1, "porcentaje": porcentaje, "sal": sal,
-                  "asignaciones": dict(sorted(asignaciones.items()))}
+    congelado = {"version": 2, "clave": "sha256_origen", "porcentaje": porcentaje, "sal": sal,
+                  "asignaciones": dict(sorted(asignaciones.items())), "linaje": dict(sorted(linaje.items()))}
     _escribir_atomico(congelado_path, json.dumps(congelado, ensure_ascii=False, indent=2) + "\n")
     hashes_salida = {}
     for nombre, registros in colecciones.items():
@@ -157,7 +201,7 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
         hashes_salida[path.name] = sha256_archivo(path)
     hashes_salida[congelado_path.name] = sha256_archivo(congelado_path)
     manifiesto = {
-        "version": 1,
+        "version": 2,
         "indice": str(indice_dir),
         "raiz_medios": indice["raiz"],
         "raices_medios": indice.get("raices", {"carpeta": indice["raiz"]}),
@@ -165,7 +209,7 @@ def exportar(indice_dir: Path, salida: Path, gustos: Path | None = None,
         "sha256_vectores_npz": sha256_archivo(indice_dir / "vectores.npz"),
         "gustos": str(gustos) if gustos else None,
         "sha256_gustos": sha_gustos,
-        "politica_holdout": {"porcentaje": porcentaje, "sal": sal, "clave": "sha256_archivo"},
+        "politica_holdout": {"porcentaje": porcentaje, "sal": sal, "clave": "sha256_origen"},
         "totales": {k: len(v) for k, v in colecciones.items()},
         "gustos_sin_vincular": sorted(set(etiquetas) - usados),
         "sha256_salidas": hashes_salida,
@@ -181,8 +225,9 @@ def main() -> None:
     parser.add_argument("--gustos", type=Path, help="Solo lectura; por defecto busca gustos.json junto a medios o índice")
     parser.add_argument("--holdout", type=int, default=20, help="Porcentaje fijo, 1–50")
     parser.add_argument("--sal", default="prometeo-indice-v1")
+    parser.add_argument("--origenes", type=Path, help="JSON sha256_derivado -> sha256_fuente original")
     args = parser.parse_args()
-    print(json.dumps(exportar(args.indice, args.salida, args.gustos, args.holdout, args.sal),
+    print(json.dumps(exportar(args.indice, args.salida, args.gustos, args.holdout, args.sal, args.origenes),
                      ensure_ascii=False, indent=2))
 
 

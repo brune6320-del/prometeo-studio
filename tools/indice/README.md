@@ -70,7 +70,7 @@ nice -n 15 .venv/bin/python exportar.py salidas/mi-indice --gustos /ruta/a/gusto
 
 La búsqueda automática también revisa `gustos.json` en la raíz del repositorio. Las páginas PDF y fotogramas de un mismo archivo siempre comparten partición. El dataset conserva `pagina`, `fotograma`, `origen`, `ruta_fuente` y todas las raíces; no pierde la ubicación de piezas externas. Se validan todas las asignaciones ya congeladas, incluso fuentes retiradas, y se rechaza una salida que sobrescribiría gustos o el índice.
 
-Se escriben `train.jsonl`, `holdout.jsonl`, `sin_etiqueta.jsonl`, `holdout.json` y `manifest.json`, sin copiar imágenes ni pesos. La asignación train/holdout depende del SHA-256 del **archivo fuente**, el porcentaje y una sal fija; `holdout.json` conserva la asignación y rechaza cambios de política. Reencuadres o duplicados visuales con bytes distintos podrían caer en ambos conjuntos: revisar antes de entrenar. Este exportador no entrena nada.
+Se escriben `train.jsonl`, `holdout.jsonl`, `sin_etiqueta.jsonl`, `holdout.json` y `manifest.json`, sin copiar imágenes ni pesos. La asignación train/holdout depende del SHA-256 del **archivo fuente**, el porcentaje y una sal fija; `holdout.json` conserva la asignación y rechaza cambios de política. Los derivados deben declarar su procedencia mediante `piezas.json` o `--origenes mapa.json` (objeto SHA-256 del derivado → SHA-256 de su fuente original). Se resuelve el linaje transitivo; se rechazan ciclos, contradicciones y recortes de la raíz recortador sin procedencia. En la raíz general, el productor debe declarar los derivados: no se puede deducir su origen por píxeles. El holdout v2 usa `sha256_origen`; rechaza el v1, que debe conservarse en otra carpeta para auditoría. Este exportador no entrena nada.
 
 ## Verificación en esta Mac — 25/10/2026
 
@@ -86,8 +86,22 @@ Reproducir desde la raíz del repositorio (quitar `HF_HUB_OFFLINE=1` si todavía
 PYTHONDONTWRITEBYTECODE=1 OMP_NUM_THREADS=2 VECLIB_MAXIMUM_THREADS=2 HF_HUB_OFFLINE=1 nice -n 15 tools/indice/.venv/bin/python tools/indice/verificar_sintetico.py
 ```
 
-**NO VERIFICADO:** MPS, otra Mac, calidad con referentes reales, miles de archivos y salidas reales del recortador (no existe en esta base). No se encontró `gustos.json` real: el vínculo con IDs de tarjetas de Studio requiere una correspondencia explícita con archivos; las claves desconocidas se reportan sin inventarla. El holdout agrupa por bytes de fuente, no por familia visual: recortes guardados en archivos distintos pueden cruzar particiones. El porcentaje hash no garantiza ambos splits con datasets diminutos. No hubo entrenamiento ni medición sobre datos reales.
+**NO VERIFICADO:** MPS, otra Mac, calidad con referentes reales, miles de archivos y salidas reales del recortador (no existe en esta base). No se encontró `gustos.json` real: el vínculo con IDs de tarjetas de Studio requiere una correspondencia explícita con archivos; las claves desconocidas se reportan sin inventarla. El holdout v2 agrupa por fuente original declarada; procedencias ausentes o falsas en imágenes de la raíz general no pueden detectarse visualmente. El porcentaje hash no garantiza ambos splits con datasets diminutos. No hubo entrenamiento ni medición sobre datos reales.
 
 ## Entrega al propietario
 
 `entrega/D2-indice-visual-master.zip` contiene código y documentación en `FULL/`, evidencias y parches por commit en `RECUPERACION/`, más manifiestos SHA-256 y CRC-32. No contiene pesos, medios, entorno virtual ni cachés. `empaquetar.py` genera y verifica el ZIP desde un commit limpio; la suma del contenedor y la verificación de todos los miembros quedan en `entrega/verificacion.json`. El commit fuente del paquete se identifica dentro de él; un commit posterior incorpora únicamente el contenedor y su verificación.
+
+## Corrección D-10 / paso 0 — 26-10-2026
+
+Nueve pruebas pasan, incluida una con hashes de derivados que antes caían en
+ambos splits y ahora comparten origen. `evidencias/origen_cpu.json` conserva
+la repetición con pesos SigLIP verificados: ensayo histórico completo, 18
+consultas, **0,9444 / 1,0** (igual al anterior); evaluación filtrada por
+SHA-256 del origen holdout, **0,6667 / 1,0**, 3 consultas de 1 origen.
+No comparar directamente tamaños de muestra distintos ni llamar a esto
+generalización a fuentes de datos nuevas. Galería fija de 6 referentes;
+solo las consultas se restringen al holdout, sin entrenamiento. CPU nice 15,
+129,65 s incluyendo descarga inicial, 663,84 MiB RSS.
+El ZIP de entrega anterior es histórico y no contiene esta corrección; usar
+el código de la rama y el commit de D-10.

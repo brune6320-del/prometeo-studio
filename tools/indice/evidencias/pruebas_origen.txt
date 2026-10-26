@@ -1,0 +1,18 @@
+test_derivados_distintos_comparten_origen_y_rechaza_legacy (test_indice.IndiceSinteticoTest.test_derivados_distintos_comparten_origen_y_rechaza_legacy) ... ok
+test_exportar_gustos_solo_lectura_y_holdout_congelado (test_indice.IndiceSinteticoTest.test_exportar_gustos_solo_lectura_y_holdout_congelado) ... ok
+test_exportar_protege_gustos_y_funciona_sin_etiquetas (test_indice.IndiceSinteticoTest.test_exportar_protege_gustos_y_funciona_sin_etiquetas) ... ok
+test_fotogramas_video_sintetico (test_indice.IndiceSinteticoTest.test_fotogramas_video_sintetico) ... ok
+test_indexar_buscar_y_duplicados (test_indice.IndiceSinteticoTest.test_indexar_buscar_y_duplicados) ... ok
+test_integridad_vectores_y_casi_duplicados (test_indice.IndiceSinteticoTest.test_integridad_vectores_y_casi_duplicados) ... ok
+test_pdf_y_recortador_sinteticos (test_indice.IndiceSinteticoTest.test_pdf_y_recortador_sinteticos) ... <frozen importlib._bootstrap>:241: DeprecationWarning: builtin type SwigPyPacked has no __module__ attribute
+<frozen importlib._bootstrap>:241: DeprecationWarning: builtin type SwigPyObject has no __module__ attribute
+<frozen importlib._bootstrap>:241: DeprecationWarning: builtin type swigvarlink has no __module__ attribute
+ok
+test_recall_rechaza_nulos_y_no_modifica_entradas (test_indice.IndiceSinteticoTest.test_recall_rechaza_nulos_y_no_modifica_entradas) ... ok
+test_recortes_giros_color_y_recall (test_indice.IndiceSinteticoTest.test_recortes_giros_color_y_recall) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.816s
+
+OK
+sys:1: DeprecationWarning: builtin type swigvarlink has no __module__ attribute

@@ -17,7 +17,7 @@ import numpy as np
 import pymupdf
 
 from buscar import cargar_indice, duplicados, grupos, parecidos
-from exportar import exportar
+from exportar import exportar, split_sha
 from indexar import construir_indice
 from medir import crear_pares_sinteticos, evaluar
 from modelo import MODEL_ID, ModeloVisual, sha256_archivo
@@ -53,6 +53,9 @@ def verificar():
                 video.write(cv2.cvtColor(np.asarray(imagen), cv2.COLOR_RGB2BGR))
         finally:
             video.release()
+        (piezas / "piezas.json").write_text(json.dumps({"piezas": [{
+            "sha256_png": sha256_archivo(piezas / "recorte.png"),
+            "sha256_imagen_origen": sha256_archivo(medios / "ref-00.png")}]}))
         originales = {p: sha256_archivo(p) for p in [*medios.iterdir(), *piezas.iterdir()]}
         construir_indice(medios, carpeta / "indice", modelo, lote=1,
                          cada_segundos=1, max_fotogramas=2, recortes=piezas)
@@ -71,7 +74,7 @@ def verificar():
             sha256_archivo(medios / "ref-00.png"): 2,
             sha256_archivo(medios / "paginas.pdf"): 0.5,
             sha256_archivo(medios / "muestra.mp4"): 2}, "items": [
-                {"ruta": "recortador/recorte.png", "voto": "✕"}]}))
+                {"ruta": "recortador/recorte.png", "voto": "♥"}]}))
         originales[gustos] = sha256_archivo(gustos)
         resumen = exportar(carpeta / "indice", carpeta / "dataset")
         holdout = (carpeta / "dataset" / "holdout.json").read_bytes()
@@ -81,6 +84,12 @@ def verificar():
         vb = modelo.codificar(bases, lote=1)
         vc = modelo.codificar([x[0] for x in consultas], lote=1)
         recall = evaluar(vb, vc, [x[1] for x in consultas], [x[2] for x in consultas])
+        holdout_ids = [i for i in range(len(bases)) if split_sha(
+            sha256_archivo(medios / f"ref-{i:02}.png"), 20, "prometeo-indice-v1") == "holdout"]
+        seleccion = [i for i, x in enumerate(consultas) if x[1] in holdout_ids]
+        assert seleccion, "El fixture debe tener orígenes holdout"
+        recall_holdout = evaluar(vb, vc[seleccion], [consultas[i][1] for i in seleccion],
+                                 [consultas[i][2] for i in seleccion])
         return {
             "solo_datos_sinteticos": True, "dispositivo": "cpu", "lote": 1,
             "nice": os.getpriority(os.PRIO_PROCESS, 0),
@@ -91,6 +100,8 @@ def verificar():
             "duplicados_exactos_detectados": True, "grupos": len(agrupacion),
             "export_totales": resumen["totales"], "gustos_solo_lectura": True,
             "holdout_repetido_identico": True, "recall": recall,
+            "recall_holdout_por_origen": recall_holdout, "origenes_holdout": holdout_ids,
+            "nota_recall": "Galería de referencia fija; solo consultas de orígenes holdout. SigLIP no se entrena.",
             "segundos": round(time.monotonic() - inicio, 2),
             "rss_pico_mib": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024**2, 2),
             "plataforma": platform.platform(), "python": platform.python_version(),

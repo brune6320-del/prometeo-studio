@@ -11,7 +11,7 @@ import numpy as np
 from PIL import Image
 
 from buscar import cargar_indice, duplicados, grupos, parecidos
-from exportar import exportar
+from exportar import exportar, origenes_indice, split_sha
 from indexar import construir_indice
 from medir import crear_pares_sinteticos, evaluar
 from modelo import sha256_archivo
@@ -66,9 +66,12 @@ class IndiceSinteticoTest(unittest.TestCase):
             self.assertTrue(all(max(im.size) <= 513 for im, _ in paginas))
             for imagen, _ in paginas:
                 imagen.close()
+            (recortes / "piezas.json").write_text(json.dumps({"piezas": [{
+                "sha256_png": sha256_archivo(recortes / "pieza.png"),
+                "sha256_imagen_origen": sha_pdf}]}))
             gustos = origen / "gustos.json"
             gustos.write_text(json.dumps({"referentes": {sha_pdf: 2}, "items": [
-                {"ruta": "recortador/pieza.png", "voto": "✕"}]}))
+                {"ruta": "recortador/pieza.png", "voto": "♥"}]}))
             resumen = exportar(destino, base / "dataset")
             registros = []
             for nombre in ("train", "holdout"):
@@ -81,6 +84,36 @@ class IndiceSinteticoTest(unittest.TestCase):
             segundo = construir_indice(base, base / "otro-indice", CodificadorFalso(),
                                        recortes=recortes)
             self.assertEqual(sum(x["ruta"] == "piezas/pieza.png" for x in segundo["items"]), 1)
+
+    def test_derivados_distintos_comparten_origen_y_rechaza_legacy(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as temporal:
+            base = Path(temporal)
+            sha = "a" * 64
+            otros = [f"{i:064x}" for i in range(100)]
+            hijos = [next(h for h in otros if split_sha(h, 20, "s") == t)
+                     for t in ("train", "holdout")]
+            items = [{"id": h, "ruta": f"{i}.png", "sha256_archivo": h,
+                      "sha256_visual": h, "sha256_origen": sha, "tipo": tipo}
+                     for i, (h, tipo) in enumerate(zip(hijos, ("pagina_pdf", "fotograma")))]
+            items.append(dict(items[0], id="recorte", ruta="recorte.png", origen="recortador"))
+            indice = {"raiz": str(base), "items": items}
+            (base / "indice.json").write_text("{}")
+            (base / "vectores.npz").write_bytes(b"test")
+            with patch("exportar.cargar_indice", return_value=(None, indice)):
+                exportar(base, base / "out", sal="s")
+                filas = [json.loads(x) for x in (base / "out/sin_etiqueta.jsonl").read_text().splitlines()]
+                self.assertEqual(len({x["split"] for x in filas}), 1)
+                self.assertEqual({x["sha256_origen"] for x in filas}, {sha})
+                h = base / "out/holdout.json"
+                datos = json.loads(h.read_text()); datos["version"] = 1
+                h.write_text(json.dumps(datos))
+                with self.assertRaisesRegex(ValueError, "otra política"):
+                    exportar(base, base / "out", sal="s")
+            del items[-1]["sha256_origen"]
+            items[-1]["sha256_archivo"] = "f" * 64
+            with self.assertRaisesRegex(ValueError, "sin procedencia"):
+                origenes_indice(indice)
 
     def test_fotogramas_video_sintetico(self):
         try:

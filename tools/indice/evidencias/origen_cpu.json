@@ -1,0 +1,90 @@
+{
+  "solo_datos_sinteticos": true,
+  "dispositivo": "cpu",
+  "lote": 1,
+  "nice": 15,
+  "modelo": "google/siglip-base-patch16-224@264b4cf2be2e3805db80dd7f84df43989a4b76e0",
+  "sha256_pesos_recalculado": "2c63cb7d1f2e95ba501893cbb8faeb4ea9a3af295498d35097126228659c2af8",
+  "tipos": {
+    "imagen": 8,
+    "fotograma": 2,
+    "pagina_pdf": 2
+  },
+  "consulta_recorte_top1": "ref-05.png",
+  "coseno": 0.932414,
+  "consulta_recorte_positivo": "ref-01.png",
+  "posicion_positivo": 2,
+  "duplicados_exactos_detectados": true,
+  "grupos": 3,
+  "export_totales": {
+    "train": 5,
+    "holdout": 2,
+    "sin_etiqueta": 5
+  },
+  "gustos_solo_lectura": true,
+  "holdout_repetido_identico": true,
+  "recall": {
+    "global": {
+      "consultas": 18,
+      "recall@1": 0.9444,
+      "recall@5": 1.0
+    },
+    "por_transformacion": {
+      "color": {
+        "consultas": 6,
+        "recall@1": 1.0,
+        "recall@5": 1.0
+      },
+      "giro": {
+        "consultas": 6,
+        "recall@1": 1.0,
+        "recall@5": 1.0
+      },
+      "recorte": {
+        "consultas": 6,
+        "recall@1": 0.8333,
+        "recall@5": 1.0
+      }
+    }
+  },
+  "recall_holdout_por_origen": {
+    "global": {
+      "consultas": 3,
+      "recall@1": 0.6667,
+      "recall@5": 1.0
+    },
+    "por_transformacion": {
+      "color": {
+        "consultas": 1,
+        "recall@1": 1.0,
+        "recall@5": 1.0
+      },
+      "giro": {
+        "consultas": 1,
+        "recall@1": 1.0,
+        "recall@5": 1.0
+      },
+      "recorte": {
+        "consultas": 1,
+        "recall@1": 0.0,
+        "recall@5": 1.0
+      }
+    }
+  },
+  "origenes_holdout": [
+    1
+  ],
+  "nota_recall": "Galería de referencia fija; solo consultas de orígenes holdout. SigLIP no se entrena.",
+  "segundos": 129.65,
+  "rss_pico_mib": 663.84,
+  "plataforma": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.11.4",
+  "paquetes": {
+    "numpy": "1.26.4",
+    "Pillow": "11.3.0",
+    "torch": "2.8.0",
+    "transformers": "4.57.6",
+    "PyMuPDF": "1.26.5",
+    "opencv-python-headless": "4.11.0.86"
+  }
+}
