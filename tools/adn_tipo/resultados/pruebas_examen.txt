@@ -1,0 +1,18 @@
+test_abstencion_cuenta_como_fallo (test_examen.ExamenTest.test_abstencion_cuenta_como_fallo) ... ok
+test_excepcion_no_filtra_datos_ni_traceback (test_examen.ExamenTest.test_excepcion_no_filtra_datos_ni_traceback) ... ok
+test_fuga_origen_y_pesos_distintos_rechazan_antes_de_pdf (test_examen.ExamenTest.test_fuga_origen_y_pesos_distintos_rechazan_antes_de_pdf) ... ok
+test_metadata_incorrecta_gasta_intento_y_no_publica_parcial (test_examen.ExamenTest.test_metadata_incorrecta_gasta_intento_y_no_publica_parcial) ... ok
+test_prerregistro_alterado_no_lee_carpeta (test_examen.ExamenTest.test_prerregistro_alterado_no_lee_carpeta) ... ok
+test_rechaza_faltante_sobrante_duplicado_y_archivo_no_pdf (test_examen.ExamenTest.test_rechaza_faltante_sobrante_duplicado_y_archivo_no_pdf) ... ok
+test_rechaza_hash_sello_alterado_y_enlaces (test_examen.ExamenTest.test_rechaza_hash_sello_alterado_y_enlaces) ... ok
+test_rechaza_repeticion_incluso_sello_reordenado (test_examen.ExamenTest.test_rechaza_repeticion_incluso_sello_reordenado) ... ok
+test_rechaza_sello_duplicado_paginas_boolean_y_cantidad (test_examen.ExamenTest.test_rechaza_sello_duplicado_paginas_boolean_y_cantidad) ... ok
+test_rechaza_tipo_de_sello_incorrecto (test_examen.ExamenTest.test_rechaza_tipo_de_sello_incorrecto) ... ok
+test_sello_solo_metadatos_y_carpeta_exacta (test_examen.ExamenTest.test_sello_solo_metadatos_y_carpeta_exacta) ... ok
+test_sin_referencia_no_fabrica_metricas (test_examen.ExamenTest.test_sin_referencia_no_fabrica_metricas) ... ok
+test_una_apertura_por_pdf_solo_agregados_sin_temporales (test_examen.ExamenTest.test_una_apertura_por_pdf_solo_agregados_sin_temporales) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 1.044s
+
+OK

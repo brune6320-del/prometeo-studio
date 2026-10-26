@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "fecha": "2026-10-26",
+  "python": "3.11.4",
+  "paquetes": {
+    "numpy": "1.26.4",
+    "Pillow": "11.3.0",
+    "PyMuPDF": "1.26.5",
+    "torch": "2.8.0",
+    "scikit-image": "0.25.2",
+    "fonttools": "4.60.1",
+    "pyspellchecker": "0.8.3",
+    "pytesseract": "0.3.13"
+  },
+  "pruebas": {
+    "D10": 13,
+    "D2": 9,
+    "estado": "pasan"
+  },
+  "notebook": "JSON leído y celdas compiladas; NO ejecutado en Colab/Drive/GPU",
+  "examen_real": "NO abierto; NO preparado por falta de PDFs propios y sello de Claude",
+  "afinado_A": "Implementado; NO entrenado ni medido",
+  "sha256_fuentes_codigo": {
+    "extraer.py": "091edbb2cc138c82dd03d93ca06bfd7c0eb5083214c22e397672c918b1587125",
+    "ocr.lock.json": "055b1f5d530a88d6eefcef42441a0dc242388e4e684d0ad9c1c2c89215025f37",
+    "nativo.py": "27451d698585fff5b6a87c873ad316344e9d702219aafcddd41c80afcb0f96ec",
+    "modelo.py": "a0deb9a703ba3ab0dbfe287e5da81c0ac4c757d5348cedae3c3c0ee40c84e329",
+    "test_adn.py": "adc5e850750fcfbc46485635a29e396e166e5aaf1b8655121973190c38e83b51",
+    "inferir.py": "e56bcfc8dbc0320ed6918c956f1fabfbb4f60a9b1128587098b7e73c0f7b60dd",
+    "requirements.txt": "4c04ece0109985cf8b18873b255c12a4e61112916e07cdd787652176ee421109",
+    "medir.py": "cc79a00523b8784ace33b14260612cf393abf0f2d39f53054c716b6070874ae5",
+    "ESQUEMA.md": "2812270403b3b3aea709d2dcbce17bb32912952ebf16812056474140e1545c8b",
+    "README.md": "1382d454b59cf8a5dcefe610c91528d1bc1c8bd10c47afd343a554ae34914fb3",
+    "descargar_ocr.py": "8ad19645a8759d775c9c3ad2af4843873ee76cd4ceb2c3090e204e76b0d33443",
+    "comparar.py": "6ef861c6ce03cf8bde9136434a66a3ae32fd52abe6eb8e16bf3cd3edbc206fcd",
+    "generar_sintetico.py": "36e66adfc406c4354b865343a75b93ec00e3fc803b075413760c52258256a0ca",
+    "fuentes.lock.json": "76835ef5d330c0e98fc04b8eaf5915df95e6ebcb4b7d7298cc909c7c26009ea2",
+    "preparar_examen.py": "802aab40bc79d3fea70d36b3387b0a96d4b6267c47bef3e8d356ac6f1bfe6e78",
+    "PRERREGISTRO.md": "7188b9f03db9ef1733c858580c14e59d963d12e19d28bab1784e1b8b58731a78",
+    "entrenar.py": "df18d607133741cd88e22e5ffe051e840f55dad53ebccfef232090e4f43945e5",
+    "fuentes.py": "fdb11509522584db5f25c4f2c9bf162017baf0d4dcab82acece82edb0c6a923b",
+    "EXAMEN-CLAUDE.md": "60966e7218160ac68f7ad90840b63f982a2230142ff054dfd267b8e2b2ec11d8",
+    "entrenar_colab.ipynb": "c40d9320463bac8b83476d4e82cf94ca962c322dc7d76d1e7e4f9448721d9f66",
+    "comun.py": "b91518cd5fe88418c63696e4e1a9155d79b6eb34766bfff53a8aade22a1eda71"
+  },
+  "sha256_pruebas": "a8702c80455dba35deca1c3990fd81a26cf17d45fdeb500d93f005d7c456347d",
+  "sha256_holdout": "e906ab30ce3e966a4e3baf1409cf91d25b7e54e4ff3880eb20911a70f7909965",
+  "sha256_pesos_humo": "215d13ff35e1803b0d8237d1500cb360a5dd3c9ace2793a5f87a28e9354c45b6"
+}

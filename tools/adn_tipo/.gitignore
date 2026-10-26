@@ -1,0 +1,17 @@
+.venv/
+.cache/
+salidas/
+__pycache__/
+*.pyc
+*.pt
+*.pth
+*.ttf
+*.otf
+*.png
+*.jpg
+*.pdf
+*.npz
+*.cff
+*.bin
+*.traineddata
+*.jpeg

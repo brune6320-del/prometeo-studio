@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "fecha": "2026-10-26",
+  "pruebas_total": 30,
+  "pruebas_nuevas_examen": 17,
+  "codigo_examen_fijado": "36ee1f29c86d58db01ee6bdaf2a2f0dc72e35df1",
+  "prerregistro_publicado_commit": "b0de0bf",
+  "sha256_prerregistro": "16b5a933c466c04eaa9a28e06dcb62ceb4be2c66b73e1391b1a16d546637d776",
+  "evidencia": "Solo fixtures artificiales; predictores simulados para comprobar protocolo, privacidad y agregación.",
+  "notebooks": "JSON validado; celdas compiladas; no ejecutados en Colab",
+  "examen_real_abierto": false,
+  "drive_accedido": false,
+  "nuevos_entrenamientos": 0,
+  "no_verificado": [
+    "Colab/Drive/GPU",
+    "afinación A real",
+    "calidad en examen de Bruno",
+    "concurrencia de runtimes Drive"
+  ],
+  "archivos_sha256": {
+    "examen/preparar.py": "433b67dae2916846ebd7451e17bc2ed05b16d7dbb4aa64bf13c9cb0fe12cfa3d",
+    "examen/catalogo_preexamen.json": "8394ef725c6bde9b0ba73efb52f061317e3f3c21b26a747227fd0cf7ecfc10f2",
+    "examen/protocolo.json": "a64bd441d174d2861d1984af47984e0b31eb5b00f4b621fd1cbfacdfa337e0b2",
+    "medir_examen.py": "15b58b92ea1b05c40e3fe10fe459cbd154be05eb517108ee4d2b11e36df2a2a9",
+    "evaluar_examen_colab.ipynb": "8823082849b425ebcb13ccc29f2a067c75980256dcbe3978118edb29bb24ceeb",
+    "entrenar_colab.ipynb": "0dfc3a2c53f1cf3703b77d6aa48fa28540475335bb4e2fd9ab5fd7a2000f3128",
+    "EXAMEN-CLAUDE.md": "dce800f1091a7469bc32b1a3139dd8fac6ef6eeb2f47d8646146d649fdd52ccb",
+    "PRERREGISTRO.md": "16b5a933c466c04eaa9a28e06dcb62ceb4be2c66b73e1391b1a16d546637d776",
+    "preparar_examen.py": "40abfc335d620c5c631124d7576f293e8c3a073e0910f406f8481b8aaa6ff21e",
+    "test_adn.py": "8f86c52256a2591952e38be2236f0286479e28b72d0c7b04e6daab7389b3f0fe",
+    "test_examen.py": "0809627cd0f0f580bbfdc4c34cb52e0981332bfe612e8fea20d2f8b6d6a6883e",
+    "resultados/pruebas_examen_v2.txt": "51fb7e3f013d2e9f23700b5d6ab00235564c2b1f4625db19343bf3bb28258447"
+  }
+}

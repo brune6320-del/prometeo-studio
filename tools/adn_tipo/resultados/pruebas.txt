@@ -1,0 +1,19 @@
+test_cajas_vacias_y_lab_invalido (test_adn.ADNTest.test_cajas_vacias_y_lab_invalido) ... ok
+test_embebida_y_rotacion (test_adn.ADNTest.test_embebida_y_rotacion) ... ok
+test_evaluacion_rechaza_familia_vista (test_adn.ADNTest.test_evaluacion_rechaza_familia_vista) ... ok
+test_familia_normalizada_y_estilos_mismo_split (test_adn.ADNTest.test_familia_normalizada_y_estilos_mismo_split) ... ok
+test_lab_y_ortografia_no_corrige (test_adn.ADNTest.test_lab_y_ortografia_no_corrige) ... ok
+test_maestro_train_propio_sin_abrir_examen (test_adn.ADNTest.test_maestro_train_propio_sin_abrir_examen) ... ok
+test_nativo_caracter_fuente_y_pixeles (test_adn.ADNTest.test_nativo_caracter_fuente_y_pixeles) ... ok
+test_pdf_mixto_enruta_y_preserva_pagina (test_adn.ADNTest.test_pdf_mixto_enruta_y_preserva_pagina) ... ok
+test_plan_rechaza_origen_en_ambos_splits_sin_abrir_pdf (test_adn.ADNTest.test_plan_rechaza_origen_en_ambos_splits_sin_abrir_pdf) ... ok
+test_rechaza_firmas_sellos_y_sin_declaracion (test_adn.ADNTest.test_rechaza_firmas_sellos_y_sin_declaracion) ... ok
+test_rechaza_fuga_train_antes_de_gradientes (test_adn.ADNTest.test_rechaza_fuga_train_antes_de_gradientes) ... ok
+test_sha_de_imagen_y_holdout (test_adn.ADNTest.test_sha_de_imagen_y_holdout) ... ok
+test_sintetico_tamano_efectivo_y_semilla (test_adn.ADNTest.test_sintetico_tamano_efectivo_y_semilla) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.481s
+
+OK
+{'version': 1, 'dominio': 'nativo_train', 'sha256_plan': 'd902b5b220a4b9d94e4413b497b84eb944de54115872426c48671eeeae2e2539', 'origenes': ['2ffce04ed221614ab04a2ce50c2b9c24ec52707a7097b795a7ddc64cf8eeb727'], 'n': 4, 'omitidos': 0, 'advertencia': 'Rasterización con ruido; NO es impresión/escáner físico. Examen de glifos con transcripción A conocida.', 'train_sha256': '1f5132d0a5ae917132c85c6dd7fe807850f15c35cfaa93b6173516d877f33f56'}

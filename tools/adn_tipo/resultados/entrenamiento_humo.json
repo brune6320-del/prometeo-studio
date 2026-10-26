@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "etapa": "solo_sintetico",
+  "epocas": 1,
+  "n": 1056,
+  "seed": 2610,
+  "dispositivo": "cpu",
+  "gpu": null,
+  "segundos": 3.1179149579256773,
+  "coste_usd": null,
+  "tarifa_usd_h": null,
+  "plataforma": "macOS-26.6.2-arm64-arm-64bit",
+  "nice": 15,
+  "parametros": 71614,
+  "loss": [
+    2.480583010297833
+  ],
+  "sha256_pesos": "215d13ff35e1803b0d8237d1500cb360a5dd3c9ace2793a5f87a28e9354c45b6",
+  "sha256_holdout": "e906ab30ce3e966a4e3baf1409cf91d25b7e54e4ff3880eb20911a70f7909965",
+  "sha256_train": "3ec017ca82ca232a4ab52a4206cb3d1eef09f14f89f9421e7da87ef2887e16b7",
+  "sha256_prerregistro": "7188b9f03db9ef1733c858580c14e59d963d12e19d28bab1784e1b8b58731a78"
+}

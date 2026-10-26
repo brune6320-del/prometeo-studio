@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "metodo": "vecino_pixeles",
+  "dominio": "sintetico",
+  "n": 288,
+  "cobertura": 1.0,
+  "familias_holdout": 2,
+  "candidatas": 12,
+  "top1": 0.7743055555555556,
+  "top5": 0.9756944444444444,
+  "error_tamano_pt": {
+    "media": 1.3470936634984763,
+    "mediana": 0.6859318996415755,
+    "p95": 5.319642857142855
+  },
+  "deltaE2000": {
+    "media": 7.01717334738414,
+    "mediana": 6.436388273893535,
+    "p95": 14.386524595200472
+  },
+  "sha256_holdout": "e906ab30ce3e966a4e3baf1409cf91d25b7e54e4ff3880eb20911a70f7909965",
+  "sha256_pesos": null,
+  "sha256_galeria": "ed1d0a7b7e42b03e1c02099a1c12c1bbec22a0a02aea07cac39db49f1a86ce58",
+  "segundos_inferencia": 0.41375954216346145,
+  "dispositivo": "cpu",
+  "coste_usd": null,
+  "ocr": "carácter conocido para aislar tipografía; OCR no evaluado",
+  "entrenamiento": {
+    "gpu": null,
+    "segundos": 0,
+    "coste_usd": 0
+  }
+}

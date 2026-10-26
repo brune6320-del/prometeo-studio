@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "fixture": "PDF propio generado por el test; no es examen real de Bruno",
+  "sha256_pdf": "cf9a6e4c3a091d3768f4d5121e73fc6b1cc4a32f1341bed081dd4efa63e32808",
+  "comparacion": {
+    "bloques": [
+      {
+        "bloque": 0,
+        "bbox": [
+          20.0,
+          24.20800018310547,
+          108.28800201416016,
+          43.40800094604492
+        ],
+        "dpi": 144,
+        "soportado": true,
+        "mae_pixel": 0.0,
+        "fraccion_pixeles_distintos": 0.0,
+        "mae_tinta": 0.0
+      },
+      {
+        "bloque": 1,
+        "bbox": [
+          20.0,
+          74.94999694824219,
+          95.4740219116211,
+          94.18599700927734
+        ],
+        "dpi": 144,
+        "soportado": true,
+        "mae_pixel": 0.0,
+        "fraccion_pixeles_distintos": 0.0,
+        "mae_tinta": 0.0
+      }
+    ],
+    "nota": "Compara bloque completo: fondos, gráficos, clipping y modos de texto no reconstruidos afectan la diferencia."
+  },
+  "fuentes": [
+    {
+      "nombre": "Lato Regular",
+      "sha256": "d636e4683231f931eda222d588e944d082bfd3bdba02f928bee461c0f185b251"
+    },
+    {
+      "nombre": "Helvetica",
+      "sha256": null
+    }
+  ],
+  "ocr_texto": "Árbol propio\n\nHola mundo\n",
+  "ocr_caracteres": 20,
+  "ocr_abstenciones": 0,
+  "nota_ocr": "Prueba de integración solamente, no benchmark OCR ni de fuente inferida."
+}

@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "procedencia": "Nombres de fuentes OFL públicas; generado antes del sellado real",
+  "fuentes_lock_sha256": "76835ef5d330c0e98fc04b8eaf5915df95e6ebcb4b7d7298cc909c7c26009ea2",
+  "alias": {
+    "abeezee": "ABeeZee",
+    "abeezeeregular": "ABeeZee",
+    "abel": "Abel",
+    "abelregular": "Abel",
+    "anton": "Anton",
+    "antonregular": "Anton",
+    "arvo": "Arvo",
+    "arvoitalic": "Arvo",
+    "asul": "Asul",
+    "asulregular": "Asul",
+    "bangers": "Bangers",
+    "bangersregular": "Bangers",
+    "cardo": "Cardo",
+    "cardoregular": "Cardo",
+    "coda": "Coda",
+    "codaregular": "Coda",
+    "cousine": "Cousine",
+    "cousineregular": "Cousine",
+    "didactgothic": "Didact Gothic",
+    "didactgothicregular": "Didact Gothic",
+    "fjallaone": "Fjalla One",
+    "fjallaoneregular": "Fjalla One",
+    "lato": "Lato",
+    "latobold": "Lato",
+    "latoregular": "Lato"
+  }
+}

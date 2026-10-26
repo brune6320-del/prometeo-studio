@@ -1,0 +1,147 @@
+{
+  "repo": "https://github.com/google/fonts",
+  "revision": "e7db6ca603fd4862010383ff17ffd6cc4ffac1c0",
+  "licencia": "OFL-1.1",
+  "fuentes": [
+    {
+      "directorio": "abel",
+      "familia": "Abel",
+      "archivo": "abel/Abel-Regular.ttf",
+      "sha256": "8809dcad25318225052f88333e208c5aad4adcb7b2c934c135735ec19aa410b4",
+      "licencia": "abel/OFL.txt",
+      "licencia_sha256": "4f4bc3806a1e55789c6ef75ca5fc628297b05292f74966474dc0d40324abc609",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "abeezee",
+      "familia": "ABeeZee",
+      "archivo": "abeezee/ABeeZee-Regular.ttf",
+      "sha256": "2901c8df256648cc2bb2e3afb381cb8d28e65ed3dbe11de20695ae4d5ffdeda9",
+      "licencia": "abeezee/OFL.txt",
+      "licencia_sha256": "f0376d04eb58fb19e9f1690a99a1eb37380ad0246f7d503f2abd8e8a74ed12be",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "anton",
+      "familia": "Anton",
+      "archivo": "anton/Anton-Regular.ttf",
+      "sha256": "a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab",
+      "licencia": "anton/OFL.txt",
+      "licencia_sha256": "ee67e6ee22790b7929f1a3769ca2801d565c64b5a9096942c1adf5596de9c9e4",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "arvo",
+      "familia": "Arvo",
+      "archivo": "arvo/Arvo-Regular.ttf",
+      "sha256": "f41bd41471ec2db7140351bdde614da5341524503598ff7fe79f3c89c13b605e",
+      "licencia": "arvo/OFL.txt",
+      "licencia_sha256": "359671bf16c00cae69cb66d041296b2adc7a4becd73a463cb8c5e101d97c7986",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "asul",
+      "familia": "Asul",
+      "archivo": "asul/Asul-Regular.ttf",
+      "sha256": "2bd614af0594c9657cc6f986f602b294d2a903b3a7ce137942a35ac01b6f1f76",
+      "licencia": "asul/OFL.txt",
+      "licencia_sha256": "ea274e87939d38032b31fb741af75bff9fa3f8d4a8b652265f9e0ce1ad7e9f80",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "bangers",
+      "familia": "Bangers",
+      "archivo": "bangers/Bangers-Regular.ttf",
+      "sha256": "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824",
+      "licencia": "bangers/OFL.txt",
+      "licencia_sha256": "630dd5a307c0657b094d324e069b390edf90182fe5003639e06c02a0e5769af7",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "cardo",
+      "familia": "Cardo",
+      "archivo": "cardo/Cardo-Regular.ttf",
+      "sha256": "bcb81f376f1c3892c7026dabf2beafbd1a7ee8ae95d132ee7d4ff7d7c3988261",
+      "licencia": "cardo/OFL.txt",
+      "licencia_sha256": "8e28b778b6e1a7ff9ca72f4dee2d53120aa2856dc1bfd0be44307e365b0e45bb",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "coda",
+      "familia": "Coda",
+      "archivo": "coda/Coda-Regular.ttf",
+      "sha256": "f5d32ae9d5c78cdab7e75a52bd1da07ae22644597232d085a5ce7cd1af341e17",
+      "licencia": "coda/OFL.txt",
+      "licencia_sha256": "0b1bada9befa95a40d55830fe83fc7f8064e245fea33bdf0f96f57848f3866fa",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "cousine",
+      "familia": "Cousine",
+      "archivo": "cousine/Cousine-Regular.ttf",
+      "sha256": "1da22250675fc4c42fcf3a9736c44bc0570516105331443b663fd5cfbd1412fe",
+      "licencia": "cousine/OFL.txt",
+      "licencia_sha256": "b81c4d4dc0a9f72c9155e78187316e016e2012a8102468804173dc61468b906d",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "didactgothic",
+      "familia": "Didact Gothic",
+      "archivo": "didactgothic/DidactGothic-Regular.ttf",
+      "sha256": "b98f9e091b6337a86f4e0f69c94c31905e1e287782853f472e176b4e28d3f81f",
+      "licencia": "didactgothic/OFL.txt",
+      "licencia_sha256": "36e2f1debc9778bac79fac1a0cb5a5ef51c102f00b58ef7d8a05324144b68166",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "fjallaone",
+      "familia": "Fjalla One",
+      "archivo": "fjallaone/FjallaOne-Regular.ttf",
+      "sha256": "ce3b299625abe3c76f8acd235b57b3e07ac6ee2d550e106a4b4e4d60095ae2ba",
+      "licencia": "fjallaone/OFL.txt",
+      "licencia_sha256": "047c204476dacfeddbf93d33ab3d43ba82fb7e66e398fdacfce8e815e9a5c270",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "lato",
+      "familia": "Lato",
+      "archivo": "lato/Lato-Regular.ttf",
+      "sha256": "d636e4683231f931eda222d588e944d082bfd3bdba02f928bee461c0f185b251",
+      "licencia": "lato/OFL.txt",
+      "licencia_sha256": "74ba064d03f1f1c4a952da936c3eb71866c34404916734de3cae73b34357e59e",
+      "peso": 400,
+      "cursiva": false
+    },
+    {
+      "directorio": "lato",
+      "familia": "Lato",
+      "archivo": "lato/Lato-Bold.ttf",
+      "sha256": "8a0aace75d33794eece4b28187bfc1df0bbd2888b5d8a56e01788c8d65d16be1",
+      "licencia": "lato/OFL.txt",
+      "licencia_sha256": "74ba064d03f1f1c4a952da936c3eb71866c34404916734de3cae73b34357e59e",
+      "peso": 700,
+      "cursiva": false
+    },
+    {
+      "directorio": "arvo",
+      "familia": "Arvo",
+      "archivo": "arvo/Arvo-Italic.ttf",
+      "sha256": "a2eb63a0771b8d13d8e54bf650a02aef813eeaa2e10f6298358e6b15d26c6686",
+      "licencia": "arvo/OFL.txt",
+      "licencia_sha256": "359671bf16c00cae69cb66d041296b2adc7a4becd73a463cb8c5e101d97c7986",
+      "peso": 400,
+      "cursiva": true
+    }
+  ]
+}
