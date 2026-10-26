@@ -18,6 +18,7 @@ import {
   Pencil,
   Plus,
   Search,
+  SlidersHorizontal,
   Trash2,
   Undo2,
   Upload,
@@ -31,6 +32,9 @@ import {
   boardToMarkdown,
   cloneBoardForImport,
   createBoard,
+  createCard,
+  createMediaCard,
+  DEFAULT_BOARD_SETTINGS,
   duplicateCards,
   isSafeExternalUrl,
   makeBoardExport,
@@ -43,11 +47,12 @@ import {
   type BoardDocument,
   type BoardMedia,
   type BoardRelation,
+  type BoardSettings,
 } from '../board/model';
 import { geometriaConector, rectDeTarjeta } from '../board/conectores';
 import { vecinoGeometrico, type Direccion } from '../board/navegacion';
 import { coincideBusqueda, ordenDePintado, ventanaVirtual, INDICE_ROW_HEIGHT } from '../board/indice';
-import { readColumnData, setColumnFolded, columnChildIds, COLUMN_MIN_HEIGHT, quitarHijoDeColumna, reordenarHijoDeColumna } from '../board/columnas';
+import { readColumnData, normalizeColumnData, setColumnFolded, columnChildIds, COLUMN_MIN_HEIGHT, quitarHijoDeColumna, reordenarHijoDeColumna } from '../board/columnas';
 import { normalizarVistaPrevia } from '../board/vistaPrevia';
 import { borrarPlantillasLegacy, crearPlantilla, leerPlantillasLegacy, listarPlantillas, materializar, type Plantilla } from '../board/plantillas';
 import { ABRIR_TABLERO_EVENT } from '../board/tools/tablero';
@@ -60,6 +65,7 @@ import { esMediaLibre, medirMedio } from '../board/medio';
 import {
   cardsInsideFrame,
   FRAME_MIN_SIZE,
+  normalizeFrameData,
   readFrameData,
   rectFromPoints,
   setFrameView,
@@ -142,7 +148,7 @@ import {
 import { useBoardWrites } from '../hooks/useBoardWrites';
 import { BoardCardItem } from './BoardCardItem';
 import { BoardColumn } from './BoardColumn';
-import { BoardFreeMedia, type EsquinaMedia } from './BoardFreeMedia';
+import { BoardFreeMedia, leerRecorte, type EsquinaMedia } from './BoardFreeMedia';
 import { TituloEnSitio } from './InlineEdit';
 import { useFocusTrap } from './useFocusTrap';
 import { MirarDialog } from './MirarDialog';
@@ -221,7 +227,7 @@ interface CardHandlers {
   select: (cardId: string, event: Modificadores) => void;
   connect: (cardId: string) => void;
   connectStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
-  dragStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
+  dragStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>, force?: boolean) => void;
   dragMove: (event: React.PointerEvent<HTMLElement>) => void;
   dragEnd: (event: React.PointerEvent<HTMLElement>) => void;
   delete: (cardId: string) => void;
@@ -272,6 +278,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [loadError, setLoadError] = useState<string | null>(null);
   const storageError = loadError ?? writes.error;
   const [selectedCardIds, setSelectedCardIds] = useState<string[]>([]);
+  /** Copia viva para que los callbacks de tarjeta no cambien de identidad con cada selección. */
+  const selectedIdsRef = useRef<string[]>([]);
+  useEffect(() => { selectedIdsRef.current = selectedCardIds; }, [selectedCardIds]);
   const [connectMode, setConnectMode] = useState(false);
   const [connectFromId, setConnectFromId] = useState<string | null>(null);
   /** Tirador de conector: tarjeta de origen y puntero en coordenadas de pantalla. */
@@ -296,6 +305,17 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const indexSearchRef = useRef<HTMLInputElement>(null);
   const pendingCentro = useRef<{ boardId: string; cardId: string } | null>(null);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
+  /** Engranaje de una tarjeta seleccionada: edita esa tarjeta o toda la selección. */
+  const [settingsCardId, setSettingsCardId] = useState<string | null>(null);
+  const [settingsPos, setSettingsPos] = useState<{ x: number; y: number } | null>(null);
+  const [boardSettingsOpen, setBoardSettingsOpen] = useState(false);
+  /** Punto donde estaba el cursor al pulsar N: la herramienta nace ahí, no en el centro. */
+  const addPointRef = useRef<{ x: number; y: number } | null>(null);
+  const linkPointRef = useRef<{ x: number; y: number } | null>(null);
+  const mediaPointRef = useRef<{ x: number; y: number } | null>(null);
+  const desarmarRef = useRef<(cardId: string, url: string) => void>(() => undefined);
+  const adjuntarRef = useRef<(cardId: string, files: File[]) => void>(() => undefined);
+  const capturarUrlRef = useRef<(cardId: string, url: string) => void>(() => undefined);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [libraryMenuOpen, setLibraryMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -306,7 +326,6 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const [linkError, setLinkError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [snapEnabled, setSnapEnabled] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
   /** Modo Mano: un dedo o el ratón mueven el mundo sin dibujar marquesina. */
   const [handMode, setHandMode] = useState(false);
@@ -414,6 +433,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
   const activeProjectReferences = projectReferences.filter((reference) => reference.projectId === activeProjectId);
   const activeBoard = projectBoards.find((board) => board.id === activeBoardId) ?? projectBoards[0] ?? null;
+  const ajustes: BoardSettings = activeBoard?.ajustes ?? DEFAULT_BOARD_SETTINGS;
+  const snapEnabled = ajustes.iman;
   const selectedCards = activeBoard?.cards.filter((card) => selectedCardIds.includes(card.id)) ?? [];
   /** T-3: el `contain: paint` del escenario solo se retira si hay coordenadas negativas. */
   const hasNegative = (activeBoard?.cards ?? []).some((card) => card.x < 0 || card.y < 0);
@@ -1004,6 +1025,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     setBoards(boardsRef.current);
   }, [activeBoardId]);
 
+  /** Cada tablero guarda sus guías, imán, retícula, fondo, cursor y densidad. */
+  const updateAjustes = useCallback((patch: Partial<BoardSettings>) => {
+    updateBoard((board) => ({
+      ...board,
+      ajustes: { ...(board.ajustes ?? DEFAULT_BOARD_SETTINGS), ...patch },
+    }), { coalesceKey: 'ajustes-tablero' });
+  }, [updateBoard]);
+
   /** Una lectura aceptada puede caer en la Biblioteca aunque el tablero abierto sea otro. */
   const updateBoardById = useCallback((
     boardId: string,
@@ -1111,33 +1140,31 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     return card;
   }, [activeBoard, frameToolId, measureCardSizes, updateBoard, viewportSize]);
 
-  const chooseTool = useCallback((toolId: string) => {
+  const chooseTool = useCallback((toolId: string, at?: { x: number; y: number }) => {
+    const punto = at ?? addPointRef.current ?? undefined;
+    addPointRef.current = null;
     setAddMenuOpen(false);
-    if (toolId === 'marco') {
-      setFrameToolId(toolId);
-      setNotice('Arrastra en la pizarra para dibujar el marco. Escape para cancelar.');
-      return;
-    }
+    setFrameToolId(null);
     if (toolId === 'tablero') {
       setNestedDialog(true);
       return;
     }
-    setFrameToolId(null);
-    addToolCard(toolId);
-  }, [addToolCard]);
-
-  const activarHerramienta = (toolId: string) => {
     if (toolId === 'link') {
+      linkPointRef.current = punto ?? null;
       setLinkDialog(true);
       setLinkError(null);
       return;
     }
     if (toolId === 'media') {
+      mediaPointRef.current = punto ?? null;
       mediaInput.current?.click();
       return;
     }
-    chooseTool(toolId);
-  };
+    // Un clic añade ya: la nota, la columna o el marco nacen donde estaba el cursor.
+    addToolCard(toolId, undefined, punto);
+  }, [addToolCard]);
+
+  const activarHerramienta = (toolId: string) => chooseTool(toolId);
 
   const startToolDrag = (toolId: string) => (event: React.DragEvent<HTMLButtonElement>) => {
     event.dataTransfer.setData('application/x-prometeo-tool', toolId);
@@ -1170,19 +1197,34 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       }
       return;
     }
+    const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
+    const medidas = measureCardSizes();
+    const referente = (activeBoardRef.current?.cards ?? []).find((card) => {
+      if (card.type !== 'referente') return false;
+      const alto = medidas.get(card.id)?.height ?? 260;
+      return punto.x >= card.x && punto.x <= card.x + card.width && punto.y >= card.y && punto.y <= card.y + alto;
+    });
     const archivos = Array.from(event.dataTransfer.files ?? []);
     if (archivos.length) {
       event.preventDefault();
-      const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
+      if (referente) {
+        adjuntarRef.current(referente.id, archivos);
+        return;
+      }
       archivos.forEach((file, indice) => {
         void addMedia(file, { x: punto.x + indice * 36, y: punto.y + indice * 28 });
       });
       return;
     }
+    const urlSoltada = (event.dataTransfer.getData('text/uri-list') || event.dataTransfer.getData('text/plain') || '').split('\n')[0]?.trim() ?? '';
+    if (referente && isSafeExternalUrl(urlSoltada)) {
+      event.preventDefault();
+      capturarUrlRef.current(referente.id, urlSoltada);
+      return;
+    }
     const toolId = event.dataTransfer.getData('application/x-prometeo-tool');
     if (!toolId) return;
     event.preventDefault();
-    const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
     const tool = getBoardTool(toolId);
     if (tool?.tipo === 'marco') {
       setFrameToolId(null);
@@ -1678,30 +1720,32 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     else endPan(event);
   };
 
-  const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLElement>) => {
+  const startCardDrag = (card: BoardCard, event: React.PointerEvent<HTMLElement>, force = false) => {
     detenerInercia();
-    if (spaceHeld.current || event.button !== 0 || event.detail > 1 || frameToolId || connectMode || card.locked || (event.target as HTMLElement).closest('input,button,a,textarea,select,.board-inline-input') || !activeBoard) return;
+    const profundo = event.metaKey || event.ctrlKey;
+    if (spaceHeld.current || event.button !== 0 || event.detail > 1 || frameToolId || connectMode || card.locked
+      || (!force && (event.target as HTMLElement).closest('input,button,a,textarea,select,[contenteditable="true"],.board-inline-input'))
+      || !activeBoard) return;
     marcarGestoVisual();
     suppressCardClick.current = false;
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
     setSettlingIds([]);
     setGuias({});
     limpiarInclinacion();
-    const hasModifier = event.shiftKey || event.metaKey || event.ctrlKey;
     let nextSelection = selectedCardIds;
-    if (event.metaKey || event.ctrlKey) {
-      nextSelection = alternarEnSeleccion(selectedCardIds, card.id);
-      suppressCardClick.current = true;
+    if (profundo) {
+      // ⌘/Ctrl + arrastrar toma lo que hay debajo (aunque estés editando o dentro de un marco).
+      // El clic sin arrastre sigue alternando la selección.
     } else if (event.shiftKey) {
       nextSelection = alternarEnSeleccion(selectedCardIds, card.id);
       suppressCardClick.current = true;
-    } else if (!hasModifier && !selectedCardIds.includes(card.id)) {
+    } else if (!selectedCardIds.includes(card.id)) {
       nextSelection = [card.id];
     }
     if (nextSelection !== selectedCardIds) setSelectedCardIds(nextSelection);
-    if (hasModifier && !nextSelection.includes(card.id)) return;
+    if (event.shiftKey && !nextSelection.includes(card.id)) return;
 
-    const idsBrutos = hasModifier
+    const idsBrutos = profundo || event.shiftKey
       ? [card.id]
       : card.type === 'marco'
         ? [...new Set([...nextSelection.includes(card.id) ? nextSelection : [card.id], ...readFrameData(card).hijos])]
@@ -1713,10 +1757,15 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const positions = new Map(
       activeBoard.cards.filter((item) => ids.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]),
     );
-    const sizes = measureCardSizes();
+    // Solo se mide la tarjeta que se agarra. Medir las 500 en el pointerdown
+    // convertía un clic en una tarea de 200 ms; las demás usan su ancho guardado
+    // y un alto razonable para el imán.
+    const sizes = new Map<string, CardSize>();
+    const elementoAgarrado = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`);
+    const cajaAgarrada = elementoAgarrado?.getBoundingClientRect();
     sizes.set(card.id, {
       width: card.width,
-      height: card.type === 'marco' ? readFrameData(card).alto : sizes.get(card.id)?.height ?? 200,
+      height: card.type === 'marco' ? readFrameData(card).alto : cajaAgarrada ? cajaAgarrada.height / cameraRef.current.zoom : 200,
     });
     cardDrag.current = {
       pointerId: event.pointerId,
@@ -1744,8 +1793,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const moveCardDrag = (event: React.PointerEvent<HTMLElement>) => {
     const drag = cardDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    const distancia = Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y);
-    if (!drag.moved && distancia < 3) return;
+    const distancia = Math.max(Math.abs(event.clientX - drag.x), Math.abs(event.clientY - drag.y));
+    if (!drag.moved && distancia < 4) return;
     if (!drag.moved) {
       drag.moved = true;
       try { drag.captureEl?.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
@@ -1796,7 +1845,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             height: medida?.height ?? (item.type === 'marco' ? readFrameData(item).alto : 200),
           };
         });
-      const iman = imanDeCaja(caja, otras, { umbral: 7 / Math.max(0.05, cameraRef.current.zoom), rejilla: GRID_SIZE });
+      // La retícula ya se aplicó arriba; aquí el imán solo compara con otras tarjetas.
+      const iman = snapEnabled
+        ? imanDeCaja(caja, otras, { umbral: 7 / Math.max(0.05, cameraRef.current.zoom), rejilla: 0 })
+        : { dx: 0, dy: 0, guias: {} as GuiasIman };
       deltaX += iman.dx;
       deltaY += iman.dy;
       setGuias((actual) => actual.x === iman.guias.x && actual.y === iman.guias.y ? actual : iman.guias);
@@ -2035,31 +2087,33 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
 
   /** H6 · asa de ancho de una nota (o de toda la selección). El alto sigue al contenido. */
   const startWidthResize = useCallback((card: BoardCard, event: React.PointerEvent<HTMLElement>) => {
-    if (event.button !== 0 || !activeBoard || card.locked) return;
+    const board = activeBoardRef.current;
+    if (event.button !== 0 || !board || card.locked) return;
     event.preventDefault();
     event.stopPropagation();
     detenerInercia();
     marcarGestoVisual();
-    const seleccion = selectedCardIds.includes(card.id) ? selectedCardIds : [card.id];
+    const seleccionActual = selectedIdsRef.current;
+    const seleccion = seleccionActual.includes(card.id) ? seleccionActual : [card.id];
     const ids = seleccion.filter((id) => {
-      const item = activeBoard.cards.find((candidate) => candidate.id === id);
+      const item = board.cards.find((candidate) => candidate.id === id);
       return Boolean(item && !item.locked && item.type !== 'marco' && item.type !== 'media');
     });
     if (!ids.includes(card.id)) ids.push(card.id);
-    const startWidths = new Map(ids.map((id) => [id, activeBoard.cards.find((item) => item.id === id)?.width ?? card.width]));
+    const startWidths = new Map(ids.map((id) => [id, board.cards.find((item) => item.id === id)?.width ?? card.width]));
     widthResize.current = {
       pointerId: event.pointerId,
       ids,
       startX: event.clientX,
       startWidths,
-      startBoard: activeBoard,
+      startBoard: board,
       captureEl: event.currentTarget,
       raf: 0,
       ultimas: new Map(startWidths),
     };
     setSettlingIds([]);
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
-  }, [activeBoard, detenerInercia, marcarGestoVisual, selectedCardIds]);
+  }, [detenerInercia, marcarGestoVisual]);
 
   const moveWidthResize = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const drag = widthResize.current;
@@ -2087,7 +2141,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     widthResize.current = null;
     liberarPuntero(drag.captureEl, event.pointerId);
     terminarGestoVisual();
-    const tablero = boards.find((board) => board.id === drag.startBoard.id) ?? activeBoard;
+    const tablero = boardsRef.current.find((board) => board.id === drag.startBoard.id) ?? activeBoardRef.current;
     if (!tablero) return;
     const final: BoardDocument = {
       ...tablero,
@@ -2102,7 +2156,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }));
     setBoards((current) => current.map((board) => board.id === final.id ? final : board));
     enqueueBoardSave(final);
-  }, [activeBoard, boards, terminarGestoVisual]);
+  }, [terminarGestoVisual]);
 
   /** Redimensionar una imagen o vídeo desde cualquier esquina; Shift mantiene la proporción. */
   const startFreeResize = (card: BoardCard, corner: EsquinaMedia, event: React.PointerEvent<HTMLElement>) => {
@@ -2427,6 +2481,101 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       setSelectedCardIds([cardId]);
     }
   };
+
+  /** El engranaje edita la tarjeta pulsada y, si hay varias seleccionadas, todas. */
+  const abrirAjustesTarjeta = useCallback((card: BoardCard, event: React.MouseEvent<HTMLElement>) => {
+    const actuales = selectedIdsRef.current;
+    const ids = actuales.includes(card.id) ? actuales : [card.id];
+    if (!actuales.includes(card.id)) setSelectedCardIds(ids);
+    const tarjeta = (event.currentTarget.closest('[data-card-id]') as HTMLElement | null)?.getBoundingClientRect();
+    const ancho = 288;
+    const x = tarjeta ? Math.min(window.innerWidth - ancho - 12, Math.max(12, tarjeta.right + 10)) : Math.round(window.innerWidth / 2);
+    const y = tarjeta ? Math.min(window.innerHeight - 420, Math.max(72, tarjeta.top)) : 120;
+    setSettingsPos({ x, y });
+    setSettingsCardId(card.id);
+  }, []);
+
+  const idsDeAjustes = useMemo(
+    () => (settingsCardId && selectedCardIds.includes(settingsCardId) ? selectedCardIds : settingsCardId ? [settingsCardId] : []),
+    [selectedCardIds, settingsCardId],
+  );
+
+  const aplicarEstilo = useCallback((patch: Partial<NonNullable<BoardCard['estilo']>>) => {
+    if (!idsDeAjustes.length) return;
+    const ids = new Set(idsDeAjustes);
+    updateBoard((board) => ({
+      ...board,
+      cards: board.cards.map((card) => (ids.has(card.id) ? { ...card, estilo: { ...(card.estilo ?? {}), ...patch } } : card)),
+    }), { coalesceKey: `estilo:${idsDeAjustes.join(',')}` });
+  }, [idsDeAjustes, updateBoard]);
+
+  const aplicarColor = useCallback((color: BoardCard['color']) => {
+    if (!idsDeAjustes.length) return;
+    const ids = new Set(idsDeAjustes);
+    updateBoard((board) => ({
+      ...board,
+      cards: board.cards.map((card) => (ids.has(card.id) ? { ...card, color } : card)),
+    }));
+  }, [idsDeAjustes, updateBoard]);
+
+  const alternarBloqueoSeleccion = useCallback(() => {
+    if (!idsDeAjustes.length) return;
+    const ids = new Set(idsDeAjustes);
+    updateBoard((board) => ({
+      ...board,
+      cards: board.cards.map((card) => (ids.has(card.id) ? { ...card, locked: !card.locked } : card)),
+    }));
+  }, [idsDeAjustes, updateBoard]);
+
+  /** Convertir conserva posición, título y color; el tipo nuevo decide el contenido. */
+  const convertirEn = useCallback((tipo: 'note' | 'marco' | 'columna') => {
+    if (!idsDeAjustes.length) return;
+    const ids = new Set(idsDeAjustes);
+    updateBoard((board) => {
+      const cardIds = new Set(board.cards.map((card) => card.id));
+      return {
+        ...board,
+        cards: board.cards.map((card) => {
+          if (!ids.has(card.id)) return card;
+          if (tipo === 'marco') {
+            return {
+              ...card,
+              type: 'marco',
+              width: Math.max(320, card.width),
+              height: undefined,
+              media: undefined,
+              datos: { ...normalizeFrameData(card.datos ?? {}, card.id, cardIds) },
+            };
+          }
+          if (tipo === 'columna') {
+            return {
+              ...card,
+              type: 'columna',
+              width: Math.max(260, card.width),
+              height: undefined,
+              media: undefined,
+              datos: { ...normalizeColumnData(card.datos ?? {}, card.id, cardIds) },
+            };
+          }
+          return {
+            ...card,
+            type: 'note',
+            width: Math.min(640, Math.max(210, card.width)),
+            height: undefined,
+            url: undefined,
+            media: undefined,
+            datos: undefined,
+          };
+        }),
+      };
+    });
+    setNotice(tipo === 'note' ? 'Convertida en nota. Su contenido sigue editable.' : tipo === 'marco' ? 'Convertida en marco: arrastra otras tarjetas dentro.' : 'Convertida en columna: orden explícito y plegable.');
+  }, [idsDeAjustes, updateBoard]);
+
+  useEffect(() => {
+    if (!settingsCardId) return;
+    if (!activeBoard?.cards.some((card) => card.id === settingsCardId) || !selectedCardIds.includes(settingsCardId)) setSettingsCardId(null);
+  }, [activeBoard?.cards, selectedCardIds, settingsCardId]);
 
   const crearRelacion = useCallback((from: string, to: string) => {
     if (!activeBoard || from === to) return false;
@@ -3031,6 +3180,201 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }
   }, [updateBoard]);
 
+  const desarmandoRef = useRef<string | null>(null);
+
+  const mimeDeDataUrl = (dataUrl: string): string => {
+    const match = /^data:([^;,]+)[;,]/.exec(dataUrl);
+    return match?.[1] || 'image/png';
+  };
+
+  /** Pega una URL en un Referente: captura + enlace como original fijo y bloqueado. */
+  const capturarUrlEnReferente = useCallback(async (cardId: string, url: string) => {
+    const limpia = url.trim();
+    if (!isSafeExternalUrl(limpia)) {
+      setNotice('Usa una dirección web completa que empiece con http:// o https://.');
+      return;
+    }
+    let preview: ReturnType<typeof normalizarVistaPrevia>;
+    try {
+      preview = normalizarVistaPrevia(await studioApi.vistaPreviaUrl(limpia), limpia);
+    } catch {
+      preview = undefined;
+    }
+    updateBoard((board) => {
+      const card = board.cards.find((item) => item.id === cardId);
+      if (!card) return board;
+      const referente = leerReferente(card);
+      const conImagen = preview?.imagen ? agregarImagenDesdeUrl(referente, preview.imagen) ?? referente : referente;
+      const siguiente = {
+        ...conImagen,
+        nombre: preview?.titulo || conImagen.nombre || new URL(limpia).hostname,
+        url: limpia,
+        archivoOrigen: conImagen.archivoOrigen || new URL(limpia).hostname,
+        porQue: conImagen.porQue || preview?.descripcion || '',
+      };
+      return {
+        ...board,
+        cards: board.cards.map((item) => item.id === cardId
+          ? {
+            ...item,
+            title: siguiente.nombre || item.title,
+            locked: true,
+            datos: { ...item.datos, ...siguiente, vistaPrevia: preview },
+          }
+          : item),
+      };
+    });
+    setNotice(preview?.imagen
+      ? 'Captura y enlace guardados como original fijo. Pulsa «Desarmar» para separar sus piezas.'
+      : 'Enlace guardado como original fijo. Pulsa «Desarmar» para descargar la captura y sus piezas.');
+  }, [updateBoard]);
+
+  /** Cualquier adjunto (PDF, vídeo, audio, archivo) entra en un Referente como copia local. */
+  const adjuntarArchivosAReferente = useCallback(async (cardId: string, files: File[]) => {
+    const validos = files.filter((file) => file.size <= MAX_MEDIA_BYTES);
+    if (!validos.length) {
+      setNotice(files.length ? 'Los adjuntos superan el límite de 12 MB.' : 'No hay archivos que adjuntar.');
+      return;
+    }
+    try {
+      const leidos = await Promise.all(validos.map(async (file) => ({
+        name: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        dataUrl: await readFileAsDataUrl(file),
+        kind: (file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'file') as BoardMedia['kind'],
+      })));
+      updateBoard((board) => ({
+        ...board,
+        cards: board.cards.map((card) => {
+          if (card.id !== cardId) return card;
+          const referente = leerReferente(card);
+          return { ...card, datos: { ...card.datos, ...referente, adjuntos: [...referente.adjuntos, ...leidos] } };
+        }),
+      }));
+      setNotice(`${leidos.length} ${leidos.length === 1 ? 'adjunto guardado' : 'adjuntos guardados'} en el Referente.`);
+    } catch {
+      setNotice('No se pudieron leer los adjuntos.');
+    }
+  }, [updateBoard]);
+
+  /**
+   * Desarmar una URL: el backend descarga el HTML y las imágenes (sin JS ajeno),
+   * guarda el original bloqueado y coloca piezas editables alrededor.
+   */
+  const desarmarEnReferente = useCallback(async (cardId: string, url: string) => {
+    const limpia = url.trim();
+    if (!isSafeExternalUrl(limpia)) {
+      setNotice('La URL del referente no es válida.');
+      return;
+    }
+    if (desarmandoRef.current) return;
+    desarmandoRef.current = limpia;
+    setNotice('Desarmando la página en piezas…');
+    try {
+      const respuesta = await studioApi.desarmarUrl(limpia);
+      if (!respuesta.ok) {
+        setNotice(respuesta.message || 'La página no se pudo desarmar.');
+        return;
+      }
+      const piezas = (respuesta.piezas ?? []).slice(0, 28);
+      const fecha = new Date().toISOString().slice(0, 10);
+      let creadas = 0;
+      updateBoard((board) => {
+        const original = board.cards.find((card) => card.id === cardId);
+        if (!original) return board;
+        const referente = leerReferente(original);
+        const captura = respuesta.captura
+          ? [{
+              name: `captura-${respuesta.host || 'pagina'}.${mimeDeDataUrl(respuesta.captura).includes('svg') ? 'svg' : 'png'}`,
+              mimeType: mimeDeDataUrl(respuesta.captura),
+              dataUrl: respuesta.captura,
+              kind: 'image' as const,
+              fuente: respuesta.url || limpia,
+              fecha,
+            }]
+          : [];
+        const actualizado: BoardCard = {
+          ...original,
+          locked: true,
+          title: respuesta.titulo || original.title,
+          datos: {
+            ...original.datos,
+            ...referente,
+            nombre: respuesta.titulo || referente.nombre,
+            url: respuesta.url || limpia,
+            archivoOrigen: respuesta.host || referente.archivoOrigen,
+            porQue: referente.porQue || respuesta.descripcion || '',
+            imagenes: [...captura, ...referente.imagenes.filter((imagen) => imagen.fuente !== (respuesta.url || limpia) || !captura.length)],
+          },
+        };
+        const nuevas: BoardCard[] = [];
+        piezas.forEach((pieza, indice) => {
+          const columna = indice % 2;
+          const fila = Math.floor(indice / 2);
+          const x = columna === 0 ? original.x + original.width + 44 : original.x - 320;
+          const y = original.y + fila * 220;
+          if (pieza.kind === 'image' && pieza.src) {
+            const media: BoardMedia = {
+              name: pieza.name || `imagen-${indice + 1}`,
+              mimeType: pieza.mime || mimeDeDataUrl(pieza.src),
+              dataUrl: pieza.src,
+              kind: 'image',
+              alt: pieza.alt ?? '',
+            };
+            const card = { ...createMediaCard(x, y, media), width: 280 };
+            card.datos = { fuente: pieza.fuente, desarmadoDe: respuesta.url || limpia, pieza: 'image' };
+            nuevas.push(card);
+          } else if (pieza.kind === 'text' && pieza.text) {
+            const card = createCard('note', x, y);
+            card.title = pieza.rol === 'titular' ? 'Titular' : 'Texto';
+            card.body = pieza.text;
+            card.width = 280;
+            card.datos = { fuente: pieza.fuente, desarmadoDe: respuesta.url || limpia, pieza: 'text' };
+            nuevas.push(card);
+          } else if (pieza.kind === 'color' && pieza.color) {
+            const card = createCard('note', x, y);
+            card.title = pieza.color;
+            card.body = `Color de ${respuesta.host || 'la página'}`;
+            card.width = 210;
+            card.estilo = { background: pieza.color, textColor: '#111111' };
+            card.datos = { fuente: pieza.fuente, desarmadoDe: respuesta.url || limpia, pieza: 'color' };
+            nuevas.push(card);
+          } else if (pieza.kind === 'font' && pieza.font) {
+            const card = createCard('note', x, y);
+            card.title = 'Tipografía';
+            card.body = pieza.font;
+            card.width = 250;
+            const primera = pieza.font.split(',')[0].replace(/["']/g, '').trim();
+            card.estilo = primera ? { fontFamily: primera } : undefined;
+            card.datos = { fuente: pieza.fuente, desarmadoDe: respuesta.url || limpia, pieza: 'font' };
+            nuevas.push(card);
+          }
+        });
+        creadas = nuevas.length;
+        const previas = new Set(board.cards.filter((card) => card.id !== original.id && card.datos?.desarmadoDe === (respuesta.url || limpia)).map((card) => card.id));
+        return {
+          ...board,
+          cards: [...board.cards.map((card) => card.id === original.id ? actualizado : card).filter((card) => !previas.has(card.id)), ...nuevas],
+        };
+      });
+      setSelectedCardIds([cardId]);
+      const guardadas = respuesta.archivos?.length ?? 0;
+      setNotice(`Página desarmada en ${creadas} ${creadas === 1 ? 'pieza editable' : 'piezas editables'}. El original quedó bloqueado.${guardadas ? ` ${guardadas} imágenes guardadas en el proyecto.` : ''}`);
+    } catch (error) {
+      setNotice(error instanceof Error ? `No se pudo desarmar: ${error.message}` : 'No se pudo desarmar la página.');
+    } finally {
+      desarmandoRef.current = null;
+    }
+  }, [updateBoard]);
+
+  useEffect(() => {
+    desarmarRef.current = (cardId, url) => { void desarmarEnReferente(cardId, url); };
+    adjuntarRef.current = (cardId, files) => { void adjuntarArchivosAReferente(cardId, files); };
+    capturarUrlRef.current = (cardId, url) => { void capturarUrlEnReferente(cardId, url); };
+  }, [adjuntarArchivosAReferente, capturarUrlEnReferente, desarmarEnReferente]);
+
+  const accionesHerramientas = useMemo(() => ({ desarmarUrl: (cardId: string, url: string) => { void desarmarEnReferente(cardId, url); } }), [desarmarEnReferente]);
+
   const saveLinkCard = (event: React.FormEvent) => {
     event.preventDefault();
     if (!isSafeExternalUrl(linkUrl)) {
@@ -3042,7 +3386,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const created = addToolCard('link', (card) => {
       card.title = linkTitle.trim() || url;
       card.url = url;
-    });
+    }, linkPointRef.current ?? undefined);
+    linkPointRef.current = null;
     if (!created) return;
     setLinkDialog(false);
     setLinkTitle('');
@@ -3688,6 +4033,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (atajo.accion === 'herramientas') {
       if (archiveFullscreenId) return;
       event.preventDefault();
+      if (!addMenuOpen) {
+        addPointRef.current = lastPointerWorld.current
+          ?? screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, cameraRef.current);
+      }
       setAddMenuOpen((open) => !open);
       return;
     }
@@ -3837,18 +4186,29 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const handlePaste = (event: ClipboardEvent) => {
       const target = event.target;
       if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable="true"]')) return;
-      const archivos = Array.from(event.clipboardData?.files ?? []).filter((file) => file.type.startsWith('image/') || file.type.startsWith('video/'));
+      const archivos = Array.from(event.clipboardData?.files ?? []);
       if (!archivos.length) {
         for (const item of Array.from(event.clipboardData?.items ?? [])) {
           if (item.kind !== 'file') continue;
           const file = item.getAsFile();
-          if (file && (file.type.startsWith('image/') || file.type.startsWith('video/'))) archivos.push(file);
+          if (file) archivos.push(file);
         }
       }
       const punto = puntoDePegado();
+      const seleccionUnica = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
+      const referenteDestino = (() => {
+        if (!activeBoard) return undefined;
+        const id = hoveredReferenteId.current ?? seleccionUnica;
+        return id ? activeBoard.cards.find((item) => item.id === id && item.type === 'referente') : undefined;
+      })();
       if (archivos.length && activeBoard) {
         event.preventDefault();
-        archivos.forEach((file, indice) => {
+        if (referenteDestino) {
+          adjuntarRef.current(referenteDestino.id, archivos);
+          return;
+        }
+        const medios = archivos.filter((file) => file.type.startsWith('image/') || file.type.startsWith('video/'));
+        medios.forEach((file, indice) => {
           void addMediaRef.current(file, { x: punto.x + indice * 36, y: punto.y + indice * 28 });
         });
         return;
@@ -3861,20 +4221,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       }
       if (!text || !activeBoard) return;
       if (isSafeExternalUrl(text)) {
-        const selectedId = selectedCardIds.length === 1 ? selectedCardIds[0] : null;
-        const targetId = hoveredReferenteId.current ?? selectedId;
-        const card = targetId ? activeBoard.cards.find((item) => item.id === targetId && item.type === 'referente') : undefined;
-        if (card) {
-          const before = leerReferente(card);
-          const next = agregarImagenDesdeUrl(before, text);
-          if (!next) return;
+        if (referenteDestino) {
           event.preventDefault();
-          if (next.imagenes.length === before.imagenes.length) {
-            setNotice('Esa imagen ya estaba en el Referente, con su fuente y fecha.');
-            return;
-          }
-          replaceCard({ ...card, title: next.nombre.trim() || card.title, datos: { ...card.datos, ...next } });
-          setNotice(`Imagen añadida a «${next.nombre || card.title || 'Referente'}» con su fuente y fecha.`);
+          void capturarUrlEnReferente(referenteDestino.id, text);
           return;
         }
         // Sin referente debajo: la URL pegada nace como enlace en el cursor.
@@ -3899,12 +4248,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [activeBoard, addToolCard, aplicarVistaPrevia, pegarSeleccion, replaceCard, selectedCardIds]);
+  }, [activeBoard, addToolCard, aplicarVistaPrevia, capturarUrlEnReferente, pegarSeleccion, selectedCardIds]);
 
   const onCardSelect = useCallback((card: BoardCard, event: Modificadores) => cardHandlers.current?.select(card.id, event), []);
   const onCardConnect = useCallback((cardId: string) => cardHandlers.current?.connect(cardId), []);
   const onCardConnectStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.connectStart(card, event), []);
-  const onCardDragStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragStart(card, event), []);
+  const onCardDragStart = useCallback((card: BoardCard, event: React.PointerEvent<HTMLElement>, force?: boolean) => cardHandlers.current?.dragStart(card, event, force), []);
   const onCardDragMove = useCallback((event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragMove(event), []);
   const onCardDragEnd = useCallback((event: React.PointerEvent<HTMLElement>) => cardHandlers.current?.dragEnd(event), []);
   const onCardDelete = useCallback((cardId: string) => cardHandlers.current?.delete(cardId), []);
@@ -4071,7 +4420,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   }
 
   return (
-    <div className="board-workspace" inert={locked || undefined}>
+    <div className={`board-workspace densidad-${ajustes.densidad}`} inert={locked || undefined}>
       <header className="board-header" data-testid="board-topbar">
         <button className="board-back" onClick={() => void leaveBoard()} title="Volver al espacio PDF" aria-label="Volver a PDF Studio">
           <ArrowLeft size={16} aria-hidden="true" />
@@ -4266,7 +4615,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             title={handMode ? 'Mano activa · un dedo mueve el lienzo' : 'Mano · un dedo mueve el lienzo'}
           ><Hand size={16} /></button>
           <button className={`board-icon-button ${connectMode ? 'active' : ''}`} onClick={() => { setConnectMode((value) => !value); setConnectFromId(null); setNotice(connectMode ? null : 'Elige una tarjeta y luego otra para conectarlas.'); }} aria-pressed={connectMode} title="Relacionar tarjetas" aria-label="Relacionar tarjetas"><Link2 size={16} /></button>
-          <button className={`board-icon-button ${snapEnabled ? 'active' : ''}`} onClick={() => setSnapEnabled((enabled) => !enabled)} aria-pressed={snapEnabled} title="Ajustar a la cuadrícula" aria-label="Ajustar a la cuadrícula"><Magnet size={16} /></button>
+          <button className={`board-icon-button ${snapEnabled ? 'active' : ''}`} onClick={() => updateAjustes({ iman: !ajustes.iman })} aria-pressed={snapEnabled} title="Imán y cuadrícula de este tablero" aria-label="Imán y cuadrícula"><Magnet size={16} /></button>
+          <button className={`board-icon-button ${boardSettingsOpen ? 'active' : ''}`} onClick={() => setBoardSettingsOpen((open) => !open)} aria-pressed={boardSettingsOpen} title="Este tablero: guías, fondo, cursor y densidad" aria-label="Ajustes de este tablero"><SlidersHorizontal size={16} /></button>
           <span className="board-tool-divider" aria-hidden="true" />
           <button className="board-icon-button" onClick={() => zoomBy(1 / 1.15)} aria-label="Alejar" title="Alejar"><ZoomOut size={16} /></button>
           <button ref={zoomValueRef} className="board-zoom-value" onClick={fitBoard} title="Ajustar el tablero a la pantalla" aria-label={`Zoom ${Math.round(zoom * 100)} por ciento, ajustar tablero`}>{Math.round(zoom * 100)}%</button>
@@ -4460,7 +4810,10 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
               </button>
             );
           })}
-          <button type="button" className="board-rail-tool" onClick={() => setAddMenuOpen((open) => !open)} aria-haspopup="menu" aria-expanded={addMenuOpen} aria-label="Más herramientas" title="Más herramientas del registro">
+          <button type="button" className="board-rail-tool" onClick={() => {
+            if (!addMenuOpen) addPointRef.current = lastPointerWorld.current ?? screenToWorld({ x: viewportSize.width / 2, y: viewportSize.height / 2 }, cameraRef.current);
+            setAddMenuOpen((open) => !open);
+          }} aria-haspopup="menu" aria-expanded={addMenuOpen} aria-label="Más herramientas" title="Más herramientas del registro">
             <Plus size={19} />
             <span>Más</span>
           </button>
@@ -4470,7 +4823,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         ref={viewportRef}
         tabIndex={0}
         aria-label="Lienzo del tablero"
-        className={`board-viewport ${isPanning ? 'panning' : ''} ${spacePanActive ? 'space-pan' : ''} ${handMode ? 'hand-mode' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''}`}
+        className={`board-viewport ${isPanning ? 'panning' : ''} ${spacePanActive ? 'space-pan' : ''} ${handMode ? 'hand-mode' : ''} ${connectMode ? 'connecting' : ''} ${frameToolId ? 'drawing-frame' : ''} cursor-${ajustes.cursor} textura-${ajustes.textura} densidad-${ajustes.densidad} ${ajustes.reticula ? 'con-reticula' : 'sin-reticula'}`}
+        style={{ backgroundColor: ajustes.fondo }}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;
           if (event.key !== 'Tab' || event.shiftKey) return;
@@ -4538,11 +4892,11 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             </g>
           </svg>
         <div className={`board-stage ${hasNegative ? 'has-negative' : ''}`} ref={stageRef}>
-          {guias.x !== undefined && (
-            <div className="board-guide board-guide-x" data-testid="board-guide-x" style={{ left: guias.x }} aria-hidden="true" />
+          {ajustes.guias !== 'apagadas' && guias.x !== undefined && (
+            <div className={`board-guide board-guide-x guias-${ajustes.guias}`} data-testid="board-guide-x" style={{ left: guias.x }} aria-hidden="true" />
           )}
-          {guias.y !== undefined && (
-            <div className="board-guide board-guide-y" data-testid="board-guide-y" style={{ top: guias.y }} aria-hidden="true" />
+          {ajustes.guias !== 'apagadas' && guias.y !== undefined && (
+            <div className={`board-guide board-guide-y guias-${ajustes.guias}`} data-testid="board-guide-y" style={{ top: guias.y }} aria-hidden="true" />
           )}
           {activeBoard.cards.map((card) => {
             const matches = matchingCards.has(card.id);
@@ -4566,6 +4920,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   onDragEnd={onCardDragEnd}
                   onDelete={onCardDelete}
                   onPatch={onCardPatch}
+                  onSettings={abrirAjustesTarjeta}
                   onToggleFold={(id) => updateBoard((board) => ({ ...board, cards: setColumnFolded(board.cards, id, !readColumnData(card).plegada) }))}
                   onReorderChild={(columnId, childId, targetId) => updateBoard((board) => ({ ...board, cards: reordenarHijoDeColumna(board.cards, columnId, childId, targetId) }))}
                   onDetachChild={(columnId, childId) => updateBoard((board) => ({ ...board, cards: quitarHijoDeColumna(board.cards, columnId, childId) }))}
@@ -4637,6 +4992,16 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                         aria-label={`Publicar ${card.title || 'marco'}`}
                       >{publishingFrameId === card.id ? '…' : 'Publicar'}</button>
                     )}
+                    {selectedCardIds.includes(card.id) && (
+                      <button
+                        type="button"
+                        className="board-frame-settings"
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onClick={(event) => { event.stopPropagation(); abrirAjustesTarjeta(card, event); }}
+                        aria-label={`Ajustes de ${card.title || 'el marco'}`}
+                        title="Ajustes de este marco"
+                      ><SlidersHorizontal size={13} /></button>
+                    )}
                     <button
                       type="button"
                       className="board-frame-lock"
@@ -4704,6 +5069,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                   onDragEnd={onCardDragEnd}
                    onDelete={onCardDelete}
                    onPatch={onCardPatch}
+                   onSettings={abrirAjustesTarjeta}
                    onResizeStart={startFreeResize}
                   onResizeMove={moveFreeResize}
                   onResizeEnd={endFreeResize}
@@ -4735,10 +5101,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                  onWidthResizeMove={moveWidthResize}
                  onWidthResizeEnd={endWidthResize}
                  onDelete={onCardDelete}
-                onPatch={onCardPatch}
-                onReplace={onCardReplace}
-                onHover={onCardHover}
-                onBlurCapture={onCardBlur}
+                 onSettings={abrirAjustesTarjeta}
+                 onPatch={onCardPatch}
+                 onReplace={onCardReplace}
+                 onHover={onCardHover}
+                 onBlurCapture={onCardBlur}
+                 acciones={accionesHerramientas}
               />
             );
           })}
@@ -4801,7 +5169,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
       </main>
 
         <input ref={importInput} type="file" accept="application/json,.json,text/markdown,.md" hidden onChange={(event) => { void importBoard(event.target.files?.[0]); event.target.value = ''; }} />
-        <input ref={mediaInput} type="file" accept="image/*,video/*,audio/*,application/pdf,text/plain,.txt" hidden onChange={(event) => { void addMedia(event.target.files?.[0]); event.target.value = ''; }} />
+        <input ref={mediaInput} type="file" accept="image/*,video/*,audio/*,application/pdf,text/plain,.txt" hidden onChange={(event) => {
+          const punto = mediaPointRef.current ?? undefined;
+          mediaPointRef.current = null;
+          void addMedia(event.target.files?.[0], punto);
+          event.target.value = '';
+        }} />
         <input ref={gustosInput} type="file" accept="application/json,.json" hidden aria-label="Archivo de gustos parciales" onChange={(event) => { void importGustos(event.target.files?.[0]); event.target.value = ''; }} />
       </div>
 
@@ -4940,6 +5313,159 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         </div>
       )}
 
+      {boardSettingsOpen && (
+        <aside className="board-settings-panel" aria-label="Este tablero" role="dialog">
+          <div className="board-settings-head">
+            <div><strong>Este tablero</strong><span>Se guarda con este tablero, no con la app.</span></div>
+            <button type="button" className="board-icon-button" onClick={() => setBoardSettingsOpen(false)} aria-label="Cerrar ajustes del tablero"><X size={15} /></button>
+          </div>
+          <div className="board-settings-body">
+            <label>Guías de alineación
+              <select value={ajustes.guias} onChange={(event) => updateAjustes({ guias: event.target.value as BoardSettings['guias'] })}>
+                <option value="visibles">Visibles</option>
+                <option value="sutiles">Sutiles (casi invisibles)</option>
+                <option value="apagadas">Apagadas</option>
+              </select>
+            </label>
+            <label className="board-settings-check"><input type="checkbox" checked={ajustes.iman} onChange={(event) => updateAjustes({ iman: event.target.checked })} /> Imán y ajuste a la cuadrícula</label>
+            <label className="board-settings-check"><input type="checkbox" checked={ajustes.reticula} onChange={(event) => updateAjustes({ reticula: event.target.checked })} /> Retícula del fondo</label>
+            <label>Color del fondo
+              <span className="board-settings-color">
+                <input type="color" value={ajustes.fondo} onChange={(event) => updateAjustes({ fondo: event.target.value })} aria-label="Color del fondo del tablero" />
+                <code>{ajustes.fondo}</code>
+              </span>
+            </label>
+            <label>Textura
+              <select value={ajustes.textura} onChange={(event) => updateAjustes({ textura: event.target.value as BoardSettings['textura'] })}>
+                <option value="ninguna">Ninguna</option>
+                <option value="puntos">Puntos</option>
+                <option value="papel">Papel</option>
+                <option value="lino">Lino</option>
+              </select>
+            </label>
+            <label>Cursor sobre el lienzo
+              <select value={ajustes.cursor} onChange={(event) => updateAjustes({ cursor: event.target.value as BoardSettings['cursor'] })}>
+                <option value="normal">Normal</option>
+                <option value="cruz">Cruz</option>
+                <option value="mano">Mano</option>
+              </select>
+            </label>
+            <label>Densidad de controles
+              <select value={ajustes.densidad} onChange={(event) => updateAjustes({ densidad: event.target.value as BoardSettings['densidad'] })}>
+                <option value="compacta">Compacta</option>
+                <option value="normal">Normal</option>
+                <option value="amplia">Amplia</option>
+              </select>
+            </label>
+            <p className="board-settings-hint">Las guías solo aparecen mientras arrastras y solo cuando hay un ajuste real.</p>
+          </div>
+        </aside>
+      )}
+
+      {settingsCardId && settingsPos && (() => {
+        const card = activeBoard?.cards.find((item) => item.id === settingsCardId);
+        if (!card) return null;
+        const estilo = card.estilo ?? {};
+        const varias = idsDeAjustes.length > 1;
+        const recorte = leerRecorte(card);
+        const alt = typeof card.datos?.alt === 'string' ? card.datos.alt : '';
+        const aplicarAlt = (valor: string) => {
+          const ids = new Set(idsDeAjustes);
+          updateBoard((board) => ({
+            ...board,
+            cards: board.cards.map((item) => (ids.has(item.id) ? { ...item, datos: { ...item.datos, alt: valor.slice(0, 300) } } : item)),
+          }), { coalesceKey: 'alt-medios' });
+        };
+        const aplicarRecorte = (patch: Partial<typeof recorte>) => {
+          const ids = new Set(idsDeAjustes);
+          updateBoard((board) => ({
+            ...board,
+            cards: board.cards.map((item) => (ids.has(item.id) && item.type === 'media'
+              ? { ...item, datos: { ...item.datos, recorte: { ...leerRecorte(item), ...patch } } }
+              : item)),
+          }), { coalesceKey: 'recorte-medios' });
+        };
+        return (
+          <div className="board-card-settings-panel" style={{ left: settingsPos.x, top: settingsPos.y }} role="dialog" aria-label="Ajustes de la tarjeta" onPointerDown={(event) => event.stopPropagation()}>
+            <div className="board-card-settings-head">
+              <div><strong>{varias ? `${idsDeAjustes.length} tarjetas` : card.title || 'Tarjeta'}</strong><span>{varias ? 'Los cambios se aplican a toda la selección.' : 'Se aplica en vivo, sin Aplicar.'}</span></div>
+              <button type="button" className="board-icon-button" onClick={() => setSettingsCardId(null)} aria-label="Cerrar ajustes de la tarjeta"><X size={14} /></button>
+            </div>
+            <div className="board-card-settings-body">
+              <fieldset>
+                <legend>Color</legend>
+                <div className="board-card-settings-colors">
+                  {COLORS.map((color) => (
+                    <button key={color} type="button" className={`board-settings-swatch color-${color} ${card.color === color ? 'current' : ''}`} onClick={() => aplicarColor(color)} aria-label={`Color ${color}`} aria-pressed={card.color === color} />
+                  ))}
+                </div>
+              </fieldset>
+              <label>Tipografía
+                <select value={estilo.fontFamily ?? ''} onChange={(event) => aplicarEstilo({ fontFamily: event.target.value || undefined })}>
+                  <option value="">La del tablero</option>
+                  <option value="Georgia, serif">Georgia</option>
+                  <option value="Palatino, serif">Palatino</option>
+                  <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+                  <option value="Avenir Next, Avenir, sans-serif">Avenir</option>
+                  <option value="Menlo, monospace">Menlo</option>
+                  <option value="Courier New, monospace">Courier</option>
+                </select>
+              </label>
+              <label>Tamaño de texto <output>{estilo.fontSize ?? 16} px</output>
+                <input type="range" min="10" max="40" step="1" value={estilo.fontSize ?? 16} onChange={(event) => aplicarEstilo({ fontSize: Number(event.target.value) })} />
+              </label>
+              <label>Color del texto <input type="color" value={estilo.textColor ?? '#2b2118'} onChange={(event) => aplicarEstilo({ textColor: event.target.value })} /></label>
+              <div className="board-card-settings-row">
+                <label>Borde <input type="range" min="0" max="6" step="0.5" value={estilo.borderWidth ?? 0} onChange={(event) => aplicarEstilo({ borderWidth: Number(event.target.value), borderColor: estilo.borderColor ?? '#8a6a4a', borderStyle: estilo.borderStyle && estilo.borderStyle !== 'none' ? estilo.borderStyle : 'solid' })} /></label>
+                <label>Estilo
+                  <select value={estilo.borderStyle ?? 'solid'} onChange={(event) => aplicarEstilo({ borderStyle: event.target.value as NonNullable<BoardCard['estilo']>['borderStyle'], borderWidth: estilo.borderWidth ?? 1, borderColor: estilo.borderColor ?? '#8a6a4a' })}>
+                    <option value="solid">Sólido</option>
+                    <option value="dashed">Discontinuo</option>
+                    <option value="none">Sin borde</option>
+                  </select>
+                </label>
+              </div>
+              <div className="board-card-settings-row">
+                <label>Sombra
+                  <select value={estilo.shadow ?? 'suave'} onChange={(event) => aplicarEstilo({ shadow: event.target.value as NonNullable<BoardCard['estilo']>['shadow'] })}>
+                    <option value="none">Sin sombra</option>
+                    <option value="suave">Suave</option>
+                    <option value="fuerte">Fuerte</option>
+                  </select>
+                </label>
+                <label>Opacidad <output>{Math.round((estilo.opacity ?? 1) * 100)}%</output>
+                  <input type="range" min="0.1" max="1" step="0.05" value={estilo.opacity ?? 1} onChange={(event) => aplicarEstilo({ opacity: Number(event.target.value) })} />
+                </label>
+              </div>
+              <label className="board-settings-check"><input type="checkbox" checked={card.locked} onChange={alternarBloqueoSeleccion} /> Bloqueada (no se mueve ni se borra)</label>
+              <label>Convertir en
+                <select value={card.type === 'note' || card.type === 'marco' || card.type === 'columna' ? card.type : 'note'} onChange={(event) => convertirEn(event.target.value as 'note' | 'marco' | 'columna')}>
+                  <option value="note">Nota</option>
+                  <option value="columna">Columna</option>
+                  <option value="marco">Marco</option>
+                </select>
+              </label>
+              {card.type === 'media' && (
+                <>
+                  <div className="board-card-settings-row">
+                    <label>Recorte X <output>{Math.round(recorte.x * 100)}%</output>
+                      <input type="range" min="0" max="1" step="0.02" value={recorte.x} onChange={(event) => aplicarRecorte({ x: Number(event.target.value) })} />
+                    </label>
+                    <label>Recorte Y <output>{Math.round(recorte.y * 100)}%</output>
+                      <input type="range" min="0" max="1" step="0.02" value={recorte.y} onChange={(event) => aplicarRecorte({ y: Number(event.target.value) })} />
+                    </label>
+                  </div>
+                  <label>Zoom del recorte <output>{recorte.escala.toFixed(2)}×</output>
+                    <input type="range" min="1" max="3" step="0.05" value={recorte.escala} onChange={(event) => aplicarRecorte({ escala: Number(event.target.value) })} />
+                  </label>
+                  <label>Texto alternativo<input value={alt} maxLength={300} onChange={(event) => aplicarAlt(event.target.value)} placeholder="Qué se ve en la imagen" /></label>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       {shortcutsOpen && (
         <div className="board-add-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setShortcutsOpen(false); }}>
           <div ref={(element) => { dialogRef.current = element; }} className="board-dialog board-shortcuts" role="dialog" aria-modal="true" aria-labelledby="board-shortcuts-title">
@@ -4974,6 +5500,22 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         <div
           className="board-add-backdrop"
           onMouseDown={(event) => { if (event.target === event.currentTarget) setAddMenuOpen(false); }}
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes('application/x-prometeo-tool') || event.dataTransfer.types.includes('Files')) {
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'copy';
+            }
+          }}
+          onDrop={(event) => {
+            const toolId = event.dataTransfer.getData('application/x-prometeo-tool');
+            if (!toolId) return;
+            event.preventDefault();
+            setAddMenuOpen(false);
+            const rect = viewportRef.current?.getBoundingClientRect();
+            if (!rect) return;
+            const punto = screenToWorld({ x: event.clientX - rect.left, y: event.clientY - rect.top }, cameraRef.current);
+            addToolCard(toolId, undefined, punto);
+          }}
         >
           <div className="board-add-panel" role="presentation">
             <div className="board-add-heading">

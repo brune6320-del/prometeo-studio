@@ -34,6 +34,8 @@ export interface Referente {
   etiquetas: string[];
   /** Medios de la biblioteca; `imagenes[0]` es la imagen principal. */
   imagenes: MedioReferente[];
+  /** Cualquier adjunto aceptado: PDF, vídeo, audio o archivo, no solo imágenes. */
+  adjuntos: MedioReferente[];
   vistoEn: string[];
   lecturas: Lectura[];
 }
@@ -99,6 +101,26 @@ function normalizarImagen(value: unknown, index: number): MedioReferente | null 
   return imagen;
 }
 
+/** Un adjunto puede ser cualquier medio; solo se guarda una copia `data:` acotada. */
+function normalizarAdjunto(value: unknown, index: number): MedioReferente | null {
+  if (!isRecord(value)) return null;
+  const source = typeof value.dataUrl === 'string' ? value.dataUrl : '';
+  const mimeType = texto(value.mimeType, '', 100).trim().toLowerCase();
+  if (!mimeType || !source.startsWith(`data:${mimeType};base64,`) || source.length > MAX_MEDIA_DATA_URL_CHARS) return null;
+  const kind = mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'file';
+  const adjunto: MedioReferente = {
+    name: texto(value.name, `adjunto-${index + 1}`, 180) || `adjunto-${index + 1}`,
+    mimeType,
+    dataUrl: source,
+    kind,
+  };
+  const fuente = texto(value.fuente, '', MAX_URL).trim();
+  const fecha = texto(value.fecha, '', 40).trim();
+  if (fuente && isSafeExternalUrl(fuente)) adjunto.fuente = fuente;
+  if (fecha) adjunto.fecha = fecha;
+  return adjunto;
+}
+
 function normalizarLectura(value: unknown): Lectura | null {
   if (!isRecord(value)) return null;
   return {
@@ -122,6 +144,7 @@ export function referenteVacio(): Referente {
     porQue: '',
     etiquetas: [],
     imagenes: [],
+    adjuntos: [],
     vistoEn: [],
     lecturas: [],
   };
@@ -142,6 +165,9 @@ export function normalizarReferente(value: unknown): Referente {
     etiquetas: listaTexto(value.etiquetas, MAX_ETIQUETA, MAX_ETIQUETAS),
     imagenes: Array.isArray(value.imagenes)
       ? value.imagenes.map(normalizarImagen).filter((imagen): imagen is BoardMedia => Boolean(imagen))
+      : [],
+    adjuntos: Array.isArray(value.adjuntos)
+      ? value.adjuntos.map(normalizarAdjunto).filter((adjunto): adjunto is MedioReferente => Boolean(adjunto))
       : [],
     vistoEn: listaTexto(value.vistoEn, 40, MAX_VISTO_EN),
     lecturas: Array.isArray(value.lecturas)
@@ -175,6 +201,7 @@ export function isReferente(value: unknown): value is Referente {
     Array.isArray(value.etiquetas) &&
     value.etiquetas.every((item) => typeof item === 'string') &&
     Array.isArray(value.imagenes) &&
+    (value.adjuntos === undefined || Array.isArray(value.adjuntos)) &&
     Array.isArray(value.vistoEn) &&
     value.vistoEn.every((item) => typeof item === 'string') &&
     Array.isArray(value.lecturas) &&
@@ -224,6 +251,9 @@ export function referenteMarkdown(referente: Referente): string {
   if (ref.autor) lineas.push(`**Autor:** ${ref.autor}`);
   if (ref.licencia) lineas.push(`**Licencia:** ${ref.licencia}`);
   if (ref.etiquetas.length) lineas.push(`**Etiquetas:** ${ref.etiquetas.join(', ')}`);
+  if (ref.adjuntos.length) {
+    lineas.push(`**Adjuntos:** ${ref.adjuntos.map((adjunto) => adjunto.name).join(', ')}`);
+  }
   if (ref.porQue.trim()) lineas.push('', '**Por qué lo guardé**', '', ref.porQue.trim());
 
   const ultima = ultimaLectura(ref);

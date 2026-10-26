@@ -92,10 +92,13 @@ export function imanDeCaja(
   }
 
   const guias: GuiasIman = {};
-  const dx = Math.abs(mejorX.distancia) <= umbral ? mejorX.dx : 0;
-  const dy = Math.abs(mejorY.distancia) <= umbral ? mejorY.dy : 0;
-  if (dx !== 0) guias.x = mejorX.guia;
-  if (dy !== 0) guias.y = mejorY.guia;
+  const alineadoX = mejorX.guia !== undefined && Math.abs(mejorX.distancia) <= umbral;
+  const alineadoY = mejorY.guia !== undefined && Math.abs(mejorY.distancia) <= umbral;
+  const dx = alineadoX ? mejorX.dx : 0;
+  const dy = alineadoY ? mejorY.dy : 0;
+  // Una alineación exacta también es un ajuste: se muestra la guía aunque dx sea 0.
+  if (alineadoX) guias.x = mejorX.guia;
+  if (alineadoY) guias.y = mejorY.guia;
   return { dx, dy, guias };
 }
 

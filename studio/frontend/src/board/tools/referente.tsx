@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { BookOpen, ImagePlus, Plus, Trash2, X } from 'lucide-react';
+import { BookOpen, ImagePlus, LassoSelect, Paperclip, Plus, Trash2, X } from 'lucide-react';
 import { createCard, isSafeExternalUrl, MAX_MEDIA_BYTES, type BoardCard, type BoardMedia } from '../model';
 import {
   esTarjetaReferente,
@@ -27,6 +27,13 @@ function lecturaVacia(): Lectura {
   return { fecha: new Date().toISOString().slice(0, 10), proyecto: '', ojos: '', texto: '', modelo: '', aceptada: false };
 }
 
+function tipoDeMime(mime: string): BoardMedia['kind'] {
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  return 'file';
+}
+
 export const referenteTool: BoardTool<BoardCard> = {
   id: 'referente',
   nombre: 'Referente',
@@ -34,7 +41,7 @@ export const referenteTool: BoardTool<BoardCard> = {
   icono: BookOpen,
   crear: (x, y) => createReferenteCard(x, y),
   validar: esTarjetaReferente,
-  Vista: ({ datos, editar }) => {
+  Vista: ({ datos, editar, acciones }) => {
     const [editando, setEditando] = useState(false);
     const [borrador, setBorrador] = useState<Referente>(() => leerReferente(datos));
     const [etiquetas, setEtiquetas] = useState(() => leerReferente(datos).etiquetas.join(', '));
@@ -87,6 +94,21 @@ export const referenteTool: BoardTool<BoardCard> = {
       }
     };
 
+    const anadirAdjuntos = (files: FileList | null) => {
+      if (!files) return;
+      for (const file of Array.from(files)) {
+        if (file.size > MAX_MEDIA_BYTES) continue;
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+          if (!dataUrl.startsWith(`data:${file.type};base64,`)) return;
+          const adjunto: BoardMedia = { name: file.name, mimeType: file.type || 'application/octet-stream', dataUrl, kind: tipoDeMime(file.type) };
+          setBorrador((previo) => ({ ...previo, adjuntos: [...previo.adjuntos, adjunto] }));
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
     const guardar = () => {
       const siguiente = normalizarReferente({
         ...borrador,
@@ -103,6 +125,23 @@ export const referenteTool: BoardTool<BoardCard> = {
           <div className="board-referente-form">
             <label>Nombre<input value={borrador.nombre} maxLength={200} onChange={(event) => cambiar({ nombre: event.target.value })} autoFocus /></label>
             <label>URL de la fuente<input value={borrador.url} maxLength={2048} onChange={(event) => cambiar({ url: event.target.value })} placeholder="https://…" /></label>
+            {acciones?.desarmarUrl && (
+              <div className="board-referente-desarmar">
+                <button
+                  type="button"
+                  className="board-referente-desarmar-btn"
+                  disabled={!isSafeExternalUrl(borrador.url)}
+                  onClick={() => {
+                    acciones.desarmarUrl?.(datos.id, borrador.url.trim());
+                    setEditando(false);
+                  }}
+                  title="Descarga la página sin ejecutar su JavaScript, la guarda como original fijo y pone sus imágenes, textos, colores y tipografías alrededor"
+                >
+                  <LassoSelect size={13} /> Desarmar esta página en piezas
+                </button>
+                <small>Uso personal de estudio · respeta robots.txt · el original queda bloqueado.</small>
+              </div>
+            )}
             <div className="board-referente-row">
               <label>Archivo de origen<input value={borrador.archivoOrigen} maxLength={500} onChange={(event) => cambiar({ archivoOrigen: event.target.value })} /></label>
               <label>Año<input value={borrador.anio} maxLength={20} onChange={(event) => cambiar({ anio: event.target.value })} /></label>
@@ -135,6 +174,28 @@ export const referenteTool: BoardTool<BoardCard> = {
             <label className="board-referente-file">
               <ImagePlus size={13} /> Añadir imagen
               <input type="file" accept="image/*" multiple onChange={(event) => { anadirImagenes(event.target.files); event.target.value = ''; }} />
+            </label>
+          </div>
+
+          <div className="board-referente-seccion">
+            <span className="board-referente-label">Adjuntos</span>
+            {borrador.adjuntos.length === 0 ? (
+              <p className="board-referente-vacio">PDF, vídeo, audio o cualquier archivo. Se guarda una copia local dentro del proyecto.</p>
+            ) : (
+              <ul className="board-referente-adjuntos">
+                {borrador.adjuntos.map((adjunto, index) => (
+                  <li key={`${adjunto.name}-${index}`}>
+                    <Paperclip size={12} />
+                    <span>{adjunto.name}</span>
+                    <small>{adjunto.kind} · {(adjunto.dataUrl.length / 1024 / 1024).toFixed(1)} MB</small>
+                    <button type="button" onClick={() => cambiar({ adjuntos: borrador.adjuntos.filter((_, i) => i !== index) })} aria-label={`Quitar ${adjunto.name}`}><X size={11} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <label className="board-referente-file">
+              <Paperclip size={13} /> Añadir adjunto
+              <input type="file" multiple onChange={(event) => { anadirAdjuntos(event.target.files); event.target.value = ''; }} />
             </label>
           </div>
 
@@ -254,6 +315,26 @@ export const referenteTool: BoardTool<BoardCard> = {
                 {referente.etiquetas.map((etiqueta) => <span key={etiqueta}>{etiqueta}</span>)}
               </div>
             )}
+            {referente.adjuntos.length > 0 && (
+              <div className="board-referente-adjuntos" aria-label="Adjuntos del referente">
+                {referente.adjuntos.map((adjunto, index) => (
+                  <a
+                    key={`${adjunto.name}-${index}`}
+                    href={adjunto.dataUrl}
+                    download={adjunto.name}
+                    onClick={(event) => event.stopPropagation()}
+                    title={adjunto.name}
+                  ><Paperclip size={11} /> {adjunto.name}</a>
+                ))}
+              </div>
+            )}
+            {acciones?.desarmarUrl && referente.url && isSafeExternalUrl(referente.url) && (
+              <button
+                type="button"
+                className="board-referente-desarmar-btn"
+                onClick={(event) => { event.stopPropagation(); acciones.desarmarUrl?.(datos.id, referente.url); }}
+              ><LassoSelect size={12} /> Desarmar</button>
+            )}
             <div className="board-referente-porque">
               <span className="board-referente-label">Por qué lo guardé</span>
               <p>{referente.porQue.trim() || 'Sin nota todavía.'}</p>
@@ -264,7 +345,7 @@ export const referenteTool: BoardTool<BoardCard> = {
                 {lectura.texto && <p>{lectura.texto}</p>}
               </blockquote>
             )}
-            <span className="board-referente-hint">Doble clic para editar · pega una URL de imagen</span>
+            <span className="board-referente-hint">Doble clic para editar · pega una URL o suelta cualquier archivo</span>
           </>
         )}
       </div>

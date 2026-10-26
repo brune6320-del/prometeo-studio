@@ -24,6 +24,7 @@ const REFERENTE: Referente = {
   imagenes: [
     { name: 'pareidolia.png', mimeType: 'image/png', dataUrl: 'data:image/png;base64,AAAA', kind: 'image' },
   ],
+  adjuntos: [],
   vistoEn: ['2026-10-01', '2026-09-15'],
   lecturas: [
     { fecha: '2026-09-15', proyecto: 'Luna', ojos: 'archivista', texto: 'Lectura vieja.', modelo: 'deepseek', aceptada: true },

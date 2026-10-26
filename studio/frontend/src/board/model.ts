@@ -10,6 +10,24 @@ export interface BoardMedia {
   mimeType: string;
   dataUrl: string;
   kind: BoardMediaKind;
+  /** Texto alternativo para lectores de pantalla. */
+  alt?: string;
+}
+
+/** Ajustes visuales de una tarjeta. Se aplican en vivo, sin diálogo de confirmación. */
+export interface BoardCardStyle {
+  fontFamily?: string;
+  fontSize?: number;
+  textColor?: string;
+  background?: string;
+  borderColor?: string;
+  borderWidth?: number;
+  borderStyle?: 'solid' | 'dashed' | 'none';
+  shadow?: 'none' | 'suave' | 'fuerte';
+  opacity?: number;
+  recorte?: 'cover' | 'contain';
+  focoX?: number;
+  focoY?: number;
 }
 
 export interface BoardCard {
@@ -29,7 +47,35 @@ export interface BoardCard {
   locked?: boolean;
   /** Campos propios de una herramienta; se guardan acotados y sin interpretar. */
   datos?: Record<string, unknown>;
+  /** Color, tipografía, borde, sombra y recorte propios de esta tarjeta. */
+  estilo?: BoardCardStyle;
 }
+
+export type BoardGuides = 'visibles' | 'sutiles' | 'apagadas';
+export type BoardCursor = 'normal' | 'cruz' | 'mano';
+export type BoardDensity = 'compacta' | 'normal' | 'amplia';
+export type BoardTexture = 'ninguna' | 'puntos' | 'papel' | 'lino';
+
+/** Cada tablero se configura como su dueño quiera; nada de esto es global. */
+export interface BoardSettings {
+  guias: BoardGuides;
+  iman: boolean;
+  reticula: boolean;
+  fondo: string;
+  textura: BoardTexture;
+  cursor: BoardCursor;
+  densidad: BoardDensity;
+}
+
+export const DEFAULT_BOARD_SETTINGS: BoardSettings = {
+  guias: 'sutiles',
+  iman: true,
+  reticula: true,
+  fondo: '#15100c',
+  textura: 'puntos',
+  cursor: 'normal',
+  densidad: 'normal',
+};
 
 export type BoardRelationTone = 'ember' | 'sage' | 'sky' | 'rose';
 
@@ -50,6 +96,8 @@ export interface BoardDocument {
   updatedAt: string;
   /** Sistema de diseño del tablero; ausente = Forja 2 (tableros anteriores). */
   sistema?: DesignSystemId;
+  /** Guías, imán, retícula, fondo, cursor y densidad propios de este tablero. */
+  ajustes?: BoardSettings;
   cards: BoardCard[];
   relations: BoardRelation[];
 }
@@ -80,6 +128,7 @@ export function createBoard(title = 'Mi tablero'): BoardDocument {
     createdAt: now,
     updatedAt: now,
     sistema: 'forja',
+    ajustes: { ...DEFAULT_BOARD_SETTINGS },
     cards: [],
     relations: [],
   };
@@ -159,7 +208,49 @@ function normalizeMedia(value: unknown): BoardMedia | undefined {
   const name = boundedText(value.name, 'recurso', 180);
   if (!dataUrl.startsWith(`data:${mimeType};base64,`) || dataUrl.length > MAX_MEDIA_DATA_URL_CHARS) return undefined;
   const kind: BoardMediaKind = mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'file';
-  return { name, mimeType, dataUrl, kind };
+  const alt = boundedText(value.alt, '', 300).trim();
+  return { name, mimeType, dataUrl, kind, ...(alt ? { alt } : {}) };
+}
+
+function colorHex(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const clean = value.trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(clean) ? clean : undefined;
+}
+
+function normalizeEstilo(value: unknown): BoardCardStyle | undefined {
+  if (!isRecord(value)) return undefined;
+  const estilo: BoardCardStyle = {};
+  const fuente = boundedText(value.fontFamily, '', 120).trim();
+  if (fuente) estilo.fontFamily = fuente;
+  if (typeof value.fontSize === 'number' && Number.isFinite(value.fontSize)) estilo.fontSize = Math.max(8, Math.min(72, value.fontSize));
+  const color = colorHex(value.textColor);
+  if (color) estilo.textColor = color;
+  const background = colorHex(value.background);
+  if (background) estilo.background = background;
+  const borde = colorHex(value.borderColor);
+  if (borde) estilo.borderColor = borde;
+  if (typeof value.borderWidth === 'number' && Number.isFinite(value.borderWidth)) estilo.borderWidth = Math.max(0, Math.min(12, value.borderWidth));
+  if (value.borderStyle === 'solid' || value.borderStyle === 'dashed' || value.borderStyle === 'none') estilo.borderStyle = value.borderStyle;
+  if (value.shadow === 'none' || value.shadow === 'suave' || value.shadow === 'fuerte') estilo.shadow = value.shadow;
+  if (typeof value.opacity === 'number' && Number.isFinite(value.opacity)) estilo.opacity = Math.max(0.1, Math.min(1, value.opacity));
+  if (value.recorte === 'cover' || value.recorte === 'contain') estilo.recorte = value.recorte;
+  if (typeof value.focoX === 'number' && Number.isFinite(value.focoX)) estilo.focoX = Math.max(0, Math.min(100, value.focoX));
+  if (typeof value.focoY === 'number' && Number.isFinite(value.focoY)) estilo.focoY = Math.max(0, Math.min(100, value.focoY));
+  return Object.keys(estilo).length ? estilo : undefined;
+}
+
+function normalizeAjustes(value: unknown): BoardSettings {
+  if (!isRecord(value)) return { ...DEFAULT_BOARD_SETTINGS };
+  return {
+    guias: value.guias === 'visibles' || value.guias === 'apagadas' ? value.guias : 'sutiles',
+    iman: value.iman !== false,
+    reticula: value.reticula !== false,
+    fondo: colorHex(value.fondo) ?? DEFAULT_BOARD_SETTINGS.fondo,
+    textura: value.textura === 'ninguna' || value.textura === 'papel' || value.textura === 'lino' ? value.textura : 'puntos',
+    cursor: value.cursor === 'cruz' || value.cursor === 'mano' ? value.cursor : 'normal',
+    densidad: value.densidad === 'compacta' || value.densidad === 'amplia' ? value.densidad : 'normal',
+  };
 }
 
 export function normalizeBoard(value: unknown): BoardDocument | null {
@@ -197,6 +288,8 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
     if (entry.locked === true) card.locked = true;
     const datos = normalizeDatos(entry.datos);
     if (datos) card.datos = datos;
+    const estilo = normalizeEstilo(entry.estilo);
+    if (estilo) card.estilo = estilo;
     if (type === 'media' && (media?.kind === 'image' || media?.kind === 'video')) {
       card.width = boundedNumber(entry.width, 420, 120, 1200);
       card.height = boundedNumber(entry.height, Math.round(card.width * 0.75), 60, 2400);
@@ -251,6 +344,7 @@ export function normalizeBoard(value: unknown): BoardDocument | null {
     createdAt: boundedText(value.createdAt, new Date().toISOString(), 80),
     updatedAt: boundedText(value.updatedAt, new Date().toISOString(), 80),
     sistema: normalizeDesignSystem(value.sistema),
+    ajustes: normalizeAjustes(value.ajustes),
     cards: normalizedCards,
     relations,
   };

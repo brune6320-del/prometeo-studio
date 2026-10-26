@@ -11,6 +11,11 @@ import { columnaTool } from './columna';
 import { tareasTool } from './tareas';
 import { tableroTool } from './tablero';
 
+/** Acciones del tablero que una herramienta puede pedir sin conocer el workspace. */
+export interface BoardToolActions {
+  desarmarUrl?: (cardId: string, url: string) => void;
+}
+
 /**
  * Contrato de una herramienta de la pizarra (skill prometeo-herramientas).
  * Añadir una herramienta = un archivo nuevo + una línea de registro.
@@ -23,7 +28,7 @@ export interface BoardTool<D = unknown> {
   icono?: React.ComponentType<{ size?: number }>;
   crear(x: number, y: number): D;
   validar(d: unknown): d is D;
-  Vista: React.FC<{ datos: D; hijos?: BoardCard[]; editar: (d: D) => void }>;
+  Vista: React.FC<{ datos: D; hijos?: BoardCard[]; editar: (d: D) => void; acciones?: BoardToolActions }>;
   exportarMarkdown?(d: D): string;
 }
 

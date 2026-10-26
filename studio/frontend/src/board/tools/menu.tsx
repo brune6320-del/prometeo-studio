@@ -12,9 +12,9 @@ import {
 /**
  * Biblioteca de herramientas del «+ Más».
  *
- * Se navega con búsqueda y categorías, se ve una vista previa de la herramienta
- * elegida y se añade con el botón o con doble clic. La lista sale del registro;
- * este componente no conoce ninguna herramienta por su cuenta.
+ * Un clic añade ya, en el punto donde estaba el cursor al pulsar N. La
+ * descripción se lee al pasar el puntero, no como paso previo. También se
+ * puede arrastrar una herramienta al lugar exacto del lienzo.
  */
 export const BoardToolMenu: React.FC<{ onChoose: (id: string) => void }> = ({ onChoose }) => {
   const [query, setQuery] = useState('');
@@ -104,8 +104,18 @@ export const BoardToolMenu: React.FC<{ onChoose: (id: string) => void }> = ({ on
                 role="option"
                 aria-selected={active}
                 className={`board-library-item ${active ? 'is-selected' : ''}`}
-                onClick={() => { setSelectedId(entry.id); }}
-                onDoubleClick={() => add(entry.id)}
+                draggable
+                onDragStart={(event) => {
+                  event.dataTransfer.setData('application/x-prometeo-tool', entry.id);
+                  event.dataTransfer.effectAllowed = 'copy';
+                }}
+                onClick={() => add(entry.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    add(entry.id);
+                  }
+                }}
                 onMouseEnter={() => setSelectedId(entry.id)}
                 onFocus={() => setSelectedId(entry.id)}
               >
@@ -133,10 +143,7 @@ export const BoardToolMenu: React.FC<{ onChoose: (id: string) => void }> = ({ on
                 </div>
                 <p>{entry.descripcion}</p>
                 <div className="board-library-preview-actions">
-                  <button type="button" className="board-tool primary" onClick={() => add(entry.id)}>
-                    Añadir al tablero
-                  </button>
-                  <small>Doble clic en la lista también añade.</small>
+                  <small><strong>Un clic la añade.</strong> También puedes arrastrarla al lienzo.</small>
                 </div>
               </>
             );
@@ -147,8 +154,8 @@ export const BoardToolMenu: React.FC<{ onChoose: (id: string) => void }> = ({ on
       </div>
 
       <div className="board-library-foot">
-        <span>↑ ↓ elegir</span>
-        <span>Enter añadir</span>
+        <span>1 clic añade</span>
+        <span>↑ ↓ recorrer · Enter añade</span>
         <span>{entries.length} {entries.length === 1 ? 'herramienta' : 'herramientas'}</span>
       </div>
     </div>

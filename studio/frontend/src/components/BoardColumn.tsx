@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, ChevronRight, Lock, LockOpen, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Lock, LockOpen, Settings2, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
 import { readColumnData } from '../board/columnas';
 import { TituloEnSitio } from './InlineEdit';
@@ -24,6 +24,7 @@ export interface BoardColumnProps {
   onDragEnd: (event: React.PointerEvent<HTMLElement>) => void;
   onDelete: (cardId: string) => void;
   onPatch: (cardId: string, patch: Partial<BoardCard>) => void;
+  onSettings: (card: BoardCard, event: React.MouseEvent<HTMLElement>) => void;
   onToggleFold: (cardId: string) => void;
   onReorderChild: (columnId: string, childId: string, targetId: string) => void;
   onDetachChild: (columnId: string, childId: string) => void;
@@ -52,6 +53,7 @@ export const BoardColumn: React.FC<BoardColumnProps> = ({
   onDragEnd,
   onDelete,
   onPatch,
+  onSettings,
   onToggleFold,
   onReorderChild,
   onDetachChild,
@@ -110,6 +112,16 @@ export const BoardColumn: React.FC<BoardColumnProps> = ({
         >
           {card.locked ? <Lock size={12} /> : <LockOpen size={12} />}
         </button>
+        {selected && (
+          <button
+            type="button"
+            className="board-column-settings"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => { event.stopPropagation(); onSettings(card, event); }}
+            aria-label={`Ajustes de ${card.title || 'la columna'}`}
+            title="Ajustes de esta columna"
+          ><Settings2 size={13} /></button>
+        )}
         <button className="board-column-delete" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onDelete(card.id); }} aria-label="Eliminar columna" title="Eliminar la columna y dejar sus tarjetas"><X size={13} /></button>
       </div>
       {!data.plegada && (

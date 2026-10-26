@@ -2,6 +2,15 @@
 
 exports[`registro de herramientas del tablero > un tablero viejo carga igual (snapshot) 1`] = `
 {
+  "ajustes": {
+    "cursor": "normal",
+    "densidad": "normal",
+    "fondo": "#15100c",
+    "guias": "sutiles",
+    "iman": true,
+    "reticula": true,
+    "textura": "puntos",
+  },
   "cards": [
     {
       "body": "Idea vieja",

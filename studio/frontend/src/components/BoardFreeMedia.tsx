@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, LockOpen, Pause, Play, X } from 'lucide-react';
+import { Lock, LockOpen, Pause, Play, Settings2, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
 import { metricas } from '../motion/metricas';
 import { TituloEnSitio, TextoEnSitio } from './InlineEdit';
@@ -43,11 +43,12 @@ export interface BoardFreeMediaProps {
   dragging: boolean;
   settling: boolean;
   onSelect: (card: BoardCard, modifiers: Modificadores) => void;
-  onDragStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
+  onDragStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>, force?: boolean) => void;
   onDragMove: (event: React.PointerEvent<HTMLElement>) => void;
   onDragEnd: (event: React.PointerEvent<HTMLElement>) => void;
   onDelete: (cardId: string) => void;
   onPatch: (cardId: string, patch: Partial<BoardCard>) => void;
+  onSettings: (card: BoardCard, event: React.MouseEvent<HTMLElement>) => void;
   onResizeStart: (card: BoardCard, corner: EsquinaMedia, event: React.PointerEvent<HTMLElement>) => void;
   onResizeMove: (event: React.PointerEvent<HTMLElement>) => void;
   onResizeEnd: (event: React.PointerEvent<HTMLElement>) => void;
@@ -74,6 +75,7 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
   onDragEnd,
   onDelete,
   onPatch,
+  onSettings,
   onResizeStart,
   onResizeMove,
   onResizeEnd,
@@ -119,10 +121,10 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
       onPointerDown={(event) => {
         inicioRef.current = { x: event.clientX, y: event.clientY };
         movidoRef.current = false;
-        if (!card.locked) onDragStart(card, event);
+        if (!card.locked) onDragStart(card, event, event.metaKey || event.ctrlKey);
       }}
       onPointerMove={(event) => {
-        if (inicioRef.current && Math.hypot(event.clientX - inicioRef.current.x, event.clientY - inicioRef.current.y) > 3) {
+        if (inicioRef.current && Math.max(Math.abs(event.clientX - inicioRef.current.x), Math.abs(event.clientY - inicioRef.current.y)) >= 4) {
           movidoRef.current = true;
         }
         onDragMove(event);
@@ -253,6 +255,19 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
       >
         {card.locked ? <Lock size={12} /> : <LockOpen size={12} />}
       </button>
+
+      {selected && (
+        <button
+          type="button"
+          className="board-free-media-settings"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => { event.stopPropagation(); onSettings(card, event); }}
+          aria-label={`Ajustes de ${card.title || 'la pieza'}`}
+          title="Ajustes: recorte, texto alternativo, borde, opacidad y más"
+        >
+          <Settings2 size={13} />
+        </button>
+      )}
 
       <button
         type="button"
