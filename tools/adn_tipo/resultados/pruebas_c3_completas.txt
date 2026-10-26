@@ -1,0 +1,50 @@
+test_cajas_vacias_y_lab_invalido (test_adn.ADNTest) ... ok
+test_embebida_y_rotacion (test_adn.ADNTest) ... ok
+test_evaluacion_rechaza_familia_vista (test_adn.ADNTest) ... ok
+test_familia_normalizada_y_estilos_mismo_split (test_adn.ADNTest) ... ok
+test_lab_y_ortografia_no_corrige (test_adn.ADNTest) ... ok
+test_maestro_train_propio_sin_abrir_examen (test_adn.ADNTest) ... ok
+test_nativo_caracter_fuente_y_pixeles (test_adn.ADNTest) ... ok
+test_pdf_mixto_enruta_y_preserva_pagina (test_adn.ADNTest) ... ok
+test_plan_rechaza_origen_en_ambos_splits_sin_abrir_pdf (test_adn.ADNTest) ... ok
+test_rechaza_firmas_sellos_y_sin_declaracion (test_adn.ADNTest) ... ok
+test_rechaza_fuga_train_antes_de_gradientes (test_adn.ADNTest) ... ok
+test_sha_de_imagen_y_holdout (test_adn.ADNTest) ... ok
+test_sintetico_tamano_efectivo_y_semilla (test_adn.ADNTest) ... ok
+test_abstencion_cuenta_como_fallo (test_examen.ExamenTest) ... ok
+test_afinado_distinto_y_familia_holdout_rechazados (test_examen.ExamenTest) ... ok
+test_cambio_entre_inventario_y_apertura_rechazado (test_examen.ExamenTest) ... ok
+test_catalogo_real_congelado (test_examen.ExamenTest) ... ok
+test_excepcion_no_filtra_datos_ni_traceback (test_examen.ExamenTest) ... ok
+test_fuga_origen_y_pesos_distintos_rechazan_antes_de_pdf (test_examen.ExamenTest) ... ok
+test_holdout_antiguo_deshabilitado_antes_de_leer_plan (test_examen.ExamenTest) ... ok
+test_metadata_incorrecta_gasta_intento_y_no_publica_parcial (test_examen.ExamenTest) ... ok
+test_prerregistro_alterado_no_lee_carpeta (test_examen.ExamenTest) ... ok
+test_rechaza_faltante_sobrante_duplicado_y_archivo_no_pdf (test_examen.ExamenTest) ... ok
+test_rechaza_hash_sello_alterado_y_enlaces (test_examen.ExamenTest) ... ok
+test_rechaza_repeticion_incluso_sello_reordenado (test_examen.ExamenTest) ... ok
+test_rechaza_sello_duplicado_paginas_boolean_y_cantidad (test_examen.ExamenTest) ... ok
+test_rechaza_tipo_de_sello_incorrecto (test_examen.ExamenTest) ... ok
+test_sello_solo_metadatos_y_carpeta_exacta (test_examen.ExamenTest) ... ok
+test_sin_referencia_no_fabrica_metricas (test_examen.ExamenTest) ... ok
+test_una_apertura_por_pdf_solo_agregados_sin_temporales (test_examen.ExamenTest) ... ok
+test_backward_determinista_cpu (test_modelo.PoolDeterministaTest) ... ok
+test_backward_determinista_cuda (test_modelo.PoolDeterministaTest) ... skipped 'CUDA no disponible'
+test_pool_valor_y_gradiente_cpu (test_modelo.PoolDeterministaTest) ... ok
+test_rechaza_tamano_no_equivalente (test_modelo.PoolDeterministaTest) ... ok
+test_red_y_pesos_anteriores_compatibles (test_modelo.PoolDeterministaTest) ... ok
+test_falta_motor_no_se_presenta_como_resultado (test_ocr_opcional.OCROpcionalTest) ... ok
+test_cpu_no_admite_entrenamiento_completo (test_v3.V3Test) ... ok
+test_documento_completo_no_cruza_particion (test_v3.V3Test) ... ok
+test_grupo_fuente_caracter_y_orden_independiente (test_v3.V3Test) ... ok
+test_humo_guarda_generacion_y_no_abre_holdout (test_v3.V3Test) ... {'version': 1, 'dominio': 'nativo_train', 'sha256_plan': 'a980f8b47dd8a164683be8bef74117f0240f081f863c4005b5481590fcf8f3db', 'origenes': ['384cf1555518f47f518de0ac4583cc60a6422c6e2943dc5d20c9770e69053c28'], 'n': 4, 'omitidos': 0, 'advertencia': 'Rasterización con ruido; NO es impresión/escáner físico. Examen de glifos con transcripción A conocida.', 'train_sha256': 'dbfc9cba80066d6251b951a6d1ff6a80f7c09edbe12255adb4961bd77f4f1c3a'}
+epoca 1: score validacion=0.080405
+ok
+test_no_acepta_copia_cruzada (test_v3.V3Test) ... ok
+test_no_reubica_grupos_si_falta_clase (test_v3.V3Test) ... ok
+test_parada_empate_y_no_finito (test_v3.V3Test) ... ok
+
+----------------------------------------------------------------------
+Ran 43 tests in 1.790s
+
+OK (skipped=1)

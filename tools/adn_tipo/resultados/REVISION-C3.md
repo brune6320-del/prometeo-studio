@@ -24,3 +24,26 @@ PRERREGISTRO.md v2 intacto: SHA-256
 16b5a933c466c04eaa9a28e06dcb62ceb4be2c66b73e1391b1a16d546637d776.
 CUDA/T4, reproducibilidad entre GPU y suite completa: NO VERIFICADO.
 GPU consumida: 0. No se descargaron pesos ni se ejecutó el examen.
+
+## Continuación tras autorización de Bruno · 26-10-2026
+
+La limitación anterior de dependencias quedó resuelta en el venv C3 aislado.
+Se instalaron scikit-image 0.24.0 (Python 3.9) y pyspellchecker 0.8.3 con sus
+cuatro dependencias faltantes; se conservaron torch 2.8.0 y el entorno previo.
+Inventario completo en pip-freeze-c3.txt; variantes fijadas en
+requirements-c3-py39.txt. Ver V3-EJECUCION.md para rutas y procedimiento.
+Fuentes de fixtures descargadas mediante fuentes.py, con revisión y doble
+SHA fuente/licencia de fuentes.lock.json; siguen ignoradas, nunca en Git.
+
+Se detectó importación anticipada de pytesseract incluso para camino A:
+ahora se carga solo al usar OCR B; si falta, B informa OCR no ejecutado.
+El test de PDF mixto mantiene su mock de OCR original: no demuestra OCR real.
+Se añaden origen/metodo explícitos para distinguir vecino de CNN.
+
+Suite final: 43 pruebas, 42 pasan y 1 CUDA omitida. Las 30 históricas pasan.
+El humo v3 usa una época CPU en un fixture artificial de diez imágenes;
+no abre holdout ni examen y no acredita mejora. Sus pesos temporales se
+descartan. Se prueba separación por origen/carácter, duplicados, early stopping
+y persistencia/carga del checkpoint. CUDA, consumo real Colab, desarrollo con
+padre v2, placebo de campaña, comparación real y examen: NO VERIFICADO.
+V2 y v3 conservan los hashes publicados. No se alteran resultados negativos.
