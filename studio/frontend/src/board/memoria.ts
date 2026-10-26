@@ -9,6 +9,7 @@
 import type { BoardDocument } from './model';
 import type { BoardHistory } from './history';
 import type { BoardProject, PdfReference } from './projectModel';
+import { marca, marcaFin } from './marcas';
 
 const DATABASE_NAME = 'prometeo-studio-memoria';
 const DATABASE_VERSION = 1;
@@ -203,23 +204,35 @@ export async function olvidarBorrado(id: string): Promise<void> {
 /** Historial de deshacer por tablero. Se guarda acotado para no reventar la cuota. */
 const MAX_HISTORIAL_BYTES = 3_500_000;
 
-function compactar(history: BoardHistory): BoardHistory {
-  const intento = (undo: BoardHistory['undo']): BoardHistory => ({ undo, redo: history.redo });
-  let candidate = intento(history.undo);
-  if (JSON.stringify(candidate).length <= MAX_HISTORIAL_BYTES) return candidate;
-  for (const limite of [20, 8, 3, 1]) {
-    candidate = intento(history.undo.slice(-limite));
-    if (JSON.stringify(candidate).length <= MAX_HISTORIAL_BYTES) return candidate;
+/**
+ * T-3 · recorta desde el final midiendo cada paso, en vez de serializar las 100
+ * copias del tablero para descubrir que sobran. Con 500 tarjetas eso eran 55 ms
+ * de JSON en el hilo principal; ahora se mide solo lo que cabe.
+ */
+export function compactarHistorial(history: BoardHistory, maxBytes = MAX_HISTORIAL_BYTES): BoardHistory {
+  const redoBytes = JSON.stringify(history.redo).length;
+  const recortado: BoardHistory['undo'] = [];
+  let bytes = redoBytes;
+  for (let indice = history.undo.length - 1; indice >= 0; indice -= 1) {
+    const entry = history.undo[indice];
+    const inicio = marca('historial:json:paso', `${history.undo.length - indice} de ${history.undo.length}`);
+    const tamano = JSON.stringify(entry).length + 1;
+    marcaFin('historial:json:paso:fin', inicio, `${(tamano / 1024).toFixed(0)} KB`);
+    if (recortado.length > 0 && bytes + tamano > maxBytes) break;
+    recortado.unshift(entry);
+    bytes += tamano;
   }
-  return intento(history.undo.slice(-1));
+  return { undo: recortado, redo: history.redo };
 }
 
 export async function guardarHistorial(boardId: string, history: BoardHistory): Promise<void> {
+  const inicio = marca('historial:guardado', `${boardId} · ${history.undo.length} pasos · ${history.redo.length} redo`);
   try {
     const database = await openDatabase();
     const transaction = database.transaction(HISTORIAL_STORE, 'readwrite');
-    transaction.objectStore(HISTORIAL_STORE).put({ boardId, history: compactar(history), savedAt: new Date().toISOString() });
+    transaction.objectStore(HISTORIAL_STORE).put({ boardId, history: compactarHistorial(history), savedAt: new Date().toISOString() });
     await transactionFinished(transaction);
+    marcaFin('historial:guardado:fin', inicio, boardId);
   } catch (error) {
     console.warn('No se pudo guardar el historial del tablero.', error);
   }

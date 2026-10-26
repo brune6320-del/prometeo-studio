@@ -1,4 +1,5 @@
 import { normalizeBoard, type BoardDocument } from './model';
+import { marca, marcaFin } from './marcas';
 
 const DATABASE_NAME = 'prometeo-studio-visual-board';
 const DATABASE_VERSION = 1;
@@ -96,7 +97,9 @@ export async function loadBoardWorkspace(): Promise<BoardWorkspaceSnapshot> {
 export async function saveBoard(board: BoardDocument): Promise<void> {
   const database = await openDatabase();
   const transaction = database.transaction(BOARDS_STORE, 'readwrite');
+  const inicio = marca('autosave:put', `${board.id} · ${board.cards.length} tarjetas · ${board.relations.length} relaciones`);
   transaction.objectStore(BOARDS_STORE).put(board);
+  marcaFin('autosave:put:fin', inicio, board.id);
   await transactionFinished(transaction);
 }
 

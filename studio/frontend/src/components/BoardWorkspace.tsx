@@ -113,6 +113,7 @@ import {
 import { gustosVacios, importarGustosParciales, like, nope, type Gustos } from '../board/vanguardia/gustos';
 import { crearMarcoManifiesto, pedirManifiesto, seleccionarSemana } from '../board/vanguardia/manifiesto';
 import { enqueueBoardSave, flushBoardWrites, removeBoardFromStore, rememberActiveBoard } from '../board/saveQueue';
+import { marca, marcaFin } from '../board/marcas';
 import { publishFrameToDirectory } from '../board/publicar';
 import {
   createPdfReference,
@@ -318,6 +319,22 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const activeBoardRef = useRef<BoardDocument | null>(null);
   const zoomValueRef = useRef<HTMLButtonElement>(null);
   const cameraRef = useRef({ pan: { x: 0, y: 0 }, zoom: 1 });
+  /** T-3: último LOD aplicado, para registrar cada cambio (compacto ↔ completo). */
+  const lodRef = useRef<'min' | 'full' | null>(null);
+  /**
+   * T-3 · el LOD no se cambia de golpe: con 500 tarjetas, montar todo el
+   * contenido en un commit era un congelón de 145–538 ms al cruzar el 35 %.
+   * `lodCompletas` guarda los ids con contenido completo: solo los que están
+   * en el encuadre (más margen), y entran por tandas.
+   */
+  const [lodCompletas, setLodCompletas] = useState<Set<string>>(() => new Set());
+  const lodCompletasRef = useRef<Set<string>>(new Set());
+  /** T-3 · el LOD espera a que el zoom se asiente: una ráfaga +/− no monta nada. */
+  const [zoomLod, setZoomLod] = useState(1);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setZoomLod(zoom), 200);
+    return () => window.clearTimeout(timer);
+  }, [zoom]);
   const paintRaf = useRef(0);
   const inertiaRaf = useRef(0);
   const syncTimer = useRef<number | null>(null);
@@ -398,6 +415,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   const activeProjectReferences = projectReferences.filter((reference) => reference.projectId === activeProjectId);
   const activeBoard = projectBoards.find((board) => board.id === activeBoardId) ?? projectBoards[0] ?? null;
   const selectedCards = activeBoard?.cards.filter((card) => selectedCardIds.includes(card.id)) ?? [];
+  /** T-3: el `contain: paint` del escenario solo se retira si hay coordenadas negativas. */
+  const hasNegative = (activeBoard?.cards ?? []).some((card) => card.x < 0 || card.y < 0);
+  const containRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (containRef.current === hasNegative) return;
+    marca('contain:cambio', `${containRef.current === null ? 'inicio' : containRef.current ? 'negativo' : 'positivo'} → ${hasNegative ? 'negativo' : 'positivo'}`);
+    containRef.current = hasNegative;
+  }, [hasNegative]);
   const activeHistory = activeBoard ? boardHistories[activeBoard.id] ?? emptyBoardHistory() : emptyBoardHistory();
   const canUndo = activeHistory.undo.length > 0;
   const canRedo = activeHistory.redo.length > 0;
@@ -502,9 +527,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   // que el problema que resuelve.
   useEffect(() => {
     if (!loaded || !historiesReady.current || !activeBoardId) return;
+    const inicio = marca('historial:programado', `${activeBoardId} · ${(boardHistories[activeBoardId]?.undo.length ?? 0)} pasos`);
     const timer = window.setTimeout(() => {
       const history = boardHistories[activeBoardId];
-      if (history) void guardarHistorial(activeBoardId, history);
+      if (history) {
+        marcaFin('historial:espera', inicio);
+        void guardarHistorial(activeBoardId, history);
+      }
     }, 600);
     return () => window.clearTimeout(timer);
   }, [activeBoardId, boardHistories, loaded]);
@@ -586,7 +615,14 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     const stage = stageRef.current;
     if (stage) {
       stage.style.transform = `translate3d(${posicion.x}px, ${posicion.y}px, 0) scale(${escala})`;
-      stage.dataset.lod = escala < 0.35 ? 'min' : 'full';
+      // T-3: el atributo es para medios/marcos; el contenido de las tarjetas
+      // cambia por tandas en React, nunca con un recálculo global.
+      const lod: 'min' | 'full' = escala < 0.35 ? 'min' : 'full';
+      if (stage.dataset.lod !== lod) {
+        stage.dataset.lod = lod;
+        marca('lod:cambio', `${lodRef.current ?? 'inicio'} → ${lod} · ${Math.round(escala * 100)} % · ${lodCompletasRef.current.size}/${activeBoardRef.current?.cards.length ?? 0} completas`);
+      }
+      lodRef.current = lod;
     }
     const viewport = viewportRef.current;
     if (viewport) {
@@ -819,6 +855,62 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     previousBoardId.current = activeBoard.id;
   }, [activeBoard, centerCamera, loaded, viewportSize]);
 
+  /**
+   * T-3 · el contenido completo entra por tandas y solo para lo que está en el
+   * encuadre (más un margen). 500 tarjetas completas de golpe eran 238 ms de
+   * estilo/layout; 4 por fotograma mantienen cada frame dentro de presupuesto.
+   */
+  useEffect(() => {
+    const tablero = activeBoard;
+    const { width, height } = viewportSize;
+    const escala = Math.max(zoomLod, 0.0001);
+    const deseados: string[] = [];
+    if (tablero && width && height && zoom >= 0.35 && zoomLod >= 0.35) {
+      const margen = 512;
+      const izquierda = -pan.x / escala - margen;
+      const arriba = -pan.y / escala - margen;
+      const derecha = (width - pan.x) / escala + margen;
+      const abajo = (height - pan.y) / escala + margen;
+      const centro = { x: (izquierda + derecha) / 2, y: (arriba + abajo) / 2 };
+      const candidatos: Array<{ id: string; distancia: number }> = [];
+      for (const card of tablero.cards) {
+        const rect = rectDeTarjeta(card);
+        if (rect.x > derecha || rect.y > abajo || rect.x + rect.width < izquierda || rect.y + rect.height < arriba) continue;
+        const dx = rect.x + rect.width / 2 - centro.x;
+        const dy = rect.y + rect.height / 2 - centro.y;
+        candidatos.push({ id: card.id, distancia: dx * dx + dy * dy });
+      }
+      candidatos.sort((a, b) => a.distancia - b.distancia);
+      deseados.push(...candidatos.map((candidato) => candidato.id));
+    }
+    const objetivo = new Set(deseados);
+    let raf = 0;
+    let cancelado = false;
+    const paso = () => {
+      if (cancelado) return;
+      const actual = lodCompletasRef.current;
+      const faltan = deseados.filter((id) => !actual.has(id));
+      const sobran = [...actual].filter((id) => !objetivo.has(id));
+      if (!faltan.length && !sobran.length) return;
+      const siguiente = new Set(actual);
+      if (faltan.length) {
+        for (const id of faltan.slice(0, 4)) siguiente.add(id);
+        marca('lod:tanda', `+${Math.min(4, faltan.length)} · ${siguiente.size}/${deseados.length} en encuadre`);
+      } else {
+        for (const id of sobran.slice(0, 16)) siguiente.delete(id);
+        marca('lod:tanda', `−${Math.min(16, sobran.length)} · ${siguiente.size}/${deseados.length} en encuadre`);
+      }
+      lodCompletasRef.current = siguiente;
+      setLodCompletas(siguiente);
+      raf = requestAnimationFrame(paso);
+    };
+    raf = requestAnimationFrame(paso);
+    return () => {
+      cancelado = true;
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [activeBoard, pan, viewportSize, zoom, zoomLod]);
+
   useEffect(() => {
     if (!loaded || !activeBoardId) return;
     rememberActiveBoard(activeBoardId);
@@ -898,6 +990,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     if (!actual) return;
     const nextBoard = { ...mutate(actual), updatedAt: new Date().toISOString() };
     if (options.recordHistory !== false) {
+      marca('historial:registro', `${nextBoard.id} · ${nextBoard.cards.length} tarjetas · ${options.coalesceKey ?? 'sin coalescencia'}`);
       setBoardHistories((current) => ({
         ...current,
         [actual.id]: recordBoardChange(current[actual.id] ?? emptyBoardHistory(), actual, nextBoard, options.coalesceKey),
@@ -1941,7 +2034,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   /** H6 · asa de ancho de una nota (o de toda la selección). El alto sigue al contenido. */
-  const startWidthResize = (card: BoardCard, event: React.PointerEvent<HTMLElement>) => {
+  const startWidthResize = useCallback((card: BoardCard, event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || !activeBoard || card.locked) return;
     event.preventDefault();
     event.stopPropagation();
@@ -1966,9 +2059,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     };
     setSettlingIds([]);
     try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
-  };
+  }, [activeBoard, detenerInercia, marcarGestoVisual, selectedCardIds]);
 
-  const moveWidthResize = (event: React.PointerEvent<HTMLElement>) => {
+  const moveWidthResize = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const drag = widthResize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const delta = (event.clientX - drag.startX) / cameraRef.current.zoom;
@@ -1985,9 +2078,9 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         if (elemento) elemento.style.width = `${ancho}px`;
       }
     });
-  };
+  }, []);
 
-  const endWidthResize = (event: React.PointerEvent<HTMLElement>) => {
+  const endWidthResize = useCallback((event: React.PointerEvent<HTMLElement>) => {
     const drag = widthResize.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     if (drag.raf) { cancelAnimationFrame(drag.raf); drag.raf = 0; }
@@ -2009,7 +2102,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     }));
     setBoards((current) => current.map((board) => board.id === final.id ? final : board));
     enqueueBoardSave(final);
-  };
+  }, [activeBoard, boards, terminarGestoVisual]);
 
   /** Redimensionar una imagen o vídeo desde cualquier esquina; Shift mantiene la proporción. */
   const startFreeResize = (card: BoardCard, corner: EsquinaMedia, event: React.PointerEvent<HTMLElement>) => {
@@ -3838,13 +3931,21 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   };
 
   const matchingCards = useMemo(() => {
+    const inicio = marca('busqueda:filtro', `consulta de ${search.trim().length} caracteres`);
     const query = search.trim().toLocaleLowerCase();
-    return new Set((activeBoard?.cards ?? []).filter((card) => !query || `${card.title} ${card.body} ${card.url ?? ''}`.toLocaleLowerCase().includes(query)).map((card) => card.id));
+    const coincidencias = new Set((activeBoard?.cards ?? []).filter((card) => !query || `${card.title} ${card.body} ${card.url ?? ''}`.toLocaleLowerCase().includes(query)).map((card) => card.id));
+    marcaFin('busqueda:filtro:fin', inicio, `${coincidencias.size} de ${activeBoard?.cards.length ?? 0}`);
+    return coincidencias;
   }, [activeBoard?.cards, search]);
 
   const resultadosBusqueda = useMemo(() => {
+    const inicio = marca('busqueda:resultados', searchScope);
     const query = search.trim();
-    if (!query) return [] as Array<{ boardId: string; boardTitle: string; card: BoardCard }>;
+    const vacio: Array<{ boardId: string; boardTitle: string; card: BoardCard }> = [];
+    if (!query) {
+      marcaFin('busqueda:resultados:fin', inicio, '0');
+      return vacio;
+    }
     const fuentes = searchScope === 'tablero'
       ? (activeBoard ? [activeBoard] : [])
       : projectBoards.length ? projectBoards : activeBoard ? [activeBoard] : [];
@@ -3858,9 +3959,13 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         if (vistos.has(clave)) continue;
         vistos.add(clave);
         resultados.push({ boardId: board.id, boardTitle: board.title, card });
-        if (resultados.length >= 200) return resultados;
+        if (resultados.length >= 200) {
+          marcaFin('busqueda:resultados:fin', inicio, '200 (tope)');
+          return resultados;
+        }
       }
     }
+    marcaFin('busqueda:resultados:fin', inicio, `${resultados.length}`);
     return resultados;
   }, [activeBoard, projectBoards, search, searchScope]);
 
@@ -3869,10 +3974,12 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   }, [search, searchScope]);
 
   const indiceOrdenado = useMemo(() => ordenDePintado(activeBoard?.cards ?? []), [activeBoard?.cards]);
-  const indiceFiltrado = useMemo(
-    () => indiceOrdenado.filter((card) => coincideBusqueda(card, indexQuery)),
-    [indiceOrdenado, indexQuery],
-  );
+  const indiceFiltrado = useMemo(() => {
+    const inicio = marca('indice:filtro', `consulta de ${indexQuery.trim().length} caracteres`);
+    const filtrado = indiceOrdenado.filter((card) => coincideBusqueda(card, indexQuery));
+    marcaFin('indice:filtro:fin', inicio, `${filtrado.length} de ${indiceOrdenado.length}`);
+    return filtrado;
+  }, [indiceOrdenado, indexQuery]);
   const ventanaIndice = ventanaVirtual(indiceFiltrado.length, indexScroll, 420, INDICE_ROW_HEIGHT);
   const indiceVisibles = indiceFiltrado.slice(ventanaIndice.inicio, ventanaIndice.fin);
 
@@ -3883,17 +3990,19 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
   }, [indexOpen]);
 
   const cerrarIndice = useCallback((devolverFoco = true) => {
+    marca('indice:cerrar', `${indiceFiltrado.length} filas`);
     setIndexOpen(false);
     setIndexQuery('');
     setIndexScroll(0);
     if (devolverFoco) viewportRef.current?.focus({ preventScroll: true });
-  }, []);
+  }, [indiceFiltrado.length]);
 
   const abrirIndice = useCallback(() => {
+    marca('indice:abrir', `${activeBoard?.cards.length ?? 0} tarjetas`);
     setIndexOpen(true);
     setIndexQuery('');
     setIndexScroll(0);
-  }, []);
+  }, [activeBoard?.cards.length]);
 
   /** ⌘F · Enter lleva al resultado: cambia de tablero si hace falta, selecciona y centra. */
   const centrarEnTarjeta = useCallback((boardId: string, cardId: string) => {
@@ -4428,7 +4537,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
             })()}
             </g>
           </svg>
-        <div className={`board-stage ${activeBoard.cards.some((card) => card.x < 0 || card.y < 0) ? 'has-negative' : ''}`} ref={stageRef}>
+        <div className={`board-stage ${hasNegative ? 'has-negative' : ''}`} ref={stageRef}>
           {guias.x !== undefined && (
             <div className="board-guide board-guide-x" data-testid="board-guide-x" style={{ left: guias.x }} aria-hidden="true" />
           )}
@@ -4615,7 +4724,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
                  connectionTarget={connectDraft?.target === card.id}
                  connectMode={connectMode}
                  colors={COLORS}
-                 compact={zoom < 0.35}
+                 compact={!lodCompletas.has(card.id)}
                  onSelect={onCardSelect}
                  onConnect={onCardConnect}
                  onConnectStart={onCardConnectStart}

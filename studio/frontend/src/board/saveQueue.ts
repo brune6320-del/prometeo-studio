@@ -8,6 +8,7 @@
  */
 import type { BoardDocument } from './model';
 import { deleteBoard, saveActiveBoardId, saveBoard } from './storage';
+import { marca, marcaFin } from './marcas';
 
 const DEBOUNCE_MS = 400;
 
@@ -59,8 +60,10 @@ export function getBoardWriteStatus(): BoardWriteStatus {
 async function drainOnce(): Promise<boolean> {
   while (pending.size > 0) {
     const [id, entry] = pending.entries().next().value as [string, PendingBoard];
+    const inicio = marca('autosave:escritura', `${id} · ${entry.board.cards.length} tarjetas`);
     try {
       await saveBoard(entry.board);
+      marcaFin('autosave:escritura:fin', inicio, `${id} · rev ${entry.revision}`);
     } catch (error) {
       lastError = messageOf(error, 'No se pudo guardar este tablero.');
       publish();
@@ -93,6 +96,7 @@ function drain(): Promise<boolean> {
 export function enqueueBoardSave(board: BoardDocument, options: { immediate?: boolean } = {}): void {
   revisionCounter += 1;
   pending.set(board.id, { board, revision: revisionCounter });
+  marca('autosave:encolado', `${board.id} · ${board.cards.length} tarjetas`);
   publish();
   if (timer !== null) globalThis.clearTimeout(timer);
   timer = globalThis.setTimeout(() => {
@@ -106,6 +110,7 @@ export function enqueueBoardSave(board: BoardDocument, options: { immediate?: bo
  * en ese caso la copia sigue en memoria y no debe considerarse guardada.
  */
 export async function flushBoardWrites(): Promise<boolean> {
+  const inicio = marca('autosave:flush', `${pending.size} pendientes`);
   if (timer !== null) {
     globalThis.clearTimeout(timer);
     timer = null;
@@ -114,6 +119,7 @@ export async function flushBoardWrites(): Promise<boolean> {
     const ok = await drain();
     if (!ok) return false;
   }
+  marcaFin('autosave:flush:fin', inicio);
   return lastError === null;
 }
 

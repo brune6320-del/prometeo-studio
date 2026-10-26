@@ -3085,34 +3085,13 @@
   .board-rail { flex-basis: 68px; width: 68px; }
 }
 
-/* ── LOD: por debajo del 35 % solo título, color y miniatura ───────────── */
-.board-stage[data-lod='min'] .board-card {
-  min-height: 0;
-  padding: var(--space-2);
-}
-
-.board-stage[data-lod='min'] .board-card-color-row,
-.board-stage[data-lod='min'] .board-card-body,
-.board-stage[data-lod='min'] .board-card-link,
-.board-stage[data-lod='min'] .board-referente-tabs,
-.board-stage[data-lod='min'] .board-referente-meta,
-.board-stage[data-lod='min'] .board-referente-etiquetas,
-.board-stage[data-lod='min'] .board-referente-porque,
-.board-stage[data-lod='min'] .board-referente-lectura,
-.board-stage[data-lod='min'] .board-referente-hint,
-.board-stage[data-lod='min'] .board-entropia-meta {
-  display: none;
-}
-
-.board-stage[data-lod='min'] .board-card-title {
-  font-size: var(--font-size-caption);
-}
-
-.board-stage[data-lod='min'] .board-card-media img,
-.board-stage[data-lod='min'] .board-referente-imagen {
-  max-height: 110px;
-  object-fit: cover;
-}
+/* ── LOD: el contenido de las tarjetas lo decide React por tandas (T-3) ─── */
+/*
+ * T-3 · las reglas de LOD por tarjeta viven en `.board-card-compact`. Un
+ * cambio global de `data-lod` a `full` obligaba a recalcular el estilo y el
+ * layout de 500 tarjetas en un solo fotograma (238 ms medidos). El atributo
+ * se queda solo para medios libres, marcos y columnas, que son pocos.
+ */
 
 /* El aviso no empuja el lienzo: se posa encima, como una notificación. */
 .board-toast {
