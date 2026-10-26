@@ -1,0 +1,12 @@
+# Requisitos fijados para FASE 4b (ADN Unido: OCR + métricas geométricas en CPU, 0 Colab)
+pytesseract==0.3.13
+Pillow==11.3.0
+numpy==1.26.4
+scikit-image==0.25.2 ; python_version >= "3.10"
+scikit-image==0.24.0 ; python_version < "3.10"
+PyMuPDF==1.26.5
+fonttools==4.60.1
+pyspellchecker==0.8.3
+certifi==2026.10.23
+torch==2.8.0 ; python_version >= "3.10"
+torch==2.2.2 ; python_version < "3.10"

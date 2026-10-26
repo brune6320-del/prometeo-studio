@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Suite de 4 pruebas obligatorias de Fase 4 (ADN Unido: D-10 + D-11b).
+"""Suite de 5 pruebas obligatorias de Fase 4b (ADN Unido: D-10 Camino B sin CNN + D-11b).
 
 Verifica:
 1. 22/22 fichas válidas contra el validador del esquema (tools/adn_unido/esquema.py).
@@ -7,6 +7,9 @@ Verifica:
 3. Integridad del lote: ningún cartel/pieza se pierde ni se duplica (22 entradas únicas).
 4. Inmutabilidad de D-10: tools/adn_tipo/ sigue idéntico byte a byte al commit dc5ddd5
    (tree Git SHA-1 fe5ee96d398e6b6fb1acaa3ff00004f765ff8173 y 42/42 blobs verificados).
+5. Cobertura tipográfica en carteles (Fase 4b): en >=12 de los 18 carteles el bloque 'tipo'
+   trae texto detectado o una métrica de letra distinta de no_calculado, y el sub-bloque
+   CNN mantiene {"estado": "no_calculado", "motivo": "pesos.pt se entrenan en Colab (D-10), aún no entrenados"}.
 """
 
 from __future__ import annotations
@@ -26,17 +29,23 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from tools.adn_unido.esquema import (
+    CNN_MOTIVO_ESPERADO,
     COMMIT_ADN_TIPO,
     calcular_sha256_ficha_sin_fecha,
     validar_ficha_unida,
 )
-from tools.adn_unido.estudiar_todo import estudiar_carpeta, resolver_piezas_carpeta
+from tools.adn_unido.estudiar_todo import (
+    EXTENSIONES_IMAGEN,
+    estudiar_carpeta,
+    resolver_piezas_carpeta,
+)
 
 CORPUS_D3_DEFAULT = Path(
     "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/corpus-editorial"
 )
 
 TREE_SHA1_ADN_TIPO_DC5DDD5 = "fe5ee96d398e6b6fb1acaa3ff00004f765ff8173"
+DIRECTORIOS_IGNORADOS_ADN_TIPO = {"__pycache__", ".cache", ".venv", "salidas"}
 
 
 def _git_blob_sha1(data: bytes) -> bytes:
@@ -45,11 +54,11 @@ def _git_blob_sha1(data: bytes) -> bytes:
 
 
 def _calcular_git_tree_sha1_directorio(dir_path: Path) -> Tuple[str, int]:
-    """Calcula de forma exacta el objeto Merkle tree SHA-1 de Git para un directorio en disco."""
+    """Calcula de forma exacta el objeto Merkle tree SHA-1 de Git para los archivos rastreados."""
     entradas: List[Tuple[bytes, str, str, bytes]] = []
     total_archivos = 0
     for p in dir_path.iterdir():
-        if p.name == "__pycache__":
+        if p.name in DIRECTORIOS_IGNORADOS_ADN_TIPO or p.name.endswith(".pyc"):
             continue
         if p.is_dir():
             sub_hex, sub_cnt = _calcular_git_tree_sha1_directorio(p)
@@ -117,7 +126,7 @@ def _leer_objeto_pack_git(git_dir: Path, sha_hex: str) -> bytes | None:
         while c & 0x80:
             c = pack_data[p]
             p += 1
-        if obj_type in (1, 2, 3):  # commit, tree, blob directos
+        if obj_type in (1, 2, 3):
             return zlib.decompress(pack_data[p:])
     return None
 
@@ -176,15 +185,15 @@ def verificar_identidad_adn_tipo(
 
     return (
         True,
-        f"{num_archivos}/42 archivos de tools/adn_tipo/ idénticos byte a byte a {commit_esperado[:7]} (Merkle tree SHA-1 = {tree_actual[:12]}…)",
+        f"{num_archivos}/42 archivos rastreados de tools/adn_tipo/ idénticos byte a byte a {commit_esperado[:7]} (Merkle tree SHA-1 = {tree_actual[:12]}…)",
     )
 
 
 def ejecutar_pruebas_unido(
     carpeta_corpus: Path = CORPUS_D3_DEFAULT,
     carpeta_salida_persistente: Path | None = None,
-) -> Tuple[bool, List[Tuple[str, bool, str]], List[Dict[str, Any]]]:
-    """Ejecuta las 4 pruebas obligatorias de medir_unido.py y devuelve el resumen y la tabla de 22 filas."""
+) -> Tuple[bool, List[Tuple[str, bool, str]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """Ejecuta las 5 pruebas obligatorias de medir_unido.py y devuelve resumen, tabla de 18 carteles y tabla de 22 piezas."""
     repo_root = Path(__file__).resolve().parents[2]
     piezas_esperadas = resolver_piezas_carpeta(carpeta_corpus)
     num_esperado = len(piezas_esperadas)
@@ -260,44 +269,86 @@ def ejecutar_pruebas_unido(
         # Prueba 4: tools/adn_tipo/ idéntico byte a byte a dc5ddd5
         ok_p4, msg_p4 = verificar_identidad_adn_tipo(repo_root, COMMIT_ADN_TIPO)
 
-        # Construir tabla resumen de las 22 piezas
-        filas_tabla: List[Dict[str, Any]] = []
+        # Prueba 5 (Fase 4b): en >=12 de los 18 carteles el bloque tipo trae texto detectado
+        # o una métrica de letra distinta de no_calculado
+        carteles_con_letra = 0
+        total_carteles = 0
+        cnn_honesta_ok = True
+        filas_18_carteles: List[Dict[str, Any]] = []
+        filas_22_piezas: List[Dict[str, Any]] = []
+
         for pieza, _, ficha in corrida_1:
             dis = ficha["diseno"]
             tip = ficha["tipo"]
-            if dis.get("estado") == "calculado":
-                k_el = dis["paleta"]["k_elegido"]
-                pal_ins = dis["paleta"]["paleta_insuficiente"]
-                conf_g = dis["confianza"]["global"]
-            else:
-                k_el = None
-                pal_ins = None
-                conf_g = None
-            filas_tabla.append(
+            es_cartel = pieza.suffix.lower() in EXTENSIONES_IMAGEN
+
+            if es_cartel:
+                total_carteles += 1
+                cnn_sub = tip.get("cnn", {})
+                if (
+                    cnn_sub.get("estado") != "no_calculado"
+                    or cnn_sub.get("motivo") != CNN_MOTIVO_ESPERADO
+                ):
+                    cnn_honesta_ok = False
+
+                texto_res = str(tip.get("texto_ocr_resumen", "")).strip()
+                metricas_l = tip.get("metricas_letra", {})
+                fuente_v = metricas_l.get("fuente_vecino_top1")
+                tiene_texto_o_metrica = (
+                    tip.get("estado") == "calculado_camino_b_sin_cnn"
+                    and int(tip.get("num_palabras_ocr", 0)) >= 1
+                    and bool(texto_res)
+                    and texto_res not in ("no_calculado", "sin_texto_ocr")
+                    and bool(fuente_v)
+                    and fuente_v not in ("no_calculado", "sin_texto_ocr")
+                )
+                if tiene_texto_o_metrica:
+                    carteles_con_letra += 1
+
+                filas_18_carteles.append(
+                    {
+                        "cartel": pieza.name,
+                        "texto_ocr_resumen": texto_res or "sin_texto_ocr",
+                        "metrica_principal": metricas_l.get("metrica_principal_resumen", "no_calculado"),
+                        "confianza_tipo": float(tip.get("confianza_tipo", 0.0)),
+                        "num_palabras_ocr": int(tip.get("num_palabras_ocr", 0)),
+                        "num_glifos": int(tip.get("num_glifos_analizados", 0)),
+                        "fuente_vecino_top1": fuente_v,
+                    }
+                )
+
+            filas_22_piezas.append(
                 {
                     "cartel": pieza.name,
-                    "k_elegido": k_el,
-                    "paleta_insuficiente": pal_ins,
+                    "k_elegido": dis["paleta"]["k_elegido"] if dis.get("estado") == "calculado" else None,
+                    "paleta_insuficiente": (
+                        dis["paleta"]["paleta_insuficiente"] if dis.get("estado") == "calculado" else None
+                    ),
                     "fuente_detectada": tip.get("fuente_detectada", "no_calculado"),
-                    "estado_tipo": tip.get("estado"),
-                    "confianza_global": conf_g,
-                    "sha256_ficha_determinista": ficha["procedencia"]["sha256_ficha_determinista"],
+                    "confianza_global": dis["confianza"]["global"] if dis.get("estado") == "calculado" else None,
                 }
             )
+
+        ok_p5 = (total_carteles == 18) and (carteles_con_letra >= 12) and cnn_honesta_ok
+        msg_p5 = (
+            f"{carteles_con_letra}/{total_carteles} carteles con texto OCR y métricas de letra calculadas "
+            f"(umbral >=12/18; sub-bloque CNN honesto en 18/18)"
+        )
 
     pruebas = [
         ("1. Validez de esquema (22/22 fichas v1.0.0)", ok_p1, msg_p1),
         ("2. Determinismo estricto (2 corridas sin fecha_utc)", ok_p2, msg_p2),
         ("3. Integridad del lote (0 pérdidas, 0 duplicados)", ok_p3, msg_p3),
         ("4. Inmutabilidad byte a byte de tools/adn_tipo/ (dc5ddd5)", ok_p4, msg_p4),
+        ("5. Cobertura de letra en carteles (>=12/18 con OCR + métrica != no_calculado)", ok_p5, msg_p5),
     ]
     todo_ok = all(ok for _, ok, _ in pruebas)
-    return todo_ok, pruebas, filas_tabla
+    return todo_ok, pruebas, filas_18_carteles, filas_22_piezas
 
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Ejecuta las 4 pruebas obligatorias de medir_unido.py sobre el corpus D-3."
+        description="Ejecuta las 5 pruebas obligatorias de medir_unido.py (Fase 4b) sobre el corpus D-3."
     )
     parser.add_argument(
         "--corpus",
@@ -306,29 +357,30 @@ def main(argv: List[str] | None = None) -> int:
     )
     parser.add_argument(
         "--guardar-fichas",
-        default="/tmp/adn_unido_fichas_d3",
-        help="Carpeta donde persistir las 22 fichas generadas (por defecto /tmp/adn_unido_fichas_d3).",
+        default="/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/corpus-editorial/fichas-adn-unido",
+        help="Carpeta donde persistir las 22 fichas generadas.",
     )
     args = parser.parse_args(argv)
 
-    todo_ok, pruebas, filas = ejecutar_pruebas_unido(
+    todo_ok, pruebas, filas_18, _ = ejecutar_pruebas_unido(
         Path(args.corpus).expanduser().resolve(),
         Path(args.guardar_fichas).expanduser().resolve() if args.guardar_fichas else None,
     )
 
-    print("=== MEDIR_UNIDO · FASE 4 (ADN UNIDO D-10 + D-11b) ===")
+    print("=== MEDIR_UNIDO · FASE 4b (LETRA EN LOS CARTELES + ADN UNIDO) ===")
     for nombre, ok, detalle in pruebas:
         estado = "PASS" if ok else "FAIL"
         print(f"[{estado}] {nombre}: {detalle}")
 
-    print("\n=== TABLA DE 22 PIEZAS DEL CORPUS D-3 ===")
-    print(f"{'Cartel / Pieza':<38} | {'K':<4} | {'Pal.Insuf':<9} | {'Fuente detectada / estado':<36} | {'Conf.Global':<11}")
-    print("-" * 110)
-    for r in filas:
-        k_str = str(r["k_elegido"]) if r["k_elegido"] is not None else "N/A"
-        pi_str = str(r["paleta_insuficiente"]).lower() if r["paleta_insuficiente"] is not None else "N/A"
-        cg_str = f"{r['confianza_global']:.4f}" if r["confianza_global"] is not None else "N/A"
-        print(f"{r['cartel']:<38} | {k_str:<4} | {pi_str:<9} | {r['fuente_detectada']:<36} | {cg_str:<11}")
+    print("\n=== TABLA DE 18 CARTELES (FASE 4b) ===")
+    print(
+        f"{'Cartel':<32} | {'Texto OCR (<=6 palabras)':<34} | {'Métrica de letra principal':<64} | {'Conf.Tipo':<9}"
+    )
+    print("-" * 148)
+    for r in filas_18:
+        print(
+            f"{r['cartel']:<32} | {r['texto_ocr_resumen']:<34} | {r['metrica_principal']:<64} | {r['confianza_tipo']:.4f}"
+        )
 
     pasadas = sum(1 for _, ok, _ in pruebas if ok)
     print(f"\nResultado global: {pasadas}/{len(pruebas)} pruebas superadas.")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validador estricto del contrato de salida de ADN Unido (<nombre>.ficha.json v1.0.0)."""
+"""Validador estricto del contrato de salida de ADN Unido (<nombre>.ficha.json v1.0.0 · Fase 4b)."""
 
 from __future__ import annotations
 
@@ -20,6 +20,8 @@ SCHEMA_VERSION_ADN_TIPO = "1.0.0"
 COMMIT_ADN_TIPO = "dc5ddd5b768a3e745cbaf903efbd4ba36aac5805"
 COMMIT_ADN_DISENO = "d25e70187db2424be43c16c214059687c01252d4"
 
+CNN_MOTIVO_ESPERADO = "pesos.pt se entrenan en Colab (D-10), aún no entrenados"
+
 CLAVES_RAIZ_UNIDO = (
     "schema_version",
     "tipo",
@@ -37,6 +39,14 @@ CLAVES_PROCEDENCIA = (
     "fecha_utc",
     "maquina",
     "sha256_ficha_determinista",
+)
+
+ESTADOS_TIPO_VALIDOS = (
+    "calculado",
+    "calculado_camino_b_sin_cnn",
+    "sin_texto_ocr",
+    "calculado_nativo_opentype",
+    "no_calculado",
 )
 
 RE_SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -83,12 +93,38 @@ def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
         errores.append("El bloque 'tipo' debe ser un dict.")
     else:
         estado_t = tipo.get("estado")
-        if estado_t not in ("calculado", "calculado_nativo_opentype", "no_calculado"):
+        if estado_t not in ESTADOS_TIPO_VALIDOS:
             errores.append(f"tipo.estado inválido: {estado_t}")
         fuente_det = tipo.get("fuente_detectada")
         if not isinstance(fuente_det, str) or not fuente_det.strip():
             errores.append("tipo.fuente_detectada debe ser un string no vacío.")
-        if estado_t == "no_calculado":
+
+        if estado_t in ("calculado_camino_b_sin_cnn", "sin_texto_ocr"):
+            cnn_blk = tipo.get("cnn")
+            if not isinstance(cnn_blk, dict):
+                errores.append("tipo.cnn obligatorio en carteles procesados por Camino B.")
+            else:
+                if cnn_blk.get("estado") != "no_calculado":
+                    errores.append(f"tipo.cnn.estado esperado 'no_calculado', recibido '{cnn_blk.get('estado')}'")
+                if cnn_blk.get("motivo") != CNN_MOTIVO_ESPERADO:
+                    errores.append(
+                        f"tipo.cnn.motivo esperado '{CNN_MOTIVO_ESPERADO}', recibido '{cnn_blk.get('motivo')}'"
+                    )
+            motor_ocr = tipo.get("motor_ocr")
+            if not isinstance(motor_ocr, dict) or motor_ocr.get("psm") != 6 or motor_ocr.get("semilla") != 2610:
+                errores.append("tipo.motor_ocr debe fijar psm=6 y semilla=2610.")
+            conf_t = tipo.get("confianza_tipo")
+            if not isinstance(conf_t, (int, float)) or not (0.0 <= float(conf_t) <= 1.0):
+                errores.append(f"tipo.confianza_tipo debe estar en [0.0, 1.0], recibido: {conf_t}")
+            metricas_l = tipo.get("metricas_letra")
+            if not isinstance(metricas_l, dict):
+                errores.append("tipo.metricas_letra debe ser un dict.")
+            elif estado_t == "calculado_camino_b_sin_cnn":
+                if not tipo.get("texto_ocr_resumen") or tipo.get("num_palabras_ocr", 0) < 1:
+                    errores.append("En estado 'calculado_camino_b_sin_cnn' debe haber >=1 palabra OCR.")
+                if not metricas_l.get("fuente_vecino_top1") or metricas_l.get("fuente_vecino_top1") == "no_calculado":
+                    errores.append("metricas_letra.fuente_vecino_top1 debe estar calculada en Camino B.")
+        elif estado_t == "no_calculado":
             motivo = tipo.get("motivo")
             if not isinstance(motivo, str) or len(motivo.strip()) < 10:
                 errores.append("tipo.motivo obligatorio y descriptivo cuando estado == 'no_calculado'.")
