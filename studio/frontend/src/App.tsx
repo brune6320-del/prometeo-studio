@@ -34,13 +34,16 @@ import { flushBoardWrites } from './board/saveQueue';
 import { exportarRescateTableros } from './board/rescate';
 import { useNativeAutoTest } from './testing/useNativeAutoTest';
 import { ErrorNotice, Notice, useResizable } from './components/ui';
+import { TelaranaPanel } from './components/TelaranaPanel';
 
 type DockTab = 'changes' | 'verification' | 'compare' | 'assistant';
 
 const isEditable = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName));
 
-export const App: React.FC = () => {
+export const App: React.FC = () => import.meta.env.VITE_TELARANA === '1' ? <TelaranaPanel /> : <AppNormal />;
+
+const AppNormal: React.FC = () => {
   const backend = useBackend();
   const [workspaceMode, setWorkspaceMode] = useState<'pdf' | 'board'>('pdf');
   // Mantén montada la interfaz si el motor cae después de haber arrancado: el tablero es local.

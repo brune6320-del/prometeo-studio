@@ -1,0 +1,12 @@
+{
+  "modelo": "SAM 2.1 Hiera Small",
+  "licencia": "Apache-2.0",
+  "licencia_url": "https://github.com/facebookresearch/sam2/blob/2b90b9f5ceec907a1c18123530e92e794ad901a4/LICENSE",
+  "declaracion_pesos_url": "https://github.com/facebookresearch/sam2/blob/2b90b9f5ceec907a1c18123530e92e794ad901a4/README.md#license",
+  "codigo_commit": "2b90b9f5ceec907a1c18123530e92e794ad901a4",
+  "config": "configs/sam2.1/sam2.1_hiera_s.yaml",
+  "archivo": "sam2.1_hiera_small.pt",
+  "url": "https://dl.fbaipublicfiles.com/segment_anything_2/092824/sam2.1_hiera_small.pt",
+  "sha256": "6d1aa6f30de5c92224f8172114de081d104bbd23dd9dc5c58996f0cad5dc4d38",
+  "sha256_procedencia": "Calculado sobre la descarga HTTPS oficial el 2026-10-25; no es una firma publicada por Meta."
+}

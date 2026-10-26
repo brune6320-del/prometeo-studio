@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.cache/
+salidas/
+*.png
+*.jpg
+*.pdf
+*.ttf
+*.otf
+*.pt
+*.pth
+*.adn.json
+proyecto.json

@@ -1,0 +1,47 @@
+{
+  "sha256_origen": "ff05702c3fe241d53bcab7fdcd37a925bb619e54313b6074bdedc68e32e9b1a9",
+  "regiones_texto": 119,
+  "relacion": {
+    "metodo": "ORB + affine parcial RANSAC; semilla 2610",
+    "coincidencias": 3000,
+    "inliers": 3000,
+    "proporcion_inliers": 1.0,
+    "error_mediano_px": 0.7337357532100363,
+    "textura_correlacion": 0.9800219753728964,
+    "matriz_a_b": [
+      [
+        3.0452609163589342e-05,
+        0.9999563846394475,
+        -0.013117222447115289
+      ],
+      [
+        -0.9999563846394475,
+        3.0452609163589342e-05,
+        1249.1392048742846
+      ]
+    ],
+    "misma_figura_propuesta": true,
+    "estado": "propuesta_para_revisar",
+    "pixeles_textura": 761333,
+    "textura_sigma_px": 1.0,
+    "advertencia": "Semejanza no demuestra identidad semántica; no probabilidad calibrada.",
+    "relaciones": {
+      "origen_compartido": true,
+      "apoyos_independientes": 1,
+      "nota": "La copia girada es una transformación controlada del mismo recorte; no otra evidencia real."
+    }
+  },
+  "estado_antes_sha256": "5cdae2489be445523fb3e76f412eff9c1aed6478c78a9b6f2f7d60c082080f1f",
+  "aprendizaje": false,
+  "gpu_unidades": 0,
+  "propio_declarado": true,
+  "documento_en_git": false,
+  "demo_transformacion_controlada": true,
+  "invalidadas": [
+    "misma-figura",
+    "decision-reutilizacion"
+  ],
+  "fichas_sin_cambios": 121,
+  "estado_despues_sha256": "41e8c28543da261a64cf68133ecf55a1603dd427cf11ba88353dfd66caee32ff",
+  "replay_exacto": true
+}

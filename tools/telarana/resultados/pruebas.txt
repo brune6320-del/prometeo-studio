@@ -1,0 +1,12 @@
+test_copias_un_solo_origen (tools.telarana.test_telarana.TelaranaTest) ... ok
+test_corregir_invalida_solo_descendientes_y_replay_exacto (tools.telarana.test_telarana.TelaranaTest) ... ok
+test_dependencia_obsoleta_y_ciclo_no_entran (tools.telarana.test_telarana.TelaranaTest) ... ok
+test_log_manipulado_rechazado (tools.telarana.test_telarana.TelaranaTest) ... ok
+test_papel_blanco_no_es_evidencia (tools.telarana.test_telarana.TelaranaTest) ... ok
+test_revision_obsoleta_no_escribe (tools.telarana.test_telarana.TelaranaTest) ... ok
+test_rotacion_con_geometria_y_textura (tools.telarana.test_telarana.TelaranaTest) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.225s
+
+OK
