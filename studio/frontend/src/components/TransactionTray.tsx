@@ -1,12 +1,14 @@
 import React from 'react';
 import { ArrowRight, Redo2, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
-import type { StagedOperation } from '../types';
+import type { PreflightResponse, StagedOperation } from '../types';
 import type { TxPhase } from '../hooks/useTransaction';
 
 interface TrayProps {
   ops: StagedOperation[];
   phase: TxPhase;
   verifying: boolean;
+  preflight?: PreflightResponse | null;
+  preflightBusy?: boolean;
   uiMode: 'user' | 'technical';
   onRemove: (opId: string) => void;
   onClear: () => void;
@@ -17,8 +19,9 @@ interface TrayProps {
   canRedo?: boolean;
 }
 
-export const TransactionTray: React.FC<TrayProps> = ({ ops, phase, verifying, uiMode, onRemove, onClear, onVerify, onUndo, onRedo, canUndo = false, canRedo = false }) => {
+export const TransactionTray: React.FC<TrayProps> = ({ ops, phase, verifying, preflight = null, preflightBusy = false, uiMode, onRemove, onClear, onVerify, onUndo, onRedo, canUndo = false, canRedo = false }) => {
   const count = ops.length;
+  const preflightTone = preflightBusy ? 'Comprobando en segundo plano…' : preflight ? (preflight.ok ? 'Comprobación previa aprobada' : 'La comprobación previa no pasó') : '';
   return (
     <div>
       <div className="tray-head">
@@ -37,6 +40,11 @@ export const TransactionTray: React.FC<TrayProps> = ({ ops, phase, verifying, ui
                 ? 'Guarda la copia en «Verificación». Si añades o quitas cambios, habrá que verificar de nuevo.'
                 : 'Se verificarán juntos: si uno no se puede aplicar con fidelidad, no se aplica ninguno.'}
           </div>
+          {count > 0 && preflightTone && (
+            <div className="hint" data-testid="preflight-status" style={{ marginTop: 4, color: preflight && !preflight.ok ? 'var(--st-failed)' : undefined }}>
+              {preflightTone}{preflight && !preflight.ok && preflight.verifier_result?.reason ? ` · ${preflight.verifier_result.reason}` : ''}
+            </div>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
           <button className="btn btn-ghost btn-icon btn-sm" onClick={onUndo} disabled={!canUndo || verifying} aria-label="Deshacer el último cambio preparado" title="Deshacer en la bandeja (⌘Z)">

@@ -13,6 +13,8 @@ sin ellas WebKit reduce cualquier error a "Load failed".
 """
 
 import asyncio
+import base64
+import hashlib
 import hmac
 import html as html_lib
 import ipaddress
@@ -26,6 +28,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import urllib.robotparser
 from html.parser import HTMLParser
 from typing import Any, Dict, List, Optional
 
@@ -474,6 +477,364 @@ def url_preview(url: str = Query(..., max_length=2048)):
     return {"ok": True, **data}
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# REFERENTES: DESARMAR UNA PÁGINA EN PIEZAS DE COLLAGE (SUPER-4 · I7)
+# ─────────────────────────────────────────────────────────────────────────────
+
+DESARMAR_TIMEOUT = 10.0
+DESARMAR_MAX_HTML = 2 * 1024 * 1024
+DESARMAR_MAX_IMAGES = 6
+DESARMAR_MAX_IMAGE_BYTES = 2 * 1024 * 1024
+DESARMAR_UA = "Prometeo-Studio-Referentes/1.0 (+uso personal de estudio)"
+
+
+class _DesarmarParser(HTMLParser):
+    """Lee titulares, textos, imágenes, estilos y fuentes. No ejecuta nada de la página."""
+
+    CAPTURAS = {"title", "h1", "h2", "h3", "p", "blockquote", "figcaption", "li"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.title = ""
+        self.meta: Dict[str, str] = {}
+        self.headings: List[Dict[str, str]] = []
+        self.paragraphs: List[str] = []
+        self.images: List[Dict[str, str]] = []
+        self.styles: List[str] = []
+        self._captura: Optional[str] = None
+        self._profundidad = 0
+        self._buffer: List[str] = []
+        self._en_style = False
+        self._style_buffer: List[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        attributes = {str(key).lower(): (value or "") for key, value in attrs}
+        if tag == "meta":
+            key = (attributes.get("property") or attributes.get("name") or "").strip().lower()
+            content = attributes.get("content", "").strip()
+            if key and content and key not in self.meta:
+                self.meta[key] = content
+            return
+        if tag == "img":
+            src = (attributes.get("src") or "").strip()
+            srcset = (attributes.get("srcset") or "").strip()
+            if not src and srcset:
+                src = srcset.split(",")[0].strip().split(" ")[0]
+            if src:
+                self.images.append({"src": src, "alt": (attributes.get("alt") or "").strip()[:300]})
+            return
+        if tag == "link":
+            href = attributes.get("href", "").strip()
+            if href and ("font" in (attributes.get("rel") or "").lower() or "fonts." in href):
+                self.styles.append(f"url({href})")
+            return
+        if tag == "style":
+            self._en_style = True
+            self._style_buffer = []
+            return
+        if tag in self.CAPTURAS:
+            if self._captura is None:
+                self._captura = tag
+                self._profundidad = 0
+                self._buffer = []
+            self._profundidad += 1
+        style = attributes.get("style", "")
+        if style:
+            self.styles.append(style)
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        if tag == "style" and self._en_style:
+            self._en_style = False
+            self.styles.append(" ".join(self._style_buffer))
+            self._style_buffer = []
+            return
+        if self._captura is None or tag != self._captura:
+            return
+        self._profundidad -= 1
+        if self._profundidad > 0:
+            return
+        text = re.sub(r"\s+", " ", html_lib.unescape("".join(self._buffer))).strip()[:800]
+        if self._captura == "title":
+            self.title = text
+        elif self._captura in ("h1", "h2", "h3"):
+            if text:
+                self.headings.append({"rol": self._captura, "text": text})
+        elif text and len(text) >= 3:
+            self.paragraphs.append(text)
+        self._captura = None
+        self._buffer = []
+
+    def handle_data(self, data):
+        if self._en_style:
+            self._style_buffer.append(data)
+        elif self._captura is not None:
+            self._buffer.append(data)
+
+    def handle_entityref(self, name):
+        if self._captura is not None:
+            self._buffer.append(f"&{name};")
+
+
+def _robots_permite(url: str) -> bool:
+    """Consulta robots.txt con el mismo guardia SSRF; si no se puede leer, no bloquea."""
+    parts = urllib.parse.urlsplit(url)
+    robots_url = urllib.parse.urlunsplit((parts.scheme, parts.netloc, "/robots.txt", "", ""))
+    try:
+        request = urllib.request.Request(robots_url, headers={"User-Agent": DESARMAR_UA}, method="GET")
+        with urllib.request.urlopen(request, timeout=4) as response:
+            body = response.read(128 * 1024).decode("utf-8", errors="replace")
+    except Exception:
+        return True
+    parser = urllib.robotparser.RobotFileParser()
+    parser.parse(body.splitlines())
+    return parser.can_fetch(DESARMAR_UA, url)
+
+
+def _descargar_html(url: str) -> Dict[str, Any]:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": DESARMAR_UA,
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "es,en;q=0.8",
+        },
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=DESARMAR_TIMEOUT) as response:
+            final_url = response.geturl()
+            final_host = urllib.parse.urlsplit(final_url).hostname or ""
+            if not final_host or not _public_url_host(final_host):
+                raise E.ApiError(400, "URL_NOT_PUBLIC", "La redirección apunta a la red local.", E.STAGE_API)
+            content_type = (response.headers.get("Content-Type") or "").lower()
+            if content_type and "html" not in content_type and "xml" not in content_type:
+                raise E.ApiError(415, "URL_NOT_HTML", "Esa dirección no devuelve una página HTML.", E.STAGE_API)
+            charset = response.headers.get_content_charset() or "utf-8"
+            body = response.read(DESARMAR_MAX_HTML + 1)
+            if len(body) > DESARMAR_MAX_HTML:
+                body = body[:DESARMAR_MAX_HTML]
+    except E.ApiError:
+        raise
+    except (urllib.error.URLError, TimeoutError, socket.timeout, OSError) as exc:
+        raise E.ApiError(502, "URL_UNREACHABLE", "No se pudo abrir la dirección.", E.STAGE_API,
+                         retryable=True, details={"reason": type(exc).__name__}) from exc
+    try:
+        text = body.decode(charset, errors="replace")
+    except LookupError:
+        text = body.decode("utf-8", errors="replace")
+    return {"url": final_url, "html": text}
+
+
+def _descargar_imagen_pagina(src: str, base_url: str) -> Optional[Dict[str, Any]]:
+    try:
+        absolute = urllib.parse.urljoin(base_url, src)
+        parts = urllib.parse.urlsplit(absolute)
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https") or not parts.hostname or not _public_url_host(parts.hostname):
+        return None
+    request = urllib.request.Request(
+        absolute,
+        headers={"User-Agent": DESARMAR_UA, "Accept": "image/*"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=8) as response:
+            final_host = urllib.parse.urlsplit(response.geturl()).hostname or ""
+            if not final_host or not _public_url_host(final_host):
+                return None
+            content_type = (response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            if not content_type.startswith("image/"):
+                return None
+            body = response.read(DESARMAR_MAX_IMAGE_BYTES + 1)
+            if len(body) > DESARMAR_MAX_IMAGE_BYTES or not body:
+                return None
+    except Exception:
+        return None
+    return {"url": absolute, "mime": content_type, "bytes": body}
+
+
+def _extension_imagen(mime: str) -> str:
+    return {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/gif": ".gif",
+        "image/webp": ".webp",
+        "image/svg+xml": ".svg",
+        "image/avif": ".avif",
+    }.get(mime, ".img")
+
+
+def _data_url(mime: str, body: bytes) -> str:
+    return f"data:{mime};base64,{base64.b64encode(body).decode('ascii')}"
+
+
+def _captura_svg(titulo: str, host: str) -> str:
+    """La captura mínima cuando la página no ofrece og:image: su título y su dominio, no una foto inventada."""
+    safe_title = html_lib.escape((titulo or host or "Página")[:120])
+    safe_host = html_lib.escape((host or "")[:80])
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450">'
+        '<rect width="100%" height="100%" fill="#1b1511"/>'
+        '<rect x="48" y="48" width="704" height="354" fill="none" stroke="#4a3a2d"/>'
+        f'<text x="80" y="210" fill="#f2e8dc" font-family="Georgia, serif" font-size="34">{safe_title}</text>'
+        f'<text x="80" y="270" fill="#c9a27a" font-family="Menlo, monospace" font-size="16">{safe_host}</text>'
+        "</svg>"
+    )
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode("ascii")
+
+
+def _colores_de_estilos(estilos: List[str]) -> List[str]:
+    vistos: List[str] = []
+    for bloque in estilos:
+        for match in re.finditer(r"#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b", bloque):
+            valor = match.group(1).lower()
+            if len(valor) == 3:
+                valor = "".join(ch * 2 for ch in valor)
+            hex_value = f"#{valor}"
+            if hex_value not in vistos:
+                vistos.append(hex_value)
+    return vistos[:8]
+
+
+def _fuentes_de_estilos(estilos: List[str]) -> List[str]:
+    vistos: List[str] = []
+    for bloque in estilos:
+        for match in re.finditer(r"font-family\s*:\s*([^;}{]+)", bloque, flags=re.IGNORECASE):
+            valor = re.sub(r"\s+", " ", match.group(1)).strip().strip("\"'")[:120]
+            if not valor or valor in vistos:
+                continue
+            if valor.startswith(("url(", "var(", "calc(")) or "var(--" in valor:
+                continue
+            vistos.append(valor)
+    return vistos[:6]
+
+
+class DesarmarRequest(BaseModel):
+    url: str = Field(..., max_length=2048, description="Página que se desarma en piezas")
+
+
+@app.post("/api/referentes/desarmar")
+def desarmar_referente(req: DesarmarRequest):
+    """Descarga una página (sin JS), la parte en piezas y guarda sus imágenes en el proyecto.
+
+    Uso personal de estudio: no se republica nada. Se respeta robots.txt y, si bloquea,
+    se avisa sin descargar el cuerpo.
+    """
+    safe_url = _validar_url_vista_previa(req.url)
+    if not _robots_permite(safe_url):
+        return {
+            "ok": False,
+            "code": "ROBOTS_DISALLOW",
+            "message": "La página pide en robots.txt no ser descargada. No se desarmó nada.",
+            "url": safe_url,
+        }
+    fetched = _descargar_html(safe_url)
+    final_url = fetched["url"]
+    parser = _DesarmarParser()
+    try:
+        parser.feed(fetched["html"])
+    except Exception:
+        pass
+    host = urllib.parse.urlsplit(final_url).netloc or final_url
+    titulo = re.sub(r"\s+", " ", parser.meta.get("og:title") or parser.meta.get("twitter:title") or parser.title).strip()[:300]
+    descripcion = re.sub(r"\s+", " ", parser.meta.get("og:description") or parser.meta.get("description") or "").strip()[:600]
+
+    # Imágenes: solo http(s), máximo 6, cada una guardada en la carpeta del proyecto.
+    carpeta = ""
+    if SESSION_MANAGER is not None:
+        marca = hashlib.sha256(final_url.encode("utf-8")).hexdigest()[:12]
+        carpeta = os.path.join(SESSION_MANAGER.instance_root, "referentes", marca)
+        os.makedirs(carpeta, mode=0o700, exist_ok=True)
+
+    urls_vistas: set = set()
+    imagenes: List[Dict[str, Any]] = []
+    archivos: List[str] = []
+    for entrada in parser.images:
+        src = urllib.parse.urljoin(final_url, entrada["src"])
+        if src in urls_vistas:
+            continue
+        urls_vistas.add(src)
+        if len(imagenes) >= DESARMAR_MAX_IMAGES:
+            break
+        descargada = _descargar_imagen_pagina(src, final_url)
+        if not descargada:
+            continue
+        indice = len(imagenes) + 1
+        nombre = f"img-{indice:02d}{_extension_imagen(descargada['mime'])}"
+        if carpeta:
+            try:
+                destino = os.path.join(carpeta, nombre)
+                with open(destino, "wb") as handle:
+                    handle.write(descargada["bytes"])
+                archivos.append(os.path.relpath(destino, SESSION_MANAGER.instance_root))
+            except OSError:
+                pass
+        imagenes.append({
+            "kind": "image",
+            "name": nombre,
+            "mime": descargada["mime"],
+            "src": _data_url(descargada["mime"], descargada["bytes"]),
+            "alt": entrada.get("alt") or "",
+            "fuente": final_url,
+        })
+
+    captura_src = parser.meta.get("og:image") or parser.meta.get("twitter:image") or ""
+    captura = ""
+    if captura_src:
+        descargada = _descargar_imagen_pagina(captura_src, final_url)
+        if descargada:
+            captura = _data_url(descargada["mime"], descargada["bytes"])
+    if not captura:
+        captura = _captura_svg(titulo, host)
+
+    piezas: List[Dict[str, Any]] = []
+    piezas.extend(imagenes)
+    vistos_texto: set = set()
+    for titular in parser.headings:
+        texto = titular["text"].strip()
+        clave = texto.lower()
+        if not texto or clave in vistos_texto:
+            continue
+        vistos_texto.add(clave)
+        piezas.append({"kind": "text", "rol": "titular", "text": texto, "fuente": final_url})
+        if len([p for p in piezas if p["kind"] == "text"]) >= 6:
+            break
+    for parrafo in parser.paragraphs:
+        clave = parrafo.lower()
+        if clave in vistos_texto:
+            continue
+        vistos_texto.add(clave)
+        piezas.append({"kind": "text", "rol": "texto", "text": parrafo, "fuente": final_url})
+        if len([p for p in piezas if p["kind"] == "text"]) >= 12:
+            break
+    paleta = _colores_de_estilos(parser.styles)
+    for color in paleta:
+        piezas.append({"kind": "color", "color": color, "fuente": final_url})
+    tipografias = _fuentes_de_estilos(parser.styles)
+    for fuente in tipografias:
+        piezas.append({"kind": "font", "font": fuente, "fuente": final_url})
+
+    return {
+        "ok": True,
+        "url": final_url,
+        "titulo": titulo or host,
+        "descripcion": descripcion,
+        "host": host,
+        "captura": captura,
+        "paleta": paleta,
+        "tipografias": tipografias,
+        "piezas": piezas,
+        "archivos": archivos,
+        "robots": "permitido",
+    }
+
+
 @app.get("/api/health")
 def health_check():
     ready = SESSION_MANAGER is not None
@@ -802,6 +1163,12 @@ def download_advanced_output(session_id: str, token: str):
 def verify_and_export_session(session_id: str, req: VerifyExportRequest):
     """Resultado de dominio: 200 con ok=false cuando el verificador rechaza o falla."""
     return _get_active_session(session_id).verify_and_export(output_filename=req.output_filename)
+
+
+@app.post("/api/sessions/{session_id}/preflight")
+def preflight_session(session_id: str):
+    """Comprobación en segundo plano: misma verificación física, sin archivo publicado."""
+    return _get_active_session(session_id).preflight()
 
 
 @app.get("/api/sessions/{session_id}/diff")

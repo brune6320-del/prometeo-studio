@@ -29,6 +29,8 @@ import type {
   StagedOperation,
   TransactionTrayData,
   VerifyAndExportResponse,
+  PreflightResponse,
+  DesarmarResponse,
   AdvancedOutput,
 } from '../types';
 
@@ -195,6 +197,17 @@ export const studioApi = {
     );
   },
 
+  /** Desarma una página en piezas editables. El backend descarga el HTML y las imágenes. */
+  desarmarUrl(url: string, signal?: AbortSignal) {
+    return request<DesarmarResponse>('/api/referentes/desarmar', {
+      method: 'POST',
+      json: { url },
+      signal,
+      timeoutMs: 60_000,
+      stage: 'API',
+    });
+  },
+
   async getHostStatus(): Promise<HostStatus | null> {
     const internals = (window as unknown as { __TAURI_INTERNALS__?: { invoke?: (cmd: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
     if (!internals?.invoke) return null;
@@ -339,6 +352,17 @@ export const studioApi = {
       method: 'POST',
       json: {},
       timeoutMs: 300_000,
+      stage: 'VERIFICATION',
+    });
+  },
+
+  /** Verificación en segundo plano por cambio; no publica ni conserva archivo. */
+  preflight(sessionId: string, signal?: AbortSignal) {
+    return request<PreflightResponse>(`/api/sessions/${enc(sessionId)}/preflight`, {
+      method: 'POST',
+      signal,
+      json: {},
+      timeoutMs: 120_000,
       stage: 'VERIFICATION',
     });
   },

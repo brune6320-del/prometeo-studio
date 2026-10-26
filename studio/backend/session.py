@@ -1427,6 +1427,121 @@ class StudioDocumentSession:
         result["diff"] = self.last_diff
         return self._finish(result)
 
+    def preflight(self) -> Dict[str, Any]:
+        """Verifica los cambios en segundo plano sin publicar ni conservar un archivo.
+
+        Es la misma autoridad física que la exportación (stage → export temporal → verifier),
+        pero el temporal se borra al terminar. La persona solo obtiene una copia cuando pulsa
+        Exportar/Guardar copia; mientras escribe no se acumulan PDFs nuevos.
+        """
+        if not self.staged_operations:
+            return xp.reject(xp.CODE_NO_STAGED, "No hay operaciones preparadas en la transacción.")
+        self._assert_original_unmodified()
+        kinds = xp.transaction_kinds(self.staged_operations)
+        if len(kinds) > 1:
+            return self._finish_preflight(xp.reject(
+                xp.CODE_MIXED,
+                "La transacción mezcla ediciones raster y de texto nativo; no se puede verificar como una unidad.",
+            ))
+        if kinds == {xp.OP_KIND_RASTER}:
+            return self._preflight_raster()
+        return self._preflight_vector()
+
+    def _finish_preflight(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """Comprueba el original y devuelve el resultado sin tocar el estado de la transacción."""
+        result["preflight"] = True
+        result["original_unchanged"] = self.original_is_unmodified()
+        result["original_sha256"] = self.source_sha256
+        self.last_preflight = result
+        return result
+
+    def _preflight_raster(self) -> Dict[str, Any]:
+        tx_id = f"pfx_{uuid.uuid4().hex[:12]}"
+        raster_ops = [op["raster_op"] for op in self.staged_operations]
+        with open(self.working_copy_path, "rb") as f:
+            source_bytes = f.read()
+        result, _out_bytes = xp.run_raster_transaction(
+            source_bytes,
+            raster_ops,
+            apply_fn=self._raster_apply_fn,
+            verify_fn=self._raster_verify_loader(),
+            semantic_available=self._semantic_authority_check(),
+        )
+        result["verifier_result"]["transaction_id"] = tx_id
+        result["transaction_state"] = xp.STATE_VERIFIED if result.get("ok") else result.get("transaction_state", xp.STATE_FAILED)
+        return self._finish_preflight(result)
+
+    def _preflight_vector(self) -> Dict[str, Any]:
+        tx_ops = []
+        for op in self.staged_operations:
+            entry = {"new_text": op["new_text"]}
+            if op.get("target_id"):
+                entry["target_id"] = op["target_id"]
+            if op.get("node_id"):
+                entry["node_id"] = op["node_id"]
+            tx_ops.append(entry)
+        stage_res = self.tools.stage_transaction(
+            document_id=self.document_id,
+            operations=tx_ops,
+            policy="ATOMIC",
+        )
+        if not stage_res.get("ok"):
+            return self._finish_preflight(xp.reject(
+                xp.CODE_CORE_REJECTED,
+                stage_res.get("error", "Transacción rechazada por el Core."),
+                details=[stage_res],
+            ))
+        tx_id = stage_res["transaction_id"]
+        temp_path = self._staging_path(tx_id, ".preflight.pdf")
+        try:
+            exp_res = self.tools.export_transaction(
+                document_id=self.document_id,
+                transaction_id=tx_id,
+                destination=temp_path,
+            )
+            if not exp_res.get("ok") or not os.path.isfile(temp_path):
+                return self._finish_preflight(xp.reject(
+                    xp.CODE_EXPORT_FAILED,
+                    exp_res.get("error") or "La verificación previa no produjo un archivo temporal.",
+                    details=[exp_res],
+                    transaction_id=tx_id,
+                ))
+            try:
+                ver_res = self.tools.verify_transaction(document_id=self.document_id, transaction_id=tx_id)
+            except Exception as exc:  # noqa: BLE001 · el verificador es autoridad y puede fallar
+                return self._finish_preflight(xp.reject(
+                    xp.CODE_VERIFIER_ERROR,
+                    f"El verificador falló durante la comprobación previa ({type(exc).__name__}).",
+                    transaction_id=tx_id,
+                ))
+            verdict = ver_res.get("verdict") if isinstance(ver_res, dict) else None
+            profile = "VERIFIER2_VECTOR_TEXT"
+            if ver_res.get("ok") and verdict == xp.VERDICT_PASS:
+                result = xp.outcome(
+                    ok=True, state=xp.STATE_VERIFIED, verdict=xp.VERDICT_PASS, code=None,
+                    reason="El verificador aprobó los cambios en la comprobación previa.",
+                    verifier_executed=True,
+                    operations_verified=len(self.staged_operations),
+                    details=[ver_res], verifier_profile=profile, transaction_id=tx_id,
+                )
+            else:
+                result = xp.failed(
+                    xp.CODE_VERIFICATION_FAILED,
+                    "La comprobación previa no alcanzó conformidad.",
+                    details=[ver_res] if isinstance(ver_res, dict) else [],
+                    transaction_id=tx_id,
+                    operations_verified=int((ver_res or {}).get("operations_verified", 0) or 0),
+                )
+            return self._finish_preflight(result)
+        finally:
+            # El temporal nunca se publica ni se queda en la carpeta de la sesión.
+            xp.discard(temp_path)
+            staging_dir = os.path.dirname(temp_path)
+            try:
+                os.rmdir(staging_dir)
+            except OSError:
+                pass
+
     def get_diff(self) -> Optional[Dict[str, Any]]:
         """Retorna el último DocGraphDiff calculado si existe."""
         return self.last_diff

@@ -256,6 +256,49 @@ export interface VerifyAndExportResponse {
   error_code?: string;
 }
 
+/** Comprobación en segundo plano: misma verificación, sin copia publicada. */
+export interface PreflightResponse {
+  ok: boolean;
+  transaction_state: string;
+  verifier_result: VerifierResult;
+  preflight: true;
+  original_unchanged?: boolean;
+  original_sha256?: string;
+  error?: string;
+  error_code?: string;
+}
+
+export type DesarmarPieceKind = 'image' | 'text' | 'color' | 'font';
+
+export interface DesarmarPiece {
+  kind: DesarmarPieceKind;
+  src?: string;
+  name?: string;
+  mime?: string;
+  alt?: string;
+  text?: string;
+  rol?: 'titular' | 'texto';
+  color?: string;
+  font?: string;
+  fuente: string;
+}
+
+export interface DesarmarResponse {
+  ok: boolean;
+  code?: string;
+  message?: string;
+  url?: string;
+  titulo?: string;
+  descripcion?: string;
+  host?: string;
+  captura?: string;
+  paleta?: string[];
+  tipografias?: string[];
+  piezas?: DesarmarPiece[];
+  archivos?: string[];
+  robots?: string;
+}
+
 export interface AgentProposedOp {
   node_id: string;
   target_id?: string;

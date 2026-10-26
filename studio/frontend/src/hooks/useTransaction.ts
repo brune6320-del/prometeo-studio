@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { studioApi } from '../api/client';
 import { ApiError, normalizeError } from '../api/errors';
-import type { DocGraphDiffResult, PageRenderData, SavedCopy, StagedOperation, VerifierResult, VerifyAndExportResponse } from '../types';
+import type { DocGraphDiffResult, PageRenderData, PreflightResponse, SavedCopy, StagedOperation, VerifierResult, VerifyAndExportResponse } from '../types';
 
 export type TxPhase = 'READY' | 'STAGED' | 'VERIFYING' | 'VERIFIED' | 'FAILED' | 'HONEST_REJECT';
 
@@ -17,9 +17,12 @@ export interface TransactionState {
   diff: DocGraphDiffResult | null;
   saved: SavedCopy | null;
   error: ApiError | null;
+  /** Verificación en segundo plano del último cambio; no publica archivo. */
+  preflight: PreflightResponse | null;
+  preflightBusy: boolean;
 }
 
-const EMPTY: TransactionState = { ops: [], phase: 'READY', result: null, lastResponse: null, diff: null, saved: null, error: null };
+const EMPTY: TransactionState = { ops: [], phase: 'READY', result: null, lastResponse: null, diff: null, saved: null, error: null, preflight: null, preflightBusy: false };
 
 function phaseFor(state: string | undefined, ops: StagedOperation[]): TxPhase {
   if (state === 'VERIFIED' || state === 'FAILED' || state === 'HONEST_REJECT') return state;
@@ -70,6 +73,33 @@ export function useTransaction(sessionId: string | null) {
     setTx((current) => ({ ...current, ops, phase, result: null, diff: null, saved: null, error: null, ...extra }));
   }, []);
 
+  const preflightTimer = useRef<number | null>(null);
+  const preflightCtrl = useRef<AbortController | null>(null);
+
+  /** Tras cada cambio, la misma verificación física corre en segundo plano (sin publicar). */
+  const programarPreflight = useCallback(() => {
+    if (!sessionId) return;
+    if (preflightTimer.current) window.clearTimeout(preflightTimer.current);
+    preflightTimer.current = window.setTimeout(() => {
+      preflightTimer.current = null;
+      preflightCtrl.current?.abort();
+      const ctrl = new AbortController();
+      preflightCtrl.current = ctrl;
+      setTx((t) => ({ ...t, preflightBusy: true }));
+      studioApi
+        .preflight(sessionId, ctrl.signal)
+        .then((res) => {
+          if (ctrl.signal.aborted) return;
+          setTx((t) => ({ ...t, preflight: res, preflightBusy: false }));
+        })
+        .catch((err) => {
+          const e = normalizeError(err, 'VERIFICATION');
+          if (e.code === 'CANCELLED') return;
+          setTx((t) => ({ ...t, preflightBusy: false }));
+        });
+    }, 420);
+  }, [sessionId]);
+
   useEffect(() => {
     setTx(EMPTY);
     setBusy('none');
@@ -77,6 +107,8 @@ export function useTransaction(sessionId: string | null) {
     future.current = [];
     recipes.current.clear();
     setHistoryVersion((value) => value + 1);
+    if (preflightTimer.current) window.clearTimeout(preflightTimer.current);
+    preflightCtrl.current?.abort();
     if (!sessionId) return;
     // La cesta vive en el motor: al cambiar de sesión (o recuperarla tras recargar) se lee de ahí.
     let cancelled = false;
@@ -89,6 +121,8 @@ export function useTransaction(sessionId: string | null) {
       .catch(() => undefined);
     return () => {
       cancelled = true;
+      if (preflightTimer.current) window.clearTimeout(preflightTimer.current);
+      preflightCtrl.current?.abort();
     };
   }, [sessionId]);
 
@@ -97,6 +131,9 @@ export function useTransaction(sessionId: string | null) {
     async (nodeId: string, newText: string) => {
       if (!sessionId) return;
       setBusy('staging');
+      if (preflightTimer.current) window.clearTimeout(preflightTimer.current);
+      preflightCtrl.current?.abort();
+      setTx((t) => ({ ...t, preflight: null, preflightBusy: true }));
       try {
         const antes = snapshot(txRef.current.ops);
         const op = await studioApi.stageEdit(sessionId, nodeId, newText);
@@ -104,17 +141,21 @@ export function useTransaction(sessionId: string | null) {
         const tray = await studioApi.getTransaction(sessionId);
         apuntar(antes);
         adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
+        programarPreflight();
       } finally {
         setBusy('none');
       }
     },
-    [adoptarCesta, apuntar, sessionId, snapshot],
+    [adoptarCesta, apuntar, programarPreflight, sessionId, snapshot],
   );
 
   const stageRaster = useCallback(
     async (page: number, observationId: string, newText: string) => {
       if (!sessionId) return;
       setBusy('staging');
+      if (preflightTimer.current) window.clearTimeout(preflightTimer.current);
+      preflightCtrl.current?.abort();
+      setTx((t) => ({ ...t, preflight: null, preflightBusy: true }));
       try {
         const antes = snapshot(txRef.current.ops);
         const op = await studioApi.stageRasterEdit(sessionId, page, observationId, newText);
@@ -122,11 +163,12 @@ export function useTransaction(sessionId: string | null) {
         const tray = await studioApi.getTransaction(sessionId);
         apuntar(antes);
         adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
+        programarPreflight();
       } finally {
         setBusy('none');
       }
     },
-    [adoptarCesta, apuntar, sessionId, snapshot],
+    [adoptarCesta, apuntar, programarPreflight, sessionId, snapshot],
   );
 
   const remove = useCallback(
@@ -137,11 +179,13 @@ export function useTransaction(sessionId: string | null) {
         const tray = await studioApi.removeStagedOp(sessionId, opId);
         apuntar(antes);
         adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
+        if (tray.staged_operations.length) programarPreflight();
+        else setTx((t) => ({ ...t, preflight: null, preflightBusy: false }));
       } catch (err) {
         setTx((t) => ({ ...t, error: normalizeError(err, 'STAGING') }));
       }
     },
-    [adoptarCesta, apuntar, sessionId, snapshot],
+    [adoptarCesta, apuntar, programarPreflight, sessionId, snapshot],
   );
 
   const clear = useCallback(async () => {
@@ -151,6 +195,7 @@ export function useTransaction(sessionId: string | null) {
       await studioApi.clearTransaction(sessionId);
       apuntar(antes);
       adoptarCesta([], 'READY');
+      setTx((t) => ({ ...t, preflight: null, preflightBusy: false }));
     } catch (err) {
       setTx((t) => ({ ...t, error: normalizeError(err, 'STAGING') }));
     }
@@ -192,6 +237,8 @@ export function useTransaction(sessionId: string | null) {
       future.current = [...future.current, actual].slice(-MAX_PDF_HISTORY);
       const tray = await studioApi.getTransaction(sessionId!);
       adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
+      if (tray.staged_operations.length) programarPreflight();
+      else setTx((t) => ({ ...t, preflight: null, preflightBusy: false }));
       setHistoryVersion((value) => value + 1);
       return true;
     } catch (err) {
@@ -200,7 +247,7 @@ export function useTransaction(sessionId: string | null) {
     } finally {
       setBusy('none');
     }
-  }, [adoptarCesta, aplicarSnapshot, sessionId, snapshot]);
+  }, [adoptarCesta, aplicarSnapshot, programarPreflight, sessionId, snapshot]);
 
   const redo = useCallback(async () => {
     const target = future.current[future.current.length - 1];
@@ -213,6 +260,8 @@ export function useTransaction(sessionId: string | null) {
       past.current = [...past.current, actual].slice(-MAX_PDF_HISTORY);
       const tray = await studioApi.getTransaction(sessionId!);
       adoptarCesta(tray.staged_operations, phaseFor(tray.transaction_state, tray.staged_operations));
+      if (tray.staged_operations.length) programarPreflight();
+      else setTx((t) => ({ ...t, preflight: null, preflightBusy: false }));
       setHistoryVersion((value) => value + 1);
       return true;
     } catch (err) {
@@ -221,11 +270,13 @@ export function useTransaction(sessionId: string | null) {
     } finally {
       setBusy('none');
     }
-  }, [adoptarCesta, aplicarSnapshot, sessionId, snapshot]);
+  }, [adoptarCesta, aplicarSnapshot, programarPreflight, sessionId, snapshot]);
 
   const verify = useCallback(async () => {
     if (!sessionId || tx.ops.length === 0) return null;
     setBusy('verifying');
+    if (preflightTimer.current) window.clearTimeout(preflightTimer.current);
+    preflightCtrl.current?.abort();
     setTx((t) => ({ ...t, phase: 'VERIFYING', error: null, saved: null }));
     try {
       const res = await studioApi.verifyAndExport(sessionId);

@@ -9,6 +9,7 @@ interface OutlinerProps {
   pageLoading: boolean;
   selectedNodeId: string | null;
   stagedNodeIds: Set<string>;
+  editedTexts?: Record<string, string>;
   currentPage: number;
   loading: boolean;
   uiMode: 'user' | 'technical';
@@ -43,6 +44,7 @@ export const Outliner: React.FC<OutlinerProps> = ({
   pageLoading,
   selectedNodeId,
   stagedNodeIds,
+  editedTexts = {},
   currentPage,
   loading,
   uiMode,
@@ -58,12 +60,13 @@ export const Outliner: React.FC<OutlinerProps> = ({
     return (pageNodes[currentPage] ?? []).filter((n) => {
       if (typeof n.page !== 'number') return false;
       if (uiMode === 'user' && (n.type === 'GROUP' || n.type === 'PAGE' || n.type === 'DOCUMENT')) return false;
-      if (n.type === 'TEXT' && !(n.text || '').trim()) return false; // espacios: no hay nada que editar
+      const texto = editedTexts[n.id] ?? n.text ?? '';
+      if (n.type === 'TEXT' && !texto.trim()) return false; // espacios: no hay nada que editar
       if (filter !== 'ALL' && n.type !== filter) return false;
-      if (q && !(n.text || '').toLowerCase().includes(q) && !n.id.toLowerCase().includes(q)) return false;
+      if (q && !texto.toLowerCase().includes(q) && !n.id.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [pageNodes, currentPage, filter, query, uiMode]);
+  }, [editedTexts, pageNodes, currentPage, filter, query, uiMode]);
 
   const pages = useMemo(() => Array.from({ length: pageCount }, (_, i) => i), [pageCount]);
   const listRef = useRef<HTMLUListElement>(null);
@@ -152,11 +155,11 @@ export const Outliner: React.FC<OutlinerProps> = ({
                               data-node-id={n.id}
                               aria-pressed={selectedNodeId === n.id}
                               onClick={() => onSelectNode(n.id, page)}
-                              title={n.text || n.id}
+                              title={editedTexts[n.id] ?? n.text ?? n.id}
                             >
                               {icon(n.type)}
                               <span className="tree-item-text">
-                                {n.text || (uiMode === 'technical' ? n.id : TYPE_LABEL[n.type] ?? n.type)}
+                                {editedTexts[n.id] ?? n.text ?? (uiMode === 'technical' ? n.id : TYPE_LABEL[n.type] ?? n.type)}
                                 <span className="sr-only">, {TYPE_LABEL[n.type] ?? n.type}</span>
                               </span>
                               {stagedNodeIds.has(n.id) ? (

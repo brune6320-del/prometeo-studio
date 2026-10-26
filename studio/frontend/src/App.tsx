@@ -80,6 +80,8 @@ const Studio: React.FC<{
   const [rightOpen, setRightOpen] = useState(() => window.innerWidth > 1000);
   const [narrowPanels, setNarrowPanels] = useState(() => window.innerWidth <= 1000);
   const wasNarrow = useRef(window.innerWidth <= 1000);
+  // El panel inferior nunca se come el visor: a 600 px de alto aún queda página visible.
+  const altoDockSeguro = (valor: number) => Math.round(Math.max(160, Math.min(560, valor, window.innerHeight * 0.42, window.innerHeight - 260)));
   const [dockHeight, setDockHeight] = useState(() => Math.round(Math.max(170, Math.min(260, window.innerHeight * 0.3))));
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -93,6 +95,7 @@ const Studio: React.FC<{
       setNarrowPanels(narrow);
       setLeftOpen(!narrow);
       setRightOpen(!narrow);
+      setDockHeight((height) => altoDockSeguro(height));
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
@@ -100,6 +103,9 @@ const Studio: React.FC<{
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [agentThinking, setAgentThinking] = useState(false);
   const [sessionLost, setSessionLost] = useState<ApiError | null>(null);
+  /** Texto optimista por nodo: se ve mientras el motor confirma el cambio en memoria. */
+  const [textEdits, setTextEdits] = useState<Record<string, string>>({});
+  const [inlineError, setInlineError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const left = useResizable(280, 200, 480);
   const right = useResizable(340, 280, 520, true);
@@ -112,6 +118,8 @@ const Studio: React.FC<{
     setViewMode('original');
     setAgentMessages([]);
     setDockTab('changes');
+    setTextEdits({});
+    setInlineError(null);
     if (sessionId) setSessionLost(null);
   }, [sessionId]);
 
@@ -161,7 +169,38 @@ const Studio: React.FC<{
   }, [backend.phase, sessionId, docs]);
 
   const stagedNodeIds = useMemo(() => new Set(tx.ops.map((o) => o.node_id)), [tx.ops]);
+  const editedTexts = useMemo(() => {
+    const confirmados = Object.fromEntries(tx.ops.filter((op) => op.node_id).map((op) => [op.node_id, op.new_text]));
+    return { ...confirmados, ...textEdits };
+  }, [tx.ops, textEdits]);
   const compare = useVerifiedPage(sessionId, docs.currentPage, tx.phase === 'VERIFIED' && viewMode === 'compare', tx.lastResponse?.output_sha256 ?? null);
+
+  /** Edición en el sitio: se pinta ya y se acumula en la sesión de trabajo (sin archivo nuevo). */
+  const editarTextoEnSitio = useCallback((nodeId: string, newText: string) => {
+    setTextEdits((prev) => ({ ...prev, [nodeId]: newText }));
+    setInlineError(null);
+    setDockOpen(true);
+    setDockTab('changes');
+    stageText(nodeId, newText)
+      .then(() => {
+        // La cesta del motor ya es la fuente de verdad; se retira el texto optimista si coincide.
+        setTextEdits((prev) => {
+          if (prev[nodeId] !== newText) return prev;
+          const next = { ...prev };
+          delete next[nodeId];
+          return next;
+        });
+      })
+      .catch((err) => {
+        const e = normalizeError(err, 'STAGING');
+        setInlineError(e.message);
+        setTextEdits((prev) => {
+          const next = { ...prev };
+          delete next[nodeId];
+          return next;
+        });
+      });
+  }, [stageText]);
 
   const selectNode = useCallback(
     (id: string, page?: number) => {
@@ -189,7 +228,7 @@ const Studio: React.FC<{
       setViewMode('compare');
     } else if (res) {
       // El motivo del fallo vive en «Verificación»: se le da altura suficiente para leerlo.
-      setDockHeight((height) => Math.min(560, Math.max(height, Math.min(window.innerHeight - 170, 380))));
+      setDockHeight((height) => altoDockSeguro(Math.max(height, Math.min(window.innerHeight - 200, 380))));
     }
   }, [verify]);
 
@@ -379,6 +418,11 @@ const Studio: React.FC<{
           </Notice>
         )}
         {docs.doc && docs.loadError && <ErrorNotice error={docs.loadError} onRetry={retryLoadGuarded} onDismiss={docs.dismissLoadError} />}
+        {inlineError && (
+          <Notice tone="warn" title="El cambio no se pudo guardar en la sesión" onDismiss={() => setInlineError(null)}>
+            <p className="notice-text">{inlineError} El original no cambió. Vuelve a intentarlo.</p>
+          </Notice>
+        )}
         {tx.error && (
           <ErrorNotice
             error={tx.error}
@@ -435,6 +479,7 @@ const Studio: React.FC<{
           pageLoading={docs.pageNodesLoading}
           selectedNodeId={selectedNodeId}
           stagedNodeIds={stagedNodeIds}
+          editedTexts={editedTexts}
           currentPage={docs.currentPage}
           loading={loading}
           uiMode={uiMode}
@@ -449,6 +494,8 @@ const Studio: React.FC<{
             nodesOnPage={docs.nodesOnPage}
             selectedNodeId={selectedNodeId}
             stagedNodeIds={stagedNodeIds}
+            editedTexts={editedTexts}
+            onInlineEdit={editarTextoEnSitio}
             onSelectNode={(id) => selectNode(id)}
             currentPage={docs.currentPage}
             pageCount={docs.pageCount}
@@ -505,11 +552,11 @@ const Studio: React.FC<{
             }}
             onPointerMove={(e) => {
               if (!(e.buttons & 1)) return;
-              setDockHeight(Math.max(160, Math.min(560, startDock.current.h - (e.clientY - startDock.current.y))));
+              setDockHeight(altoDockSeguro(startDock.current.h - (e.clientY - startDock.current.y)));
             }}
             onKeyDown={(e) => {
-              if (e.key === 'ArrowUp') setDockHeight((h) => Math.min(560, h + 24));
-              else if (e.key === 'ArrowDown') setDockHeight((h) => Math.max(160, h - 24));
+              if (e.key === 'ArrowUp') setDockHeight((h) => altoDockSeguro(h + 24));
+              else if (e.key === 'ArrowDown') setDockHeight((h) => altoDockSeguro(h - 24));
             }}
           />
         )}
@@ -541,6 +588,16 @@ const Studio: React.FC<{
               </button>
             ))}
           </div>
+          {tx.ops.length > 0 && tx.phase !== 'VERIFIED' && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleVerify()} disabled={busy === 'verifying'} title="Crear la copia nueva y verificada (SHA-256)">
+              <ShieldCheck size={13} aria-hidden="true" /> Exportar copia
+            </button>
+          )}
+          {tx.phase === 'VERIFIED' && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => void handleSave()} disabled={busy === 'saving'} title="Guardar la copia verificada">
+              <ShieldCheck size={13} aria-hidden="true" /> Guardar copia
+            </button>
+          )}
           <button className="btn btn-ghost btn-icon btn-sm" onClick={() => setDockOpen((v) => !v)} aria-label={dockOpen ? 'Contraer panel inferior' : 'Expandir panel inferior'} aria-expanded={dockOpen}>
             {dockOpen ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
           </button>
@@ -548,7 +605,7 @@ const Studio: React.FC<{
         {dockOpen && (
           <div className="dock-body" role="tabpanel" id="dock-panel" aria-labelledby={`tab-${dockTab}`}>
             {dockTab === 'changes' && (
-              <TransactionTray ops={tx.ops} phase={tx.phase} verifying={busy === 'verifying'} uiMode={uiMode} onRemove={remove} onClear={clear} onVerify={handleVerify} onUndo={() => void undo()} onRedo={() => void redo()} canUndo={canUndo} canRedo={canRedo} />
+              <TransactionTray ops={tx.ops} phase={tx.phase} verifying={busy === 'verifying'} preflight={tx.preflight} preflightBusy={tx.preflightBusy} uiMode={uiMode} onRemove={remove} onClear={clear} onVerify={handleVerify} onUndo={() => void undo()} onRedo={() => void redo()} canUndo={canUndo} canRedo={canRedo} />
             )}
             {dockTab === 'verification' && (
               <VerifierPanel

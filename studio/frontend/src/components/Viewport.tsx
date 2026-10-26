@@ -13,6 +13,9 @@ interface ViewportProps {
   nodesOnPage: NodeSummary[];
   selectedNodeId: string | null;
   stagedNodeIds: Set<string>;
+  /** Texto ya editado en memoria: se pinta al instante, sin esperar a un archivo. */
+  editedTexts: Record<string, string>;
+  onInlineEdit: (nodeId: string, newText: string) => void;
   onSelectNode: (id: string) => void;
   currentPage: number;
   pageCount: number;
@@ -34,11 +37,71 @@ interface ViewportProps {
 
 const ZOOMS = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4, 6, 8];
 
+/**
+ * La página se pinta como imagen. Si el motor devuelve una imagen vacía o rota,
+ * antes quedaba un papel blanco sin explicación; ahora se ve el motivo y se puede
+ * volver a pedir. `data-painted` lo comprueban las pruebas de píxeles.
+ */
+const PageImage: React.FC<{ src: string; alt: string; width: number; height: number; onRetry: () => void }> = ({ src, alt, width, height, onRetry }) => {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (failed || !src) {
+    return (
+      <div className="page-unpainted" role="alert" data-testid="pdf-page-unpainted">
+        <strong>La página no se pintó</strong>
+        <span>El motor no devolvió una imagen legible. Tu original sigue intacto.</span>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={onRetry}>Volver a dibujar</button>
+      </div>
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      width={width}
+      height={height}
+      draggable={false}
+      data-testid="pdf-page-image"
+      onLoad={(event) => {
+        const img = event.currentTarget;
+        img.dataset.painted = img.naturalWidth > 0 && img.naturalHeight > 0 ? 'si' : 'no';
+        if (img.naturalWidth === 0) setFailed(true);
+      }}
+      onError={() => setFailed(true)}
+    />
+  );
+};
+
 export const Viewport: React.FC<ViewportProps> = (p) => {
   const [zoom, setZoom] = useState(1);
   const [showFrames, setShowFrames] = useState(true);
+  const [editNodeId, setEditNodeId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const editCancelado = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
   const data = p.render.data;
+
+  const empezarEdicion = (id: string, texto: string) => {
+    editCancelado.current = false;
+    setEditNodeId(id);
+    setDraft(texto);
+    window.requestAnimationFrame(() => {
+      const input = editInputRef.current;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    });
+  };
+  const cerrarEdicion = (aceptar: boolean) => {
+    const id = editNodeId;
+    if (!id) return;
+    const original = p.editedTexts[id] ?? p.nodesOnPage.find((n) => n.id === id)?.text ?? '';
+    const texto = draft;
+    setEditNodeId(null);
+    if (aceptar && !editCancelado.current && texto !== original) p.onInlineEdit(id, texto);
+  };
 
   const metrics = useMemo(
     () => ({ scaleFactor: zoom, offsetX: 0, offsetY: 0, viewportWidthPx: (data?.width_pt ?? 612) * zoom, viewportHeightPx: (data?.height_pt ?? 792) * zoom }),
@@ -67,6 +130,22 @@ export const Viewport: React.FC<ViewportProps> = (p) => {
     const available = (el.clientWidth - 64 - (columns - 1) * 32) / columns;
     setZoom(Math.max(0.25, Math.min(8, available / data.width_pt)));
   };
+
+  // En una ventana estrecha la página a 100 % puede quedar más ancha que el visor:
+  // se ajusta al ancho una vez por página para que el contenido nunca quede fuera.
+  const ajustadaPara = useRef('');
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!data || !el) return;
+    const clave = `${data.page_number}:${data.width_pt}:${p.viewMode}`;
+    if (ajustadaPara.current === clave) return;
+    ajustadaPara.current = clave;
+    const columns = p.viewMode === 'compare' ? 2 : 1;
+    const disponible = (el.clientWidth - 64 - (columns - 1) * 32) / columns;
+    if (disponible > 0 && data.width_pt > disponible) {
+      setZoom(Math.max(0.25, Math.min(1, disponible / data.width_pt)));
+    }
+  }, [data, p.viewMode]);
 
   /** ⇧2 en PDF: encuadra el nodo seleccionado; sin nodo, la página completa. */
   const fitSelection = () => {
@@ -140,7 +219,7 @@ export const Viewport: React.FC<ViewportProps> = (p) => {
           </figcaption>
         )}
         <div className={`page-paper ${p.render.status === 'loading' && opts.interactive ? 'is-loading' : ''}`} style={{ width: w, height: h }}>
-          <img src={img.image_data_url} alt={`${opts.label ?? 'Página'} ${p.currentPage + 1}`} width={w} height={h} draggable={false} />
+          <PageImage src={img.image_data_url} alt={`${opts.label ?? 'Página'} ${p.currentPage + 1}`} width={w} height={h} onRetry={p.onRetryRender} />
           {opts.interactive && showFrames && (
             <div>
               {selectableNodes.map((n) => {
@@ -151,23 +230,57 @@ export const Viewport: React.FC<ViewportProps> = (p) => {
                   p.selectedNodeId === n.id ? 'is-selected' : '',
                   p.stagedNodeIds.has(n.id) ? 'is-staged' : '',
                 ].join(' ');
+                const textoVisible = p.editedTexts[n.id] ?? n.text;
+                const editando = editNodeId === n.id;
                 return (
                   <div
                     key={n.id}
                     data-node-id={n.id}
-                    className={cls}
+                    className={`${cls} ${p.editedTexts[n.id] !== undefined ? 'has-edit' : ''} ${editando ? 'is-editing' : ''}`}
                     style={{ left: r.left, top: r.top, width: r.width, height: r.height }}
-                    onClick={() => p.onSelectNode(n.id)}
-                    title={n.text || n.id}
-                    aria-label={n.type === 'TEXT' ? `Texto: ${n.text}` : undefined}
+                    onClick={() => { if (!editando) p.onSelectNode(n.id); }}
+                    onDoubleClick={(event) => {
+                      if (n.type !== 'TEXT' || !textoVisible) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      empezarEdicion(n.id, textoVisible);
+                    }}
+                    title={n.type === 'TEXT' ? 'Doble clic para editar este texto en el visor' : n.id}
+                    aria-label={n.type === 'TEXT' ? `Texto: ${textoVisible}` : undefined}
                   >
-                    {n.type === 'TEXT' && n.text && (
+                    {n.type === 'TEXT' && textoVisible && !editando && (
                       <span
                         className="overlay-text-content"
                         style={{ fontSize: Math.max(4, r.height * 0.82), lineHeight: 1 }}
-                      >{n.text}</span>
+                      >{textoVisible}</span>
                     )}
-                    {p.showStagedTags && p.stagedNodeIds.has(n.id) && <span className="overlay-tag">Preparado</span>}
+                    {editando && (
+                      <input
+                        ref={editInputRef}
+                        className="overlay-text-input"
+                        value={draft}
+                        aria-label="Editar texto del documento"
+                        maxLength={2000}
+                        style={{ fontSize: Math.max(4, r.height * 0.82) }}
+                        onChange={(event) => setDraft(event.target.value)}
+                        onClick={(event) => event.stopPropagation()}
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onDoubleClick={(event) => event.stopPropagation()}
+                        onBlur={() => cerrarEdicion(true)}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            cerrarEdicion(true);
+                          } else if (event.key === 'Escape') {
+                            event.preventDefault();
+                            editCancelado.current = true;
+                            cerrarEdicion(false);
+                          }
+                        }}
+                      />
+                    )}
+                    {p.showStagedTags && p.stagedNodeIds.has(n.id) && <span className="overlay-tag">{p.editedTexts[n.id] !== undefined ? 'Editado' : 'Preparado'}</span>}
                   </div>
                 );
               })}
