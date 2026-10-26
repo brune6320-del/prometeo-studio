@@ -118,16 +118,14 @@ def _kmeans_lab_ponderado(
     alto = len(pixeles_lab)
     ancho = len(pixeles_lab[0]) if alto > 0 else 0
 
-    # Ignorar el 2% exterior si hay reborde de escaneo para no distorsionar la paleta
     pad_y = max(0, int(alto * 0.02))
     pad_x = max(0, int(ancho * 0.02))
     y_ini, y_fin = pad_y, max(pad_y + 1, alto - pad_y)
     x_ini, x_fin = pad_x, max(pad_x + 1, ancho - pad_x)
     total_px = float(max(1, (y_fin - y_ini) * (x_fin - x_ini)))
 
-    # 1. Agrupar píxeles en celdas cuantizadas de Lab (paso 3.0 unidades) con peso exacto de área
     celdas: Dict[Tuple[int, int, int], List[float]] = {}
-    paso = 3.0
+    paso = 2.5
     for y in range(y_ini, y_fin):
         fila = pixeles_lab[y]
         for x in range(x_ini, x_fin):
@@ -151,18 +149,18 @@ def _kmeans_lab_ponderado(
     if len(muestras) <= k:
         return muestras
 
-    # 2. Inicialización k-means++ perceptual usando ΔE2000 para garantizar cobertura de tintas/acentos
+    # 2. Inicialización k-means++ perceptual usando ΔE2000
     centroides: List[Tuple[float, float, float]] = [muestras[0][0]]
     while len(centroides) < k:
         mejor_pt = muestras[0][0]
         mejor_score = -1.0
         for pt, peso in muestras:
-            if peso < 0.0015:
+            if peso < 0.0005:
                 continue
             dist_min_de = min(delta_e2000(pt, c) for c in centroides)
-            if dist_min_de < 10.0:
+            if dist_min_de < 4.5:
                 continue
-            score = (peso ** 0.22) * (dist_min_de ** 1.65)
+            score = (peso ** 0.18) * (dist_min_de ** 1.8)
             if score > mejor_score:
                 mejor_score = score
                 mejor_pt = pt
@@ -170,7 +168,8 @@ def _kmeans_lab_ponderado(
             break
         centroides.append(mejor_pt)
 
-    # 3. Iteraciones de Lloyd ponderadas por área
+    # 3. Iteraciones de Lloyd con amortiguación de área (w^0.4) en el paso de actualización
+    # para preservar acentos/tintas minoritarias, y cálculo final de proporción con área exacta (w^1.0).
     asignaciones = [0] * len(muestras)
     for _ in range(max_iter):
         cambio = False
@@ -178,7 +177,7 @@ def _kmeans_lab_ponderado(
             mejor_c = 0
             mejor_d = float("inf")
             for c_idx, c in enumerate(centroides):
-                d = (pt[0] - c[0]) ** 2 + (pt[1] - c[1]) ** 2 + (pt[2] - c[2]) ** 2
+                d = delta_e2000(pt, c)
                 if d < mejor_d:
                     mejor_d = d
                     mejor_c = c_idx
@@ -191,10 +190,11 @@ def _kmeans_lab_ponderado(
             sum_l, sum_a, sum_b, sum_w = 0.0, 0.0, 0.0, 0.0
             for i, (pt, w) in enumerate(muestras):
                 if asignaciones[i] == c_idx:
-                    sum_l += pt[0] * w
-                    sum_a += pt[1] * w
-                    sum_b += pt[2] * w
-                    sum_w += w
+                    w_eff = w ** 0.4
+                    sum_l += pt[0] * w_eff
+                    sum_a += pt[1] * w_eff
+                    sum_b += pt[2] * w_eff
+                    sum_w += w_eff
             if sum_w > 0.0:
                 nuevos_c.append((sum_l / sum_w, sum_a / sum_w, sum_b / sum_w))
             else:
@@ -203,23 +203,26 @@ def _kmeans_lab_ponderado(
         if not cambio:
             break
 
-    # 4. Calcular pesos por clúster y fusionar clústeres cercanos (ΔE2000 < 8.5)
-    pesos_cluster = [0.0] * len(centroides)
-    for i, (_, w) in enumerate(muestras):
-        pesos_cluster[asignaciones[i]] += w
+    # 4. Calcular centroide y proporción con pesos de área exactos (w) y fusionar si ΔE2000 < 4.2
+    clusters: List[Tuple[Tuple[float, float, float], float]] = []
+    for c_idx in range(len(centroides)):
+        sum_l, sum_a, sum_b, sum_w = 0.0, 0.0, 0.0, 0.0
+        for i, (pt, w) in enumerate(muestras):
+            if asignaciones[i] == c_idx:
+                sum_l += pt[0] * w
+                sum_a += pt[1] * w
+                sum_b += pt[2] * w
+                sum_w += w
+        if sum_w > 1e-4:
+            clusters.append(((sum_l / sum_w, sum_a / sum_w, sum_b / sum_w), sum_w))
 
-    clusters = [
-        (centroides[idx], pesos_cluster[idx])
-        for idx in range(len(centroides))
-        if pesos_cluster[idx] > 1e-4
-    ]
     clusters.sort(key=lambda x: x[1], reverse=True)
 
     fusionados: List[Tuple[Tuple[float, float, float], float]] = []
     for c_lab, w in clusters:
         unido = False
         for j, (ex_lab, ex_w) in enumerate(fusionados):
-            if delta_e2000(c_lab, ex_lab) < 8.5:
+            if delta_e2000(c_lab, ex_lab) < 4.2:
                 tot_w = ex_w + w
                 nuevo_lab = (
                     (ex_lab[0] * ex_w + c_lab[0] * w) / tot_w,
