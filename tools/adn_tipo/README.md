@@ -130,6 +130,10 @@ TRAIN; el antiguo holdout persistente está deshabilitado.
 Prerregistro v2 publicado antes del sellado en `b0de0bf`; SHA-256:
 `16b5a933c466c04eaa9a28e06dcb62ceb4be2c66b73e1391b1a16d546637d776`.
 Los umbrales son los mismos de v1, conservada en `examen/PRERREGISTRO-v1.md`.
+Validación v2: **30 pruebas pasan** (13 anteriores + 17 de examen), sin reentrenar.
+Evidencia: `resultados/pruebas_examen_v2.txt`. Ambos notebooks se validaron como
+JSON y se compilaron sus celdas Python; no se ejecutaron en Colab.
+El notebook de examen fija código `36ee1f29c86d58db01ee6bdaf2a2f0dc72e35df1`.
 No recibí ni abrí PDFs reales. Escaneados sin nativo emparejado no tienen
 etiquetas de estilo verificables: contados como NO EVALUABLE, métricas null.
 La parte nativa se mide con rasterización ruidosa y segmentación A conocida;
