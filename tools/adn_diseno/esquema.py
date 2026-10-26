@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validador del contrato de salida estudio.json (v1.0.0) para Forja 4."""
+"""Validador del contrato de salida estudio.json (v1.1.0) para Forja 4."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import math
 import re
 from typing import Any, Dict, List, Tuple
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 
 BLOQUES_OBLIGATORIOS: Tuple[str, ...] = (
     "paleta",
@@ -41,7 +41,7 @@ def _contiene_rgb_crudo(obj: Any, ruta: str = "paleta") -> List[str]:
 
 
 def validar_estudio(estudio: Dict[str, Any]) -> Tuple[bool, List[str]]:
-    """Valida que un diccionario estudio.json cumpla el contrato v1.0.0.
+    """Valida que un diccionario estudio.json cumpla el contrato v1.1.0.
 
     Devuelve (es_valido, lista_de_errores).
     """
@@ -66,7 +66,7 @@ def validar_estudio(estudio: Dict[str, Any]) -> Tuple[bool, List[str]]:
     if errores:
         return False, errores
 
-    # 1. Validación de paleta (Lab + proporción + ΔE2000, sin RGB crudo)
+    # 1. Validación de paleta (Lab + proporción + ΔE2000 + K adaptativo 3..10 + paleta_insuficiente)
     paleta = estudio["paleta"]
     errores.extend(_contiene_rgb_crudo(paleta, "paleta"))
 
@@ -93,9 +93,22 @@ def validar_estudio(estudio: Dict[str, Any]) -> Tuple[bool, List[str]]:
         if not math.isclose(suma_prop, 1.0, abs_tol=1e-2):
             errores.append(f"La suma de proporciones de paleta es {suma_prop:.4f} (esperado ~1.0).")
 
-    for sub in ("pares_delta_e2000", "matriz_delta_e2000", "armonia", "contraste_valores", "temperatura", "saturacion_media"):
+    for sub in (
+        "k_elegido",
+        "delta_e2000_cuantizacion_media",
+        "paleta_insuficiente",
+        "pares_delta_e2000",
+        "matriz_delta_e2000",
+        "armonia",
+        "contraste_valores",
+        "temperatura",
+        "saturacion_media",
+    ):
         if sub not in paleta:
             errores.append(f"Falta subcampo obligatorio 'paleta.{sub}'.")
+
+    if "paleta_insuficiente" in paleta and not isinstance(paleta["paleta_insuficiente"], bool):
+        errores.append("paleta.paleta_insuficiente debe ser booleano (true/false).")
 
     # 2. Validación de retícula
     reticula = estudio["reticula"]

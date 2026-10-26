@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Análisis de composición editorial: retícula, vacío/aire, jerarquía y escala tipográfica (D-10).
 
-Opera exclusivamente sobre la matriz CIE L*a*b* del referente.
+Opera exclusivamente sobre la matriz CIE L*a*b* del referente y calcula la confianza de cada
+bloque mediante fórmulas continuas sobre el residuo/SNR espacial de la imagen (Ley 8, sin constantes fijas).
 """
 
 from __future__ import annotations
@@ -31,7 +32,6 @@ def _estimar_color_fondo_lab(
     if alto < 4 or ancho < 4:
         return pixeles_lab[0][0] if (alto and ancho) else (95.0, 0.0, 0.0)
 
-    # Evitar el 3% del borde exterior (posible marco de escaneo de museo)
     y0 = max(1, int(alto * 0.03))
     y1 = min(alto - 1, max(y0 + 1, int(alto * 0.97)))
     x0 = max(1, int(ancho * 0.03))
@@ -56,7 +56,6 @@ def _estimar_color_fondo_lab(
                 acc[3] += 1.0
 
     if not bins:
-        # Si toda la imagen tiene textura alta, usar todos los píxeles interiores
         for y in range(y0, y1):
             for x in range(x0, x1):
                 l_v, a_v, b_v = pixeles_lab[y][x]
@@ -74,19 +73,25 @@ def _estimar_color_fondo_lab(
 def _calcular_mapas_actividad(
     pixeles_lab: List[List[Tuple[float, float, float]]],
     fondo_lab: Tuple[float, float, float],
-) -> Tuple[List[List[float]], List[List[float]], List[List[float]], List[List[bool]]]:
-    """Calcula mapa de peso visual W(y,x), gradientes |∂x L*|, |∂y L*| y máscara de aire/vacío."""
+) -> Tuple[List[List[float]], List[List[float]], List[List[float]], List[List[bool]], float, float, float]:
+    """Calcula mapa de peso visual W(y,x), gradientes |∂x L*|, |∂y L*|, máscara de aire/vacío y métricas de limpieza."""
     alto = len(pixeles_lab)
     ancho = len(pixeles_lab[0]) if alto > 0 else 0
+    total_px = float(max(1, alto * ancho))
 
     peso_visual: List[List[float]] = [[0.0] * ancho for _ in range(alto)]
     grad_x: List[List[float]] = [[0.0] * ancho for _ in range(alto)]
     grad_y: List[List[float]] = [[0.0] * ancho for _ in range(alto)]
     es_aire: List[List[bool]] = [[True] * ancho for _ in range(alto)]
 
-    # Ignorar reborde de escaneo en el 3% exterior para que no contamine gradientes ni figura
     borde_y = max(1, int(alto * 0.03))
     borde_x = max(1, int(ancho * 0.03))
+
+    conteo_liso = 0
+    suma_de_figura = 0.0
+    cnt_figura = 0
+    suma_ruido_aire = 0.0
+    cnt_aire = 0
 
     for y in range(alto):
         y_prev = max(0, y - 1)
@@ -108,28 +113,37 @@ def _calcular_mapas_actividad(
             gy = dl_y + da_y
             g_mag = math.hypot(gx, gy)
 
+            if g_mag < 4.5:
+                conteo_liso += 1
+
             if en_marco_y or en_marco_x:
-                # Si está en el fino reborde exterior de escaneo y es muy claro (L*>82), tratar como margen/aire
                 if px_lab[0] > 80.0 or de_fondo < 12.0:
                     grad_x[y][x] = 0.0
                     grad_y[y][x] = 0.0
                     es_aire[y][x] = True
                     peso_visual[y][x] = 0.0
+                    cnt_aire += 1
                     continue
 
             grad_x[y][x] = gx
             grad_y[y][x] = gy
 
-            # Aire/espacio negativo: cercano al color del soporte/fondo (ΔE2000 < 10.5) y sin borde fuerte
             aire = (de_fondo < 10.5) and (g_mag < 5.0)
             es_aire[y][x] = aire
 
             if aire:
                 peso_visual[y][x] = 0.0
+                suma_ruido_aire += de_fondo + g_mag
+                cnt_aire += 1
             else:
                 peso_visual[y][x] = de_fondo + 0.9 * g_mag
+                suma_de_figura += de_fondo
+                cnt_figura += 1
 
-    return peso_visual, grad_x, grad_y, es_aire
+    frac_liso = conteo_liso / total_px
+    media_de_fig = (suma_de_figura / float(cnt_figura)) if cnt_figura > 0 else 0.0
+    media_ruido_aire = (suma_ruido_aire / float(cnt_aire)) if cnt_aire > 0 else 15.0
+    return peso_visual, grad_x, grad_y, es_aire, frac_liso, media_de_fig, media_ruido_aire
 
 
 def _suavizar_1d(arr: List[float], radio: int = 2) -> List[float]:
@@ -154,7 +168,6 @@ def _detectar_picos_1d(
     n = len(perfil)
     if n < 5:
         return []
-    # Ignorar el 3% extremo al buscar el máximo para evitar artefactos de borde de imagen
     i0 = max(1, int(n * 0.03))
     i1 = min(n - 1, max(i0 + 2, int(n * 0.97)))
     max_v = max(perfil[i0:i1], default=0.0)
@@ -265,8 +278,8 @@ def _segmentar_regiones_jerarquia(
     peso_visual: List[List[float]],
     es_aire: List[List[bool]],
     fondo_lab: Tuple[float, float, float],
-) -> List[Dict[str, Any]]:
-    """Segmenta regiones activas en una rejilla morfológica 64x64 por coherencia cromática Lab."""
+) -> Tuple[List[Dict[str, Any]], float]:
+    """Segmenta regiones activas en una rejilla morfológica 64x64 y devuelve (niveles, fraccion_peso_explicada)."""
     alto = len(pixeles_lab)
     ancho = len(pixeles_lab[0]) if alto > 0 else 0
     gh = min(64, alto)
@@ -275,6 +288,7 @@ def _segmentar_regiones_jerarquia(
     celda_activa = [[False] * gw for _ in range(gh)]
     celda_peso = [[0.0] * gw for _ in range(gh)]
     celda_lab: List[List[Tuple[float, float, float]]] = [[fondo_lab] * gw for _ in range(gh)]
+    peso_activo_total_grilla = 0.0
 
     for cy in range(gh):
         y0 = int(cy * alto / gh)
@@ -299,7 +313,9 @@ def _segmentar_regiones_jerarquia(
                         sum_b += b_v
             if cnt_act > 0 and (cnt_act / float(tot_c)) >= 0.25:
                 celda_activa[cy][cx] = True
-                celda_peso[cy][cx] = sum_w / float(tot_c)
+                w_celda = sum_w / float(tot_c)
+                celda_peso[cy][cx] = w_celda
+                peso_activo_total_grilla += w_celda
                 celda_lab[cy][cx] = (sum_l / cnt_act, sum_a / cnt_act, sum_b / cnt_act)
 
     visitado = [[False] * gw for _ in range(gh)]
@@ -321,7 +337,6 @@ def _segmentar_regiones_jerarquia(
                     for dy, dx in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                         ny, nx = y_c + dy, x_c + dx
                         if 0 <= ny < gh and 0 <= nx < gw and celda_activa[ny][nx] and not visitado[ny][nx]:
-                            # Conectar si mantiene coherencia tanto con el vecino como con la semilla de la figura
                             if (
                                 delta_e2000(celda_lab[ny][nx], lab_actual) < 14.0
                                 and delta_e2000(celda_lab[ny][nx], lab_semilla) < 18.0
@@ -369,19 +384,27 @@ def _segmentar_regiones_jerarquia(
                     }
                 )
 
-    if not componentes:
-        componentes.append(
+    componentes.sort(key=lambda c: c["peso_bruto"], reverse=True)
+    top_comp = componentes[:8]
+    peso_top = sum(c["peso_bruto"] for c in top_comp)
+    fraccion_explicada = (
+        min(1.0, peso_top / peso_activo_total_grilla)
+        if peso_activo_total_grilla > 1e-6
+        else 0.0
+    )
+
+    if not top_comp:
+        top_comp = [
             {
                 "caja_rel": [0.1, 0.1, 0.8, 0.8],
                 "area_rel": 0.5,
                 "peso_bruto": 1.0,
                 "centro_rel": (0.5, 0.5),
-                "contraste_local_delta_e2000": 20.0,
+                "contraste_local_delta_e2000": 10.0,
             }
-        )
+        ]
+        fraccion_explicada = 0.0
 
-    componentes.sort(key=lambda c: c["peso_bruto"], reverse=True)
-    top_comp = componentes[:8]
     suma_peso = sum(c["peso_bruto"] for c in top_comp) or 1.0
 
     niveles_out: List[Dict[str, Any]] = []
@@ -408,16 +431,17 @@ def _segmentar_regiones_jerarquia(
             }
         )
 
-    return niveles_out
+    return niveles_out, fraccion_explicada
 
 
 def _analizar_escala_tipografica(
     grad_x: List[List[float]],
     grad_y: List[List[float]],
     es_aire: List[List[bool]],
+    frac_liso: float,
     ruta_referente: Optional[Path] = None,
 ) -> Tuple[Dict[str, Any], float, str]:
-    """Detecta bandas tipográficas y llama a tools/adn_tipo/ (D-10) si existe en el repo."""
+    """Detecta bandas tipográficas, llama a tools/adn_tipo/ si existe y calcula confianza continua."""
     alto = len(grad_x)
     ancho = len(grad_x[0]) if alto > 0 else 0
 
@@ -456,6 +480,10 @@ def _analizar_escala_tipografica(
         perfil_texto_y.append(densidad_fila)
 
     max_ty = max(perfil_texto_y, default=0.0)
+    ord_ty = sorted(perfil_texto_y)
+    mediana_ty = ord_ty[len(ord_ty) // 2] if ord_ty else 0.0
+    snr_bandas = (max_ty - mediana_ty) / (max_ty + mediana_ty + 1.5)
+
     umbral_linea = max(1.8, max_ty * 0.25)
     bandas: List[Tuple[int, int]] = []
     en_banda = False
@@ -514,11 +542,18 @@ def _analizar_escala_tipografica(
     densidad_tipografica = round(sum(z["caja_rel"][2] * z["caja_rel"][3] for z in zonas_texto), 4)
 
     fuente_str = "tools/adn_tipo" if (adn_tipo_disponible and datos_adn_tipo is not None) else "hueco_estimacion_estructural"
-    confianza = 0.90 if datos_adn_tipo is not None else (0.76 if hay_texto else 0.65)
+
+    # Confianza continua (Ley 8): producto de la limpieza estructural del lienzo (frac_liso)
+    # y la relación señal-a-ruido de las bandas horizontales (o pureza de ausencia de ruido).
+    confianza_continua = max(
+        0.0,
+        min(1.0, frac_liso * (0.50 + 0.50 * snr_bandas)),
+    )
+
     nota = (
         "Integrado con tools/adn_tipo/ (D-10)."
         if datos_adn_tipo is not None
-        else "Hueco reservado para D-10 (tools/adn_tipo/ no presente en la rama local); estimación estructural por bandas de gradiente horizontal activa."
+        else f"Hueco D-10 activo; SNR de bandas horizontales={snr_bandas:.3f}, limpieza={frac_liso:.3f}."
     )
 
     bloque_escala = {
@@ -532,22 +567,31 @@ def _analizar_escala_tipografica(
         "zonas_texto_rel": zonas_texto[:10],
         "datos_adn_tipo": datos_adn_tipo,
     }
-    return bloque_escala, confianza, nota
+    return bloque_escala, round(confianza_continua, 4), nota
 
 
 def estudiar_composicion(
     pixeles_lab: List[List[Tuple[float, float, float]]],
     ruta_referente: Optional[Path] = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any], Dict[str, Any], Dict[str, float], Dict[str, str]]:
-    """Produce los bloques (reticula, escala_tipografica, vacio, jerarquia) y sus confianzas."""
+    """Produce los bloques (reticula, escala_tipografica, vacio, jerarquia) y sus confianzas continuas."""
     alto = len(pixeles_lab)
     ancho = len(pixeles_lab[0]) if alto > 0 else 0
     total_px = float(max(1, alto * ancho))
 
     fondo_lab = _estimar_color_fondo_lab(pixeles_lab)
-    peso_visual, grad_x, grad_y, es_aire = _calcular_mapas_actividad(pixeles_lab, fondo_lab)
+    (
+        peso_visual,
+        grad_x,
+        grad_y,
+        es_aire,
+        frac_liso,
+        media_de_fig,
+        media_ruido_aire,
+    ) = _calcular_mapas_actividad(pixeles_lab, fondo_lab)
 
     conteo_aire = 0
+    conteo_aire_contiguo = 0
     mitad_y = alto // 2
     mitad_x = ancho // 2
     aire_cuad = {"sup_izq": [0, 0], "sup_der": [0, 0], "inf_izq": [0, 0], "inf_der": [0, 0]}
@@ -563,8 +607,12 @@ def estudiar_composicion(
 
     for y in range(alto):
         y_rel = (y + 0.5) / float(alto)
+        y_prev = max(0, y - 1)
+        y_next = min(alto - 1, y + 1)
         for x in range(ancho):
             x_rel = (x + 0.5) / float(ancho)
+            x_prev = max(0, x - 1)
+            x_next = min(ancho - 1, x + 1)
             clave_c = (
                 ("sup_izq" if x < mitad_x else "sup_der")
                 if y < mitad_y
@@ -574,6 +622,13 @@ def estudiar_composicion(
             if es_aire[y][x]:
                 conteo_aire += 1
                 aire_cuad[clave_c][0] += 1
+                if (
+                    es_aire[y_prev][x]
+                    and es_aire[y_next][x]
+                    and es_aire[y][x_prev]
+                    and es_aire[y][x_next]
+                ):
+                    conteo_aire_contiguo += 1
             else:
                 ocupacion_x[x] += 1.0 / float(alto)
                 ocupacion_y[y] += 1.0 / float(ancho)
@@ -588,6 +643,7 @@ def estudiar_composicion(
 
     prop_aire = conteo_aire / total_px
     pct_aire = prop_aire * 100.0
+    contig_aire = (conteo_aire_contiguo / float(conteo_aire)) if conteo_aire > 0 else 0.0
 
     if sum_peso > 1e-6:
         cx_peso = sum_wx / sum_peso
@@ -702,7 +758,9 @@ def estudiar_composicion(
     paso_h, reg_h = _autocorrelacion_paso(_suavizar_1d(borde_vert_x, radio=1))
     regularidad_ritmica = round(max(reg_v, reg_h), 4)
 
-    niveles_jer = _segmentar_regiones_jerarquia(pixeles_lab, peso_visual, es_aire, fondo_lab)
+    niveles_jer, fraccion_peso_explicada = _segmentar_regiones_jerarquia(
+        pixeles_lab, peso_visual, es_aire, fondo_lab
+    )
     area_max = max((n["area_rel"] for n in niveles_jer), default=1.0) or 1.0
     peso_max = max((n["peso_visual_rel"] for n in niveles_jer), default=1.0) or 1.0
 
@@ -773,20 +831,69 @@ def estudiar_composicion(
     }
 
     bloque_escala, conf_escala, nota_escala = _analizar_escala_tipografica(
-        grad_x, grad_y, es_aire, ruta_referente=ruta_referente
+        grad_x, grad_y, es_aire, frac_liso, ruta_referente=ruta_referente
+    )
+
+    # --- Cálculo continuo de confianzas sobre la señal de la imagen (Ley 8, sin constantes fijas) ---
+    # 1. Retícula: coeficiente de variación de los perfiles de borde proyectados + fracción lisa del soporte
+    def _cv_perfil(arr: List[float]) -> float:
+        if not arr:
+            return 0.0
+        m = sum(arr) / float(len(arr))
+        if m <= 1e-6:
+            return 0.0
+        v = sum((x - m) ** 2 for x in arr) / float(len(arr))
+        return math.sqrt(max(0.0, v)) / m
+
+    cv_bordes = 0.5 * (_cv_perfil(borde_vert_x) + _cv_perfil(borde_horiz_y))
+    snr_ejes = cv_bordes / (cv_bordes + 0.45)
+    conf_reticula = max(
+        0.0,
+        min(
+            1.0,
+            frac_liso * (0.60 * snr_ejes + 0.20 * reg_col + 0.20 * max(afin_tercios, afin_aurea)),
+        ),
+    )
+
+    # 2. Vacío: contigüidad espacial del aire + separabilidad bimodal figura/aire
+    sep_bimodal = media_de_fig / (media_de_fig + media_ruido_aire + 4.0)
+    conf_vacio = max(
+        0.0,
+        min(1.0, 0.55 * contig_aire + 0.45 * sep_bimodal * frac_liso),
+    )
+
+    # 3. Jerarquía: fracción de peso visual explicada por regiones conexas * contraste medio de las regiones
+    contraste_medio_reg = (
+        sum(n["contraste_local_delta_e2000"] * n["peso_visual_rel"] for n in niveles_jer)
+        if niveles_jer
+        else 0.0
+    )
+    factor_contraste_jer = contraste_medio_reg / (contraste_medio_reg + 10.0)
+    conf_jerarquia = max(
+        0.0,
+        min(1.0, fraccion_peso_explicada * (0.60 * frac_liso + 0.40 * factor_contraste_jer)),
     )
 
     confianzas = {
-        "reticula": 0.90 if (ejes_v or ejes_h) else 0.75,
-        "escala_tipografica": conf_escala,
-        "vacio": 0.94,
-        "jerarquia": 0.92 if len(niveles_jer) >= 2 else 0.78,
+        "reticula": round(conf_reticula, 4),
+        "escala_tipografica": round(conf_escala, 4),
+        "vacio": round(conf_vacio, 4),
+        "jerarquia": round(conf_jerarquia, 4),
     }
     notas = {
-        "reticula": f"Detectadas {num_columnas} columna(s), {len(ejes_v)} ejes V y {len(ejes_h)} ejes H.",
+        "reticula": (
+            f"Detectadas {num_columnas} col(s), {len(ejes_v)} ejes V y {len(ejes_h)} ejes H "
+            f"(CV_bordes={cv_bordes:.3f}, frac_liso={frac_liso:.3f})."
+        ),
         "escala_tipografica": nota_escala,
-        "vacio": "Espacio negativo medido por umbral ΔE2000 < 10.5 respecto al modo de bajo gradiente del soporte Lab.",
-        "jerarquia": f"Segmentadas {len(niveles_jer)} regiones jerárquicas con índice de dominancia {indice_dominancia}.",
+        "vacio": (
+            f"Aire={pct_aire:.1f}%, contigüidad={contig_aire:.3f}, "
+            f"separabilidad_bimodal={sep_bimodal:.3f}."
+        ),
+        "jerarquia": (
+            f"Segmentadas {len(niveles_jer)} regiones (peso_explicado={fraccion_peso_explicada:.3f}, "
+            f"dominancia={indice_dominancia})."
+        ),
     }
 
     return bloque_reticula, bloque_escala, bloque_vacio, bloque_jerarquia, confianzas, notas

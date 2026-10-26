@@ -3,7 +3,8 @@
 
 Combina el método clásico Spectral Residual (Hou & Zhang, CVPR 2007) mediante FFT 2D
 radix-2 en Python puro con el contraste centro-entorno multi-escala en CIE L*a*b*
-mediante ΔE2000 (Itti, Koch & Niebur, IEEE TPAMI 1998).
+mediante ΔE2000 (Itti, Koch & Niebur, IEEE TPAMI 1998), y calcula su confianza de
+forma continua a partir del SNR espacial y la coherencia local (Ley 8).
 """
 
 from __future__ import annotations
@@ -192,20 +193,49 @@ def _normalizar_mapa(mat: List[List[float]]) -> List[List[float]]:
     return [[(v - vmin) / rango for v in fila] for fila in mat]
 
 
+def _coherencia_espacial_grid(grid_lab: List[List[Tuple[float, float, float]]]) -> float:
+    """Mide la coherencia local de objetos en la rejilla Lab (1 / (1 + ΔE2000_vecinos / 8))."""
+    n = len(grid_lab)
+    if n < 4:
+        return 0.5
+    diffs: List[float] = []
+    for y in range(2, n - 2):
+        for x in range(2, n - 2):
+            c = grid_lab[y][x]
+            diffs.append(delta_e2000(c, grid_lab[y][x + 1]))
+            diffs.append(delta_e2000(c, grid_lab[y + 1][x]))
+    media_de_vec = sum(diffs) / float(max(1, len(diffs)))
+    return 1.0 / (1.0 + (media_de_vec / 7.5) ** 1.5)
+
+
 def estudiar_saliencia(
     pixeles_lab: List[List[Tuple[float, float, float]]],
     niveles_jerarquia: List[Dict[str, Any]],
 ) -> Tuple[Dict[str, Any], float]:
-    """Calcula el mapa de saliencia visual y produce el bloque 'saliencia' de estudio.json."""
+    """Calcula el mapa de saliencia visual y su confianza continua por SNR espacial (Ley 8)."""
     n = 64
     grid_lab = _reenmuestrear_lab_potencia2(pixeles_lab, n=n)
 
     canal_l = [[grid_lab[y][x][0] for x in range(n)] for y in range(n)]
     canal_c = [[math.hypot(grid_lab[y][x][1], grid_lab[y][x][2]) for x in range(n)] for y in range(n)]
 
-    sr_l = _normalizar_mapa(_spectral_residual_canal(canal_l))
-    sr_c = _normalizar_mapa(_spectral_residual_canal(canal_c))
-    cs_lab = _normalizar_mapa(_contraste_centro_entorno_lab(grid_lab))
+    sr_l_raw = _spectral_residual_canal(canal_l)
+    sr_c_raw = _spectral_residual_canal(canal_c)
+    cs_lab_raw = _contraste_centro_entorno_lab(grid_lab)
+
+    # SNR sobre el mapa bruto antes de reescalar a [0, 1]
+    raw_interior: List[float] = []
+    for y in range(4, n - 4):
+        for x in range(4, n - 4):
+            raw_interior.append(cs_lab_raw[y][x])
+    raw_ord = sorted(raw_interior)
+    p95_raw = raw_ord[int(0.95 * (len(raw_ord) - 1))] if raw_ord else 0.0
+    p50_raw = raw_ord[len(raw_ord) // 2] if raw_ord else 0.0
+    snr_espacial = (p95_raw - p50_raw) / (p95_raw + 0.5 * p50_raw + 1.0)
+
+    sr_l = _normalizar_mapa(sr_l_raw)
+    sr_c = _normalizar_mapa(sr_c_raw)
+    cs_lab = _normalizar_mapa(cs_lab_raw)
 
     saliencia_64 = [[0.0] * n for _ in range(n)]
     for y in range(n):
@@ -281,7 +311,6 @@ def estudiar_saliencia(
             fila_8.append(round(sum(sub_vals) / float(len(sub_vals)), 4))
         rejilla_8x8.append(fila_8)
 
-    # Índice de concentración espacial (fracción de energía en el 25% superior de celdas)
     flat_ord = sorted((v for fila in rejilla_8x8 for v in fila), reverse=True)
     suma_tot = sum(flat_ord) or 1.0
     concentracion = max(0.0, min(1.0, sum(flat_ord[:16]) / suma_tot))
@@ -292,6 +321,13 @@ def estudiar_saliencia(
         coincidencia = max(0.0, min(1.0, 1.0 - dist_jer_sal / 0.7071))
     else:
         coincidencia = 0.5
+
+    # Confianza continua (Ley 8): producto de coherencia local de objetos y SNR espacial del mapa
+    coherencia_obj = _coherencia_espacial_grid(grid_lab)
+    confianza_continua = max(
+        0.0,
+        min(1.0, coherencia_obj * (0.45 * snr_espacial + 0.55 * concentracion)),
+    )
 
     bloque_saliencia = {
         "metodo": "spectral_residual_hou_zhang_2007_mas_itti_koch_ciede2000",
@@ -304,8 +340,9 @@ def estudiar_saliencia(
         },
         "focos_secundarios": focos_sec,
         "concentracion_espacial": round(concentracion, 4),
+        "snr_espacial": round(snr_espacial, 4),
         "coincidencia_jerarquia_saliencia": round(coincidencia, 4),
         "mapa_rejilla_8x8": rejilla_8x8,
     }
 
-    return bloque_saliencia, 0.91
+    return bloque_saliencia, round(confianza_continua, 4)

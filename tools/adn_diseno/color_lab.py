@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-"""Motor cromático en CIE L*a*b* (D65, 2°): k-means con pesos por área y ΔE2000 (CIEDE2000).
+"""Motor cromático en CIE L*a*b* (D65, 2°): k-means adaptativo (K=3..10) con pesos por área y ΔE2000.
 
-Nunca emite ni opera sobre RGB crudo. Calcula proporción de cada color, matriz y pares ΔE2000,
-armonía cromática en ángulo de tono h_ab, contraste de valores L*, temperatura y saturación C*ab.
+En D-11b:
+- K adaptativo (de 3 a 10) crece hasta que la ΔE2000 media de los píxeles reales frente a su color de
+  paleta (reconvertido a sRGB -> Lab) sea < 5.0, o hasta K=10.
+- Si con K=10 sigue > 5.0, declara explícitamente "paleta_insuficiente": true.
+- La confianza del bloque paleta se calcula de forma continua sobre el residuo ΔE2000 real (Ley 8).
 """
 
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
+
+from .lector import lab_a_srgb_u8, srgb_a_lab
 
 
 def lab_a_lch(l_star: float, a_star: float, b_star: float) -> Tuple[float, float, float]:
@@ -109,12 +114,12 @@ def _diferencia_angular_deg(h1: float, h2: float) -> float:
     return 360.0 - diff if diff > 180.0 else diff
 
 
-def _kmeans_lab_ponderado(
+def _preparar_muestras_lab(
     pixeles_lab: List[List[Tuple[float, float, float]]],
-    k: int = 5,
-    max_iter: int = 25,
+    paso: float = 3.0,
+    max_celdas: int = 360,
 ) -> List[Tuple[Tuple[float, float, float], float]]:
-    """Ejecuta k-means determinista con pesos por área en espacio CIE L*a*b*."""
+    """Cuantiza los píxeles interiores en celdas Lab con su peso exacto de área."""
     alto = len(pixeles_lab)
     ancho = len(pixeles_lab[0]) if alto > 0 else 0
 
@@ -125,7 +130,6 @@ def _kmeans_lab_ponderado(
     total_px = float(max(1, (y_fin - y_ini) * (x_fin - x_ini)))
 
     celdas: Dict[Tuple[int, int, int], List[float]] = {}
-    paso = 2.5
     for y in range(y_ini, y_fin):
         fila = pixeles_lab[y]
         for x in range(x_ini, x_fin):
@@ -146,38 +150,56 @@ def _kmeans_lab_ponderado(
         muestras.append(((acc[0] / cnt, acc[1] / cnt, acc[2] / cnt), cnt / total_px))
 
     muestras.sort(key=lambda x: x[1], reverse=True)
-    if len(muestras) <= k:
-        return muestras
+    if len(muestras) > max_celdas:
+        # Si hay miles de celdas (p.ej. ruido puro), conservar las más frecuentes + muestreo uniforme del resto
+        top = muestras[: max_celdas // 2]
+        resto = muestras[max_celdas // 2 :]
+        stride = max(1, len(resto) // (max_celdas // 2))
+        muestras = top + resto[::stride]
+        suma_w = sum(w for _, w in muestras) or 1.0
+        muestras = [(pt, w / suma_w) for pt, w in muestras]
+    return muestras
 
-    # 2. Inicialización k-means++ perceptual usando ΔE2000
+
+def _kmeans_lab_fijo(
+    muestras: List[Tuple[Tuple[float, float, float], float]],
+    k: int = 5,
+    max_iter: int = 18,
+    umbral_fusion_de00: float = 2.0,
+) -> List[Tuple[Tuple[float, float, float], float]]:
+    """Ejecuta k-means en CIE L*a*b* para un K dado minimizando el residuo ponderado."""
+    if not muestras:
+        return [((90.0, 0.0, 0.0), 1.0)]
+    if len(muestras) <= k:
+        suma_w = sum(w for _, w in muestras) or 1.0
+        return [(pt, w / suma_w) for pt, w in muestras]
+
     centroides: List[Tuple[float, float, float]] = [muestras[0][0]]
     while len(centroides) < k:
         mejor_pt = muestras[0][0]
         mejor_score = -1.0
         for pt, peso in muestras:
-            if peso < 0.0005:
-                continue
             dist_min_de = min(delta_e2000(pt, c) for c in centroides)
-            if dist_min_de < 4.5:
+            if dist_min_de < umbral_fusion_de00:
                 continue
-            score = (peso ** 0.18) * (dist_min_de ** 1.8)
+            score = (peso ** 0.65) * (dist_min_de ** 2.0)
             if score > mejor_score:
                 mejor_score = score
                 mejor_pt = pt
-        if mejor_score <= 1e-6:
+        if mejor_score <= 1e-7:
             break
         centroides.append(mejor_pt)
 
-    # 3. Iteraciones de Lloyd con amortiguación de área (w^0.4) en el paso de actualización
-    # para preservar acentos/tintas minoritarias, y cálculo final de proporción con área exacta (w^1.0).
     asignaciones = [0] * len(muestras)
     for _ in range(max_iter):
         cambio = False
         for i, (pt, _) in enumerate(muestras):
             mejor_c = 0
             mejor_d = float("inf")
+            p0, p1, p2 = pt
             for c_idx, c in enumerate(centroides):
-                d = delta_e2000(pt, c)
+                # Distancia Lab rápida en el bucle interno de Lloyd
+                d = (p0 - c[0]) ** 2 + (p1 - c[1]) ** 2 + (p2 - c[2]) ** 2
                 if d < mejor_d:
                     mejor_d = d
                     mejor_c = c_idx
@@ -190,7 +212,7 @@ def _kmeans_lab_ponderado(
             sum_l, sum_a, sum_b, sum_w = 0.0, 0.0, 0.0, 0.0
             for i, (pt, w) in enumerate(muestras):
                 if asignaciones[i] == c_idx:
-                    w_eff = w ** 0.4
+                    w_eff = w ** 0.80
                     sum_l += pt[0] * w_eff
                     sum_a += pt[1] * w_eff
                     sum_b += pt[2] * w_eff
@@ -203,18 +225,19 @@ def _kmeans_lab_ponderado(
         if not cambio:
             break
 
-    # 4. Calcular centroide y proporción con pesos de área exactos (w) y fusionar si ΔE2000 < 4.2
+    # Asignación final exacta usando ΔE2000 y proporción de área exacta (w^1.0)
+    clusters_acc = [[0.0, 0.0, 0.0, 0.0] for _ in centroides]
+    for pt, w in muestras:
+        mejor_c = min(range(len(centroides)), key=lambda idx: delta_e2000(pt, centroides[idx]))
+        clusters_acc[mejor_c][0] += pt[0] * w
+        clusters_acc[mejor_c][1] += pt[1] * w
+        clusters_acc[mejor_c][2] += pt[2] * w
+        clusters_acc[mejor_c][3] += w
+
     clusters: List[Tuple[Tuple[float, float, float], float]] = []
-    for c_idx in range(len(centroides)):
-        sum_l, sum_a, sum_b, sum_w = 0.0, 0.0, 0.0, 0.0
-        for i, (pt, w) in enumerate(muestras):
-            if asignaciones[i] == c_idx:
-                sum_l += pt[0] * w
-                sum_a += pt[1] * w
-                sum_b += pt[2] * w
-                sum_w += w
-        if sum_w > 1e-4:
-            clusters.append(((sum_l / sum_w, sum_a / sum_w, sum_b / sum_w), sum_w))
+    for sl, sa, sb, sw in clusters_acc:
+        if sw > 1e-4:
+            clusters.append(((sl / sw, sa / sw, sb / sw), sw))
 
     clusters.sort(key=lambda x: x[1], reverse=True)
 
@@ -222,7 +245,7 @@ def _kmeans_lab_ponderado(
     for c_lab, w in clusters:
         unido = False
         for j, (ex_lab, ex_w) in enumerate(fusionados):
-            if delta_e2000(c_lab, ex_lab) < 4.2:
+            if delta_e2000(c_lab, ex_lab) < umbral_fusion_de00:
                 tot_w = ex_w + w
                 nuevo_lab = (
                     (ex_lab[0] * ex_w + c_lab[0] * w) / tot_w,
@@ -239,6 +262,87 @@ def _kmeans_lab_ponderado(
     fusionados = [(lab, w / suma_total) for lab, w in fusionados]
     fusionados.sort(key=lambda x: x[1], reverse=True)
     return fusionados
+
+
+def evaluar_residuo_paleta_srgb(
+    pixeles_lab: List[List[Tuple[float, float, float]]],
+    clusters: List[Tuple[Tuple[float, float, float], float]],
+    muestras_ponderadas: Optional[List[Tuple[Tuple[float, float, float], float]]] = None,
+) -> Tuple[float, float]:
+    """Calcula la ΔE2000 media y desviación típica de los píxeles frente a su color de paleta
+    reconvertido a sRGB (Lab -> sRGB -> Lab).
+    """
+    if not clusters or not pixeles_lab:
+        return 0.0, 0.0
+
+    centroides_srgb_lab: List[Tuple[float, float, float]] = []
+    for c_lab, _ in clusters:
+        r_u8, g_u8, b_u8 = lab_a_srgb_u8(c_lab[0], c_lab[1], c_lab[2])
+        centroides_srgb_lab.append(srgb_a_lab(r_u8, g_u8, b_u8))
+
+    if muestras_ponderadas is not None:
+        media = 0.0
+        dists_w: List[Tuple[float, float]] = []
+        for pt, w in muestras_ponderadas:
+            d_min = min(delta_e2000(pt, c_rt) for c_rt in centroides_srgb_lab)
+            media += d_min * w
+            dists_w.append((d_min, w))
+        var = sum(w * ((d - media) ** 2) for d, w in dists_w)
+        return media, math.sqrt(max(0.0, var))
+
+    # Evaluación exacta sobre el 100% de los píxeles de la rejilla con caché por triplete Lab
+    errores: List[float] = []
+    cache_dist: Dict[Tuple[int, int, int], float] = {}
+    for fila in pixeles_lab:
+        for px in fila:
+            k_px = (int(round(px[0] * 20)), int(round(px[1] * 20)), int(round(px[2] * 20)))
+            d_min = cache_dist.get(k_px)
+            if d_min is None:
+                d_min = min(delta_e2000(px, c_rt) for c_rt in centroides_srgb_lab)
+                cache_dist[k_px] = d_min
+            errores.append(d_min)
+
+    n = float(max(1, len(errores)))
+    media = sum(errores) / n
+    var = sum((e - media) ** 2 for e in errores) / n
+    return media, math.sqrt(max(0.0, var))
+
+
+def _kmeans_lab_adaptativo(
+    pixeles_lab: List[List[Tuple[float, float, float]]],
+    k_min: int = 3,
+    k_max: int = 10,
+    umbral_de00: float = 5.0,
+    k_fijo: Optional[int] = None,
+) -> Tuple[List[Tuple[Tuple[float, float, float], float]], int, float, float, bool]:
+    """Crece K desde k_min (3) hasta k_max (10) hasta que la ΔE2000 media de los píxeles
+    frente a su color de paleta reconvertido a sRGB sea < umbral_de00 (5.0), o hasta K=10.
+    """
+    muestras = _preparar_muestras_lab(pixeles_lab, paso=2.5, max_celdas=360)
+
+    if k_fijo is not None:
+        clusters = _kmeans_lab_fijo(muestras, k=k_fijo)
+        de_medio, de_std = evaluar_residuo_paleta_srgb(pixeles_lab, clusters)
+        insuficiente = de_medio >= umbral_de00
+        return clusters, k_fijo, de_medio, de_std, insuficiente
+
+    mejor_clusters: List[Tuple[Tuple[float, float, float], float]] = []
+    mejor_k = k_min
+    mejor_de_medio = float("inf")
+    mejor_de_std = 0.0
+
+    for k_cand in range(k_min, k_max + 1):
+        clusters = _kmeans_lab_fijo(muestras, k=k_cand)
+        de_medio, de_std = evaluar_residuo_paleta_srgb(pixeles_lab, clusters)
+        if de_medio < mejor_de_medio:
+            mejor_clusters = clusters
+            mejor_k = k_cand
+            mejor_de_medio = de_medio
+            mejor_de_std = de_std
+        if de_medio < umbral_de00:
+            return clusters, k_cand, de_medio, de_std, False
+
+    return mejor_clusters, k_max, mejor_de_medio, mejor_de_std, (mejor_de_medio >= umbral_de00)
 
 
 def _clasificar_armonia(colores_info: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -325,10 +429,19 @@ def _clasificar_armonia(colores_info: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def estudiar_color(
     pixeles_lab: List[List[Tuple[float, float, float]]],
-    k: int = 5,
+    k: Optional[int] = None,
+    k_min: int = 3,
+    k_max: int = 10,
+    umbral_de00: float = 5.0,
 ) -> Tuple[Dict[str, Any], float]:
-    """Produce el bloque 'paleta' de estudio.json y su puntuación de confianza."""
-    clusters = _kmeans_lab_ponderado(pixeles_lab, k=k)
+    """Produce el bloque 'paleta' de estudio.json con K adaptativo (3..10) y confianza continua."""
+    clusters, k_elegido, de_medio_px, de_std_px, paleta_insuficiente = _kmeans_lab_adaptativo(
+        pixeles_lab,
+        k_min=k_min,
+        k_max=k_max,
+        umbral_de00=umbral_de00,
+        k_fijo=k,
+    )
     n_col = len(clusters)
 
     idx_mas_claro = max(range(n_col), key=lambda i: clusters[i][0][0])
@@ -449,10 +562,22 @@ def estudiar_color(
 
     armonia = _clasificar_armonia(colores_out)
 
+    # Fórmula continua de confianza (Ley 8): basada en el residuo real de cuantización ΔE2000
+    # y la dispersión de error por píxel. Cae hacia 0 con ruido aleatorio y sube hacia ~0.98 con colores planos.
+    factor_residuo = math.exp(-de_medio_px / 9.5)
+    factor_dispersion = 1.0 / (1.0 + (de_std_px / 10.0))
+    confianza_continua = max(0.0, min(1.0, factor_residuo * (0.70 + 0.30 * factor_dispersion)))
+
     bloque_paleta = {
         "espacio_color": "CIE_L*a*b*_D65_2deg",
-        "metodo": "kmeans_lab_ponderado_area",
+        "metodo": "kmeans_lab_adaptativo_ponderado_area" if k is None else "kmeans_lab_ponderado_area",
+        "k_rango_evaluado": [k_min, k_max] if k is None else [k, k],
+        "k_elegido": k_elegido,
         "num_colores": n_col,
+        "umbral_delta_e2000_objetivo": umbral_de00,
+        "delta_e2000_cuantizacion_media": round(de_medio_px, 3),
+        "delta_e2000_cuantizacion_std": round(de_std_px, 3),
+        "paleta_insuficiente": bool(paleta_insuficiente),
         "colores": colores_out,
         "pares_delta_e2000": pares_de00,
         "matriz_delta_e2000": matriz_de00,
@@ -478,5 +603,4 @@ def estudiar_color(
         },
     }
 
-    confianza = 0.96 if n_col >= 2 else 0.85
-    return bloque_paleta, confianza
+    return bloque_paleta, round(confianza_continua, 4)
