@@ -64,6 +64,12 @@ def validar_pagina(p):
         for k in ('tamano_pt', 'peso', 'inclinacion', 'interletra', 'interlinea'):
             if s.get(k) is not None and not np.isfinite(s[k]):
                 raise ValueError(f'{k} no finito')
+        if s['tamano_pt'] is not None and s['tamano_pt'] <= 0:
+            raise ValueError('Tamaño no positivo')
+        if s['linea_base'] is not None:
+            for k in ('origen', 'direccion'):
+                if len(s['linea_base'][k]) != 2 or not np.isfinite(s['linea_base'][k]).all():
+                    raise ValueError('Línea base inválida')
         if s['tinta_lab'] is not None and (len(s['tinta_lab']) != 3 or not np.isfinite(s['tinta_lab']).all()):
             raise ValueError('Lab inválido')
     return p

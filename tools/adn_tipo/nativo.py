@@ -47,6 +47,8 @@ def resolver_fuente(nombre, fuentes, salida):
     if len(candidatos) == 1 and candidatos[0]['archivo']:
         f = candidatos[0]
         return fitz.Font(fontfile=str(salida / f['archivo'])), f
+    if any(x['archivo'] for x in candidatos):
+        return None, None  # Nombres ambiguos: no sustituir silenciosamente una fuente incrustada.
     base = BASE14.get(nombre_limpio(nombre))
     if base:
         return fitz.Font(fontname=base), None
