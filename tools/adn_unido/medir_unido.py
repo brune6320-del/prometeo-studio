@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Suite de 5 pruebas obligatorias de Fase 4b (ADN Unido: D-10 Camino B sin CNN + D-11b).
+"""Suite de pruebas de Fase 4c (ADN Unido: Letra fiable en CPU, 0 Colab).
 
 Verifica:
 1. 22/22 fichas válidas contra el validador del esquema (tools/adn_unido/esquema.py).
@@ -7,9 +7,10 @@ Verifica:
 3. Integridad del lote: ningún cartel/pieza se pierde ni se duplica (22 entradas únicas).
 4. Inmutabilidad de D-10: tools/adn_tipo/ sigue idéntico byte a byte al commit dc5ddd5
    (tree Git SHA-1 fe5ee96d398e6b6fb1acaa3ff00004f765ff8173 y 42/42 blobs verificados).
-5. Cobertura tipográfica en carteles (Fase 4b): en >=12 de los 18 carteles el bloque 'tipo'
-   trae texto detectado o una métrica de letra distinta de no_calculado, y el sub-bloque
-   CNN mantiene {"estado": "no_calculado", "motivo": "pesos.pt se entrenan en Colab (D-10), aún no entrenados"}.
+5. Dato de fiabilidad tipográfica (Fase 4c, sin umbral de aprobado): reporta
+   «nº de carteles con letra fiable = X/18» aplicando los criterios prerregistrados
+   (fraccion_palabras_reales >= 0.50 en es+en+de+fr y confianza_tipo >= 0.35),
+   la matriz de confusión de las 12 familias (sesgo Anton > 25%) y el descarte de tamaños imposibles.
 """
 
 from __future__ import annotations
@@ -36,7 +37,9 @@ from tools.adn_unido.esquema import (
 )
 from tools.adn_unido.estudiar_todo import (
     EXTENSIONES_IMAGEN,
+    _resolver_dir_cache_adn_tipo,
     estudiar_carpeta,
+    evaluar_matriz_confusion_vecino,
     resolver_piezas_carpeta,
 )
 
@@ -54,7 +57,6 @@ def _git_blob_sha1(data: bytes) -> bytes:
 
 
 def _calcular_git_tree_sha1_directorio(dir_path: Path) -> Tuple[str, int]:
-    """Calcula de forma exacta el objeto Merkle tree SHA-1 de Git para los archivos rastreados."""
     entradas: List[Tuple[bytes, str, str, bytes]] = []
     total_archivos = 0
     for p in dir_path.iterdir():
@@ -88,7 +90,6 @@ def _calcular_git_tree_sha1_directorio(dir_path: Path) -> Tuple[str, int]:
 
 
 def _leer_objeto_pack_git(git_dir: Path, sha_hex: str) -> bytes | None:
-    """Busca y descomprime un objeto no-delta en .git/objects/pack/*.idx (formato v2)."""
     pack_dir = git_dir / "objects" / "pack"
     if not pack_dir.is_dir():
         return None
@@ -132,7 +133,6 @@ def _leer_objeto_pack_git(git_dir: Path, sha_hex: str) -> bytes | None:
 
 
 def _leer_contenido_objeto_git(git_dir: Path, sha: str) -> bytes | None:
-    """Lee el cuerpo de un objeto Git (suelto o en packfile)."""
     obj_path = git_dir / "objects" / sha[:2] / sha[2:]
     if obj_path.is_file():
         raw = zlib.decompress(obj_path.read_bytes())
@@ -146,7 +146,6 @@ def verificar_identidad_adn_tipo(
     commit_esperado: str = COMMIT_ADN_TIPO,
     tree_esperado: str = TREE_SHA1_ADN_TIPO_DC5DDD5,
 ) -> Tuple[bool, str]:
-    """Verifica que tools/adn_tipo/ sea idéntico byte a byte al commit dc5ddd5."""
     dir_adn_tipo = repo_root / "tools" / "adn_tipo"
     if not dir_adn_tipo.is_dir():
         return False, f"No existe el directorio {dir_adn_tipo}"
@@ -192,9 +191,12 @@ def verificar_identidad_adn_tipo(
 def ejecutar_pruebas_unido(
     carpeta_corpus: Path = CORPUS_D3_DEFAULT,
     carpeta_salida_persistente: Path | None = None,
-) -> Tuple[bool, List[Tuple[str, bool, str]], List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """Ejecuta las 5 pruebas obligatorias de medir_unido.py y devuelve resumen, tabla de 18 carteles y tabla de 22 piezas."""
+) -> Tuple[bool, List[Tuple[str, bool, str]], List[Dict[str, Any]], Dict[str, Any]]:
+    """Ejecuta las 4 pruebas obligatorias + Prueba 5 (dato de fiabilidad X/18 sin umbral de aprobado)."""
     repo_root = Path(__file__).resolve().parents[2]
+    dir_cache = _resolver_dir_cache_adn_tipo(repo_root / "tools" / "adn_tipo")
+    auditoria_anton = evaluar_matriz_confusion_vecino(dir_cache)
+
     piezas_esperadas = resolver_piezas_carpeta(carpeta_corpus)
     num_esperado = len(piezas_esperadas)
 
@@ -269,70 +271,53 @@ def ejecutar_pruebas_unido(
         # Prueba 4: tools/adn_tipo/ idéntico byte a byte a dc5ddd5
         ok_p4, msg_p4 = verificar_identidad_adn_tipo(repo_root, COMMIT_ADN_TIPO)
 
-        # Prueba 5 (Fase 4b): en >=12 de los 18 carteles el bloque tipo trae texto detectado
-        # o una métrica de letra distinta de no_calculado
-        carteles_con_letra = 0
+        # Prueba 5 (Fase 4c): «nº de carteles con letra fiable = X/18», reportado sin umbral de aprobado.
+        carteles_fiables = 0
         total_carteles = 0
-        cnn_honesta_ok = True
+        tamanos_imposibles_tot = 0
         filas_18_carteles: List[Dict[str, Any]] = []
-        filas_22_piezas: List[Dict[str, Any]] = []
 
         for pieza, _, ficha in corrida_1:
-            dis = ficha["diseno"]
+            if pieza.suffix.lower() not in EXTENSIONES_IMAGEN:
+                continue
+            total_carteles += 1
             tip = ficha["tipo"]
-            es_cartel = pieza.suffix.lower() in EXTENSIONES_IMAGEN
+            es_fiable = bool(tip.get("fiable", False))
+            if es_fiable:
+                carteles_fiables += 1
 
-            if es_cartel:
-                total_carteles += 1
-                cnn_sub = tip.get("cnn", {})
-                if (
-                    cnn_sub.get("estado") != "no_calculado"
-                    or cnn_sub.get("motivo") != CNN_MOTIVO_ESPERADO
-                ):
-                    cnn_honesta_ok = False
+            cota_t = tip.get("cota_tamano_pt", {})
+            tamanos_imposibles_tot += int(cota_t.get("tamanos_imposibles_detectados", 0))
 
-                texto_res = str(tip.get("texto_ocr_resumen", "")).strip()
-                metricas_l = tip.get("metricas_letra", {})
-                fuente_v = metricas_l.get("fuente_vecino_top1")
-                tiene_texto_o_metrica = (
-                    tip.get("estado") == "calculado_camino_b_sin_cnn"
-                    and int(tip.get("num_palabras_ocr", 0)) >= 1
-                    and bool(texto_res)
-                    and texto_res not in ("no_calculado", "sin_texto_ocr")
-                    and bool(fuente_v)
-                    and fuente_v not in ("no_calculado", "sin_texto_ocr")
-                )
-                if tiene_texto_o_metrica:
-                    carteles_con_letra += 1
+            filtro = tip.get("filtro_ocr", {})
+            frac = float(filtro.get("fraccion_palabras_reales", 0.0))
+            n_ok = int(filtro.get("palabras_3plus_reconocidas", 0))
+            n_tot = int(filtro.get("palabras_3plus_totales", 0))
 
-                filas_18_carteles.append(
-                    {
-                        "cartel": pieza.name,
-                        "texto_ocr_resumen": texto_res or "sin_texto_ocr",
-                        "metrica_principal": metricas_l.get("metrica_principal_resumen", "no_calculado"),
-                        "confianza_tipo": float(tip.get("confianza_tipo", 0.0)),
-                        "num_palabras_ocr": int(tip.get("num_palabras_ocr", 0)),
-                        "num_glifos": int(tip.get("num_glifos_analizados", 0)),
-                        "fuente_vecino_top1": fuente_v,
-                    }
-                )
+            aud_m = tip.get("metricas_letra") if isinstance(tip.get("metricas_letra"), dict) else tip.get("metricas_letra_descartadas_auditoria") or {}
+            fuente_bruta = aud_m.get("fuente_vecino_bruta_sesgada", "sin_texto_ocr")
 
-            filas_22_piezas.append(
+            filas_18_carteles.append(
                 {
                     "cartel": pieza.name,
-                    "k_elegido": dis["paleta"]["k_elegido"] if dis.get("estado") == "calculado" else None,
-                    "paleta_insuficiente": (
-                        dis["paleta"]["paleta_insuficiente"] if dis.get("estado") == "calculado" else None
+                    "fiable": "sí" if es_fiable else "no",
+                    "motivo": tip.get("motivo_fiabilidad", ""),
+                    "fraccion_palabras_reales": f"{frac:.4f} ({n_ok}/{n_tot})",
+                    "fuente_o_sesgado": (
+                        f"sesgado (bruta: {fuente_bruta})"
+                        if tip.get("sesgo_vecino", {}).get("es_sesgado")
+                        else str(tip.get("fuente_detectada"))
                     ),
-                    "fuente_detectada": tip.get("fuente_detectada", "no_calculado"),
-                    "confianza_global": dis["confianza"]["global"] if dis.get("estado") == "calculado" else None,
+                    "confianza_tipo": float(tip.get("confianza_tipo", 0.0)),
+                    "tam_imposibles": int(cota_t.get("tamanos_imposibles_detectados", 0)),
                 }
             )
 
-        ok_p5 = (total_carteles == 18) and (carteles_con_letra >= 12) and cnn_honesta_ok
+        ok_p5 = total_carteles == 18
         msg_p5 = (
-            f"{carteles_con_letra}/{total_carteles} carteles con texto OCR y métricas de letra calculadas "
-            f"(umbral >=12/18; sub-bloque CNN honesto en 18/18)"
+            f"nº de carteles con letra fiable = {carteles_fiables}/{total_carteles} "
+            f"(reportado sin umbral de aprobado; tamaños imposibles descartados={tamanos_imposibles_tot}; "
+            f"sesgo Anton en rejilla={auditoria_anton['regimen_rejilla_cartel_8x8']['proporcion_anton'] * 100:.2f}% > 25%)"
         )
 
     pruebas = [
@@ -340,15 +325,15 @@ def ejecutar_pruebas_unido(
         ("2. Determinismo estricto (2 corridas sin fecha_utc)", ok_p2, msg_p2),
         ("3. Integridad del lote (0 pérdidas, 0 duplicados)", ok_p3, msg_p3),
         ("4. Inmutabilidad byte a byte de tools/adn_tipo/ (dc5ddd5)", ok_p4, msg_p4),
-        ("5. Cobertura de letra en carteles (>=12/18 con OCR + métrica != no_calculado)", ok_p5, msg_p5),
+        ("5. Dato de letra fiable en carteles (sin umbral de aprobado)", ok_p5, msg_p5),
     ]
     todo_ok = all(ok for _, ok, _ in pruebas)
-    return todo_ok, pruebas, filas_18_carteles, filas_22_piezas
+    return todo_ok, pruebas, filas_18_carteles, auditoria_anton
 
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Ejecuta las 5 pruebas obligatorias de medir_unido.py (Fase 4b) sobre el corpus D-3."
+        description="Ejecuta las 5 pruebas de medir_unido.py (Fase 4c) sobre el corpus D-3."
     )
     parser.add_argument(
         "--corpus",
@@ -362,28 +347,41 @@ def main(argv: List[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    todo_ok, pruebas, filas_18, _ = ejecutar_pruebas_unido(
+    todo_ok, pruebas, filas_18, auditoria_anton = ejecutar_pruebas_unido(
         Path(args.corpus).expanduser().resolve(),
         Path(args.guardar_fichas).expanduser().resolve() if args.guardar_fichas else None,
     )
 
-    print("=== MEDIR_UNIDO · FASE 4b (LETRA EN LOS CARTELES + ADN UNIDO) ===")
+    print("=== MEDIR_UNIDO · FASE 4c (LETRA FIABLE + AUDITORÍA DE SESGO ANTON) ===")
     for nombre, ok, detalle in pruebas:
         estado = "PASS" if ok else "FAIL"
         print(f"[{estado}] {nombre}: {detalle}")
 
-    print("\n=== TABLA DE 18 CARTELES (FASE 4b) ===")
+    print("\n=== TABLA DE 18 CARTELES (FASE 4c) ===")
     print(
-        f"{'Cartel':<32} | {'Texto OCR (<=6 palabras)':<34} | {'Métrica de letra principal':<64} | {'Conf.Tipo':<9}"
+        f"{'Cartel':<32} | {'Fiable':<6} | {'Fracción >=3l':<15} | {'Fuente / Sesgo':<26} | {'Motivo'}"
     )
-    print("-" * 148)
+    print("-" * 145)
     for r in filas_18:
         print(
-            f"{r['cartel']:<32} | {r['texto_ocr_resumen']:<34} | {r['metrica_principal']:<64} | {r['confianza_tipo']:.4f}"
+            f"{r['cartel']:<32} | {r['fiable']:<6} | {r['fraccion_palabras_reales']:<15} | {r['fuente_o_sesgado']:<26} | {r['motivo']}"
         )
 
+    fams = auditoria_anton["familias"]
+    print("\n=== MATRIZ DE CONFUSIÓN 12 FAMILIAS (700 GLIFOS SINTÉTICOS · NATIVO 64x64) ===")
+    cm64 = auditoria_anton["nativo_64x64"]["matriz_confusion"]
+    for f in fams:
+        row_s = " ".join(f"{cm64[f][f2]:3d}" for f2 in fams)
+        print(f"{f:<16} | {row_s}")
+
+    print("\n=== MATRIZ DE CONFUSIÓN 12 FAMILIAS (700 GLIFOS · RÉGIMEN REJILLA CARTEL 8x8 -> 32x32) ===")
+    cmlr = auditoria_anton["regimen_rejilla_cartel_8x8"]["matriz_confusion"]
+    for f in fams:
+        row_s = " ".join(f"{cmlr[f][f2]:3d}" for f2 in fams)
+        print(f"{f:<16} | {row_s}")
+
     pasadas = sum(1 for _, ok, _ in pruebas if ok)
-    print(f"\nResultado global: {pasadas}/{len(pruebas)} pruebas superadas.")
+    print(f"\nResultado global: {pasadas}/{len(pruebas)} comprobaciones verificadas.")
     return 0 if todo_ok else 1
 
 

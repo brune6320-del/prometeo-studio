@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validador estricto del contrato de salida de ADN Unido (<nombre>.ficha.json v1.0.0 · Fase 4b)."""
+"""Validador estricto del contrato de salida de ADN Unido (<nombre>.ficha.json v1.0.0 · Fase 4c)."""
 
 from __future__ import annotations
 
@@ -21,6 +21,11 @@ COMMIT_ADN_TIPO = "dc5ddd5b768a3e745cbaf903efbd4ba36aac5805"
 COMMIT_ADN_DISENO = "d25e70187db2424be43c16c214059687c01252d4"
 
 CNN_MOTIVO_ESPERADO = "pesos.pt se entrenan en Colab (D-10), aún no entrenados"
+
+UMBRAL_FRACCION_PALABRAS_REALES = 0.50
+UMBRAL_CONFIANZA_TIPO = 0.35
+UMBRAL_SESGO_ANTON = 3.0 * (1.0 / 12.0)  # 0.25 (25.0%)
+IDIOMAS_SPELLCHECKER = ("es", "en", "de", "fr")
 
 CLAVES_RAIZ_UNIDO = (
     "schema_version",
@@ -67,7 +72,7 @@ def calcular_sha256_ficha_sin_fecha(ficha: Dict[str, Any]) -> str:
 
 
 def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
-    """Valida que una ficha <nombre>.ficha.json cumpla el contrato v1.0.0 de tools/adn_unido/."""
+    """Valida que una ficha <nombre>.ficha.json cumpla el contrato v1.0.0 (Fase 4c) de tools/adn_unido/."""
     errores: List[str] = []
 
     if not isinstance(ficha, dict):
@@ -100,6 +105,12 @@ def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
             errores.append("tipo.fuente_detectada debe ser un string no vacío.")
 
         if estado_t in ("calculado_camino_b_sin_cnn", "sin_texto_ocr"):
+            if not isinstance(tipo.get("fiable"), bool):
+                errores.append("tipo.fiable debe ser un booleano explícito en carteles.")
+            motivo_fiab = tipo.get("motivo_fiabilidad")
+            if not isinstance(motivo_fiab, str) or len(motivo_fiab.strip()) < 5:
+                errores.append("tipo.motivo_fiabilidad obligatorio en carteles.")
+
             cnn_blk = tipo.get("cnn")
             if not isinstance(cnn_blk, dict):
                 errores.append("tipo.cnn obligatorio en carteles procesados por Camino B.")
@@ -110,20 +121,39 @@ def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
                     errores.append(
                         f"tipo.cnn.motivo esperado '{CNN_MOTIVO_ESPERADO}', recibido '{cnn_blk.get('motivo')}'"
                     )
+
             motor_ocr = tipo.get("motor_ocr")
             if not isinstance(motor_ocr, dict) or motor_ocr.get("psm") != 6 or motor_ocr.get("semilla") != 2610:
                 errores.append("tipo.motor_ocr debe fijar psm=6 y semilla=2610.")
+
+            filtro_ocr = tipo.get("filtro_ocr")
+            if not isinstance(filtro_ocr, dict):
+                errores.append("tipo.filtro_ocr obligatorio en carteles (Fase 4c).")
+            else:
+                frac = filtro_ocr.get("fraccion_palabras_reales")
+                if not isinstance(frac, (int, float)) or not (0.0 <= float(frac) <= 1.0):
+                    errores.append(f"filtro_ocr.fraccion_palabras_reales inválida: {frac}")
+
             conf_t = tipo.get("confianza_tipo")
             if not isinstance(conf_t, (int, float)) or not (0.0 <= float(conf_t) <= 1.0):
                 errores.append(f"tipo.confianza_tipo debe estar en [0.0, 1.0], recibido: {conf_t}")
+
+            fiable_val = bool(tipo.get("fiable"))
             metricas_l = tipo.get("metricas_letra")
-            if not isinstance(metricas_l, dict):
-                errores.append("tipo.metricas_letra debe ser un dict.")
-            elif estado_t == "calculado_camino_b_sin_cnn":
-                if not tipo.get("texto_ocr_resumen") or tipo.get("num_palabras_ocr", 0) < 1:
-                    errores.append("En estado 'calculado_camino_b_sin_cnn' debe haber >=1 palabra OCR.")
-                if not metricas_l.get("fuente_vecino_top1") or metricas_l.get("fuente_vecino_top1") == "no_calculado":
-                    errores.append("metricas_letra.fuente_vecino_top1 debe estar calculada en Camino B.")
+            if not fiable_val:
+                if metricas_l != "no_fiable":
+                    errores.append(
+                        f"Cuando tipo.fiable == false, tipo.metricas_letra debe ser 'no_fiable' (recibido: {type(metricas_l).__name__})."
+                    )
+            else:
+                if not isinstance(metricas_l, dict):
+                    errores.append("Cuando tipo.fiable == true, tipo.metricas_letra debe ser un dict.")
+                else:
+                    sesgo_blk = tipo.get("sesgo_vecino", {})
+                    if sesgo_blk.get("es_sesgado") and metricas_l.get("fuente_vecino_top1") != "sesgado":
+                        errores.append(
+                            "Cuando sesgo_vecino.es_sesgado == true, metricas_letra.fuente_vecino_top1 debe marcarse como 'sesgado'."
+                        )
         elif estado_t == "no_calculado":
             motivo = tipo.get("motivo")
             if not isinstance(motivo, str) or len(motivo.strip()) < 10:
