@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "filas": [
+    {
+      "version": 1,
+      "metodo": "vecino_pixeles",
+      "dominio": "sintetico",
+      "n": 288,
+      "cobertura": 1.0,
+      "familias_holdout": 2,
+      "candidatas": 12,
+      "top1": 0.7743055555555556,
+      "top5": 0.9756944444444444,
+      "error_tamano_pt": {
+        "media": 1.3470936634984763,
+        "mediana": 0.6859318996415755,
+        "p95": 5.319642857142855
+      },
+      "deltaE2000": {
+        "media": 7.01717334738414,
+        "mediana": 6.436388273893535,
+        "p95": 14.386524595200472
+      },
+      "sha256_holdout": "e906ab30ce3e966a4e3baf1409cf91d25b7e54e4ff3880eb20911a70f7909965",
+      "sha256_pesos": null,
+      "sha256_galeria": "ed1d0a7b7e42b03e1c02099a1c12c1bbec22a0a02aea07cac39db49f1a86ce58",
+      "segundos_inferencia": 0.41375954216346145,
+      "dispositivo": "cpu",
+      "coste_usd": null,
+      "ocr": "carácter conocido para aislar tipografía; OCR no evaluado",
+      "entrenamiento": {
+        "gpu": null,
+        "segundos": 0,
+        "coste_usd": 0
+      }
+    },
+    {
+      "version": 1,
+      "metodo": "solo_sintetico",
+      "dominio": "sintetico",
+      "n": 288,
+      "cobertura": 1.0,
+      "familias_holdout": 2,
+      "candidatas": 12,
+      "top1": 0.0,
+      "top5": 0.2152777777777778,
+      "error_tamano_pt": {
+        "media": 4.6344550748666125,
+        "mediana": 4.676187515258789,
+        "p95": 8.755495262145995
+      },
+      "deltaE2000": {
+        "media": 24.868915799982364,
+        "mediana": 23.2006580058336,
+        "p95": 37.32748950186597
+      },
+      "sha256_holdout": "e906ab30ce3e966a4e3baf1409cf91d25b7e54e4ff3880eb20911a70f7909965",
+      "sha256_pesos": "215d13ff35e1803b0d8237d1500cb360a5dd3c9ace2793a5f87a28e9354c45b6",
+      "sha256_galeria": "ed1d0a7b7e42b03e1c02099a1c12c1bbec22a0a02aea07cac39db49f1a86ce58",
+      "segundos_inferencia": 0.7531934999860823,
+      "dispositivo": "cpu",
+      "coste_usd": null,
+      "ocr": "carácter conocido para aislar tipografía; OCR no evaluado",
+      "entrenamiento": {
+        "version": 1,
+        "etapa": "solo_sintetico",
+        "epocas": 1,
+        "n": 1056,
+        "seed": 2610,
+        "dispositivo": "cpu",
+        "gpu": null,
+        "segundos": 3.1179149579256773,
+        "coste_usd": null,
+        "tarifa_usd_h": null,
+        "plataforma": "macOS-26.6.2-arm64-arm-64bit",
+        "nice": 15,
+        "parametros": 71614,
+        "loss": [
+          2.480583010297833
+        ],
+        "sha256_pesos": "215d13ff35e1803b0d8237d1500cb360a5dd3c9ace2793a5f87a28e9354c45b6",
+        "sha256_holdout": "e906ab30ce3e966a4e3baf1409cf91d25b7e54e4ff3880eb20911a70f7909965",
+        "sha256_train": "3ec017ca82ca232a4ab52a4206cb3d1eef09f14f89f9421e7da87ef2887e16b7",
+        "sha256_prerregistro": "7188b9f03db9ef1733c858580c14e59d963d12e19d28bab1784e1b8b58731a78"
+      },
+      "mejora_top1": -0.7743055555555556,
+      "supera_umbrales_prerregistrados": false
+    }
+  ],
+  "real": "NO VERIFICADO"
+}

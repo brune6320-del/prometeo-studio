@@ -1,0 +1,103 @@
+{
+  "manifest": {
+    "version": 1,
+    "dominio": "sintetico",
+    "seed": 2610,
+    "n_por_fuente": 96,
+    "holdout_sha256": "e906ab30ce3e966a4e3baf1409cf91d25b7e54e4ff3880eb20911a70f7909965",
+    "train_sha256": "3ec017ca82ca232a4ab52a4206cb3d1eef09f14f89f9421e7da87ef2887e16b7",
+    "galeria_sha256": "ed1d0a7b7e42b03e1c02099a1c12c1bbec22a0a02aea07cac39db49f1a86ce58",
+    "fuentes_lock_sha256": "76835ef5d330c0e98fc04b8eaf5915df95e6ebcb4b7d7298cc909c7c26009ea2"
+  },
+  "familias": {
+    "Abel": {
+      "sha256": "324bb56ef283edb7fa79c8d409c2ad5eb1d996512cb7016350638a690bde5f58",
+      "split": "train",
+      "archivos": [
+        "8809dcad25318225052f88333e208c5aad4adcb7b2c934c135735ec19aa410b4"
+      ]
+    },
+    "ABeeZee": {
+      "sha256": "240985376b1d6d8953dc0a84b3f02460bfa2a7d0811a441ee219281bf77ecc92",
+      "split": "train",
+      "archivos": [
+        "2901c8df256648cc2bb2e3afb381cb8d28e65ed3dbe11de20695ae4d5ffdeda9"
+      ]
+    },
+    "Anton": {
+      "sha256": "1f29f2d29f02f2608eb72d45625ba3a851eda1ee2be1bda22427a584b787c722",
+      "split": "train",
+      "archivos": [
+        "a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab"
+      ]
+    },
+    "Arvo": {
+      "sha256": "d77df9e1ba53100684d71bf98d6a23d673d2a089d8482bdf9131300c3e072742",
+      "split": "holdout",
+      "archivos": [
+        "a2eb63a0771b8d13d8e54bf650a02aef813eeaa2e10f6298358e6b15d26c6686",
+        "f41bd41471ec2db7140351bdde614da5341524503598ff7fe79f3c89c13b605e"
+      ]
+    },
+    "Asul": {
+      "sha256": "5a56e78676f2752cd2ac4d0fa9feff1922a26293de750231b76dce1ffe3ca8fd",
+      "split": "train",
+      "archivos": [
+        "2bd614af0594c9657cc6f986f602b294d2a903b3a7ce137942a35ac01b6f1f76"
+      ]
+    },
+    "Bangers": {
+      "sha256": "b58c93754e78c2b2ba8be38c09d199e192bad9d113cdd081fa0a285054ec71e1",
+      "split": "train",
+      "archivos": [
+        "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824"
+      ]
+    },
+    "Cardo": {
+      "sha256": "489d7a38ff7431e9c8e8f2155f23b776e5b79c235c25c70b6c5e975e1b0fb6cd",
+      "split": "train",
+      "archivos": [
+        "bcb81f376f1c3892c7026dabf2beafbd1a7ee8ae95d132ee7d4ff7d7c3988261"
+      ]
+    },
+    "Coda": {
+      "sha256": "66c8aec217cac5fa9829e4e314c2dfe6f3b3710cbf2c4b4df462c333565b4e27",
+      "split": "train",
+      "archivos": [
+        "f5d32ae9d5c78cdab7e75a52bd1da07ae22644597232d085a5ce7cd1af341e17"
+      ]
+    },
+    "Cousine": {
+      "sha256": "ef7607b9aeddd76a13cce51b472f3dd4ee694ed4dfa522c846aaee4262ddfd06",
+      "split": "train",
+      "archivos": [
+        "1da22250675fc4c42fcf3a9736c44bc0570516105331443b663fd5cfbd1412fe"
+      ]
+    },
+    "Didact Gothic": {
+      "sha256": "81050439d2f5b7aa2c194c66a1b76f2cac9b98a5fe02bbd9235b3ec09efe539a",
+      "split": "train",
+      "archivos": [
+        "b98f9e091b6337a86f4e0f69c94c31905e1e287782853f472e176b4e28d3f81f"
+      ]
+    },
+    "Fjalla One": {
+      "sha256": "19e8dfb6424d69c2ffa77ec8d8144c5d8e7e48366d72ae6ef916282d221ff2e9",
+      "split": "holdout",
+      "archivos": [
+        "ce3b299625abe3c76f8acd235b57b3e07ac6ee2d550e106a4b4e4d60095ae2ba"
+      ]
+    },
+    "Lato": {
+      "sha256": "4acb5d021cd5eed4819a0886b2901e2b4f85974fc27d8f4880c27c31873bb75d",
+      "split": "train",
+      "archivos": [
+        "8a0aace75d33794eece4b28187bfc1df0bbd2888b5d8a56e01788c8d65d16be1",
+        "d636e4683231f931eda222d588e944d082bfd3bdba02f928bee461c0f185b251"
+      ]
+    }
+  },
+  "train": 1056,
+  "holdout": 288,
+  "n_por_archivo": 96
+}
