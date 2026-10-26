@@ -9,6 +9,8 @@ import type { TxPhase } from '../hooks/useTransaction';
 interface InspectorProps {
   sessionId: string | null;
   node: NodeDetail | null;
+  /** Texto que el visor ya muestra (preparado o vista previa), para no enseñar el viejo. */
+  editedText?: string;
   nodeLoading: boolean;
   ocrObservation: OCRObservation | null;
   isStaged: boolean;
@@ -77,19 +79,25 @@ export const Inspector: React.FC<InspectorProps> = (p) => {
   );
 };
 
-const NodeInspector: React.FC<InspectorProps & { node: NodeDetail }> = ({ node, isStaged, txPhase, busy, uiMode, onStageText }) => {
-  const [text, setText] = useState(node.text ?? '');
+const NodeInspector: React.FC<InspectorProps & { node: NodeDetail }> = ({ node, editedText, isStaged, txPhase, busy, uiMode, onStageText }) => {
+  const [text, setText] = useState(editedText ?? node.text ?? '');
   const [error, setError] = useState<ApiError | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [justStaged, setJustStaged] = useState(false);
   const [preparedText, setPreparedText] = useState<string | null>(null);
 
   useEffect(() => {
-    setText(node.text ?? '');
+    setText(editedText ?? node.text ?? '');
     setError(null);
     setJustStaged(false);
     setPreparedText(null);
   }, [node.id, node.text]);
+
+  // El visor puede cambiar el texto (edición en el sitio); no se pierde el estado preparado.
+  useEffect(() => {
+    if (editedText === undefined) return;
+    setText((actual) => (actual === editedText ? actual : editedText));
+  }, [editedText]);
 
   if (node.type !== 'TEXT') {
     return (

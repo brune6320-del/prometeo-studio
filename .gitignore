@@ -1,3 +1,8 @@
 node_modules/
 studio-desktop/src-tauri/target/
 studio/frontend/dist/
+
+studio/frontend/test-results/
+studio/workspace/
+__pycache__/
+*.pyc

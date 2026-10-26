@@ -509,11 +509,9 @@
  * transición CSS puede retrasar el transform del mundo ni de las piezas.
  * La clase la pone el DOM en BoardWorkspace; React no se toca por evento.
  */
+/* Solo el mundo: las piezas ya desactivan su transición con `.dragging`.
+   Tocar una clase que alcanza 500 tarjetas costaba ~200 ms de estilo. */
 .board-viewport.gesto-activo .board-stage,
-.board-viewport.gesto-activo .board-card,
-.board-viewport.gesto-activo .board-free-media,
-.board-viewport.gesto-activo .board-frame,
-.board-viewport.gesto-activo .board-column,
 .board-viewport.gesto-activo .mesa-piece {
   transition: none !important;
   animation: none !important;

@@ -237,7 +237,7 @@ interface CardHandlers {
   blur: () => void;
 }
 
-export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
+const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
   onBack,
   locked = false,
   engineMessage,
@@ -3358,6 +3358,8 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
         };
       });
       setSelectedCardIds([cardId]);
+      // Encuadra el original y sus piezas para que el collage no nazca fuera de la vista.
+      window.requestAnimationFrame(() => centerCamera(activeBoardRef.current));
       const guardadas = respuesta.archivos?.length ?? 0;
       setNotice(`Página desarmada en ${creadas} ${creadas === 1 ? 'pieza editable' : 'piezas editables'}. El original quedó bloqueado.${guardadas ? ` ${guardadas} imágenes guardadas en el proyecto.` : ''}`);
     } catch (error) {
@@ -3365,7 +3367,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     } finally {
       desarmandoRef.current = null;
     }
-  }, [updateBoard]);
+  }, [centerCamera, updateBoard]);
 
   useEffect(() => {
     desarmarRef.current = (cardId, url) => { void desarmarEnReferente(cardId, url); };
@@ -5629,3 +5631,7 @@ export const BoardWorkspace: React.FC<BoardWorkspaceProps> = ({
     </div>
   );
 };
+
+
+/** Memo: guardar el estado de escritura no vuelve a reconciliar 500 tarjetas. */
+export const BoardWorkspace = React.memo(BoardWorkspaceInner);

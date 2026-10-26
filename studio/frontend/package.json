@@ -9,6 +9,7 @@
     "test": "vitest run",
     "test:l1-app": "playwright test -c playwright.l1.config.ts",
     "test:l2-app": "playwright test -c playwright.l2.config.ts",
+    "test:super4": "playwright test -c playwright.super4.config.ts",
     "test:e2e": "playwright test",
     "test:t2-produccion": "playwright test -c playwright.t2.config.ts",
     "entropia": "node scripts/entropia.mjs",

@@ -106,6 +106,18 @@ const Studio: React.FC<{
   /** Texto optimista por nodo: se ve mientras el motor confirma el cambio en memoria. */
   const [textEdits, setTextEdits] = useState<Record<string, string>>({});
   const [inlineError, setInlineError] = useState<string | null>(null);
+
+  // Al cambiar de elemento se retira el texto que solo era una vista previa del Inspector.
+  useEffect(() => {
+    setTextEdits((prev) => {
+      const confirmados = new Map(tx.ops.filter((op) => op.node_id).map((op) => [op.node_id, op.new_text]));
+      const next: Record<string, string> = {};
+      for (const [id, texto] of Object.entries(prev)) {
+        if (confirmados.get(id) === texto) next[id] = texto;
+      }
+      return Object.keys(next).length === Object.keys(prev).length ? prev : next;
+    });
+  }, [selectedNodeId, tx.ops]);
   const fileInput = useRef<HTMLInputElement>(null);
   const left = useResizable(280, 200, 480);
   const right = useResizable(340, 280, 520, true);
@@ -349,25 +361,29 @@ const Studio: React.FC<{
   const loading = docs.phase === 'DOCUMENT_LOADING';
   const startDock = useRef({ y: 0, h: 0 });
 
+  // Props estables: el estado de «Guardado» del tablero no vuelve a reconciliar el lienzo.
+  const volverAlPdf = useCallback(() => setWorkspaceMode('pdf'), [setWorkspaceMode]);
+  const pdfReferenceSource = useMemo(
+    () => (docs.doc ? { filename: docs.doc.filename, sha256: docs.doc.summary.source_sha256, page: docs.currentPage + 1 } : null),
+    [docs.doc, docs.currentPage],
+  );
+  const abrirReferenciaPdf = useCallback((reference: { sourceSha256: string; page: number }) => {
+    if (!docs.doc || docs.doc.summary.source_sha256.toLowerCase() !== reference.sourceSha256) return false;
+    docs.setCurrentPage(reference.page - 1);
+    setWorkspaceMode('pdf');
+    return true;
+  }, [docs, setWorkspaceMode]);
+
   if (workspaceMode === 'board') {
     return (
       <>
         <BoardWorkspace
-          onBack={() => setWorkspaceMode('pdf')}
+          onBack={volverAlPdf}
           locked={Boolean(unsaved.dialog)}
           engineMessage={boardEngineMessage}
           onRetryEngine={backend.retry}
-          pdfReferenceSource={docs.doc ? {
-            filename: docs.doc.filename,
-            sha256: docs.doc.summary.source_sha256,
-            page: docs.currentPage + 1,
-          } : null}
-          onOpenPdfReference={(reference) => {
-            if (!docs.doc || docs.doc.summary.source_sha256.toLowerCase() !== reference.sourceSha256) return false;
-            docs.setCurrentPage(reference.page - 1);
-            setWorkspaceMode('pdf');
-            return true;
-          }}
+          pdfReferenceSource={pdfReferenceSource}
+          onOpenPdfReference={abrirReferenciaPdf}
         />
         {unsaved.dialog && createPortal(<UnsavedDialog {...unsaved.dialog} />, document.body)}
       </>
@@ -519,6 +535,7 @@ const Studio: React.FC<{
         <Inspector
           sessionId={sessionId}
           node={nodeDetail}
+          editedText={selectedNodeId ? editedTexts[selectedNodeId] : undefined}
           nodeLoading={nodeLoading}
           ocrObservation={selectedOcr}
           isStaged={!!selectedNodeId && stagedNodeIds.has(selectedNodeId)}

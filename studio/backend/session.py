@@ -28,6 +28,7 @@ import base64
 import hashlib
 import re
 import subprocess
+import threading
 from typing import Any, Dict, List, Optional, Tuple
 
 import pymupdf
@@ -141,6 +142,8 @@ class StudioDocumentSession:
         self.active_transaction_id: Optional[str] = None
         self.transaction_state: str = xp.STATE_READY
         self.staged_operations: List[Dict[str, Any]] = []
+        # La comprobación previa corre en segundo plano; nunca debe pisar una exportación.
+        self._tx_lock = threading.Lock()
         # Solo una salida que pasó la verificación se registra aquí (PA-003).
         self.published_output: Optional[Dict[str, Any]] = None
         self.saved_outputs: List[str] = []
@@ -1280,6 +1283,10 @@ class StudioDocumentSession:
         return rec
 
     def verify_and_export(self, output_filename: Optional[str] = None) -> Dict[str, Any]:
+        with self._tx_lock:
+            return self._verify_and_export_locked(output_filename)
+
+    def _verify_and_export_locked(self, output_filename: Optional[str] = None) -> Dict[str, Any]:
         """Exporta una copia nueva y la publica únicamente si un verificador real la aprueba."""
         if not self.staged_operations:
             return xp.reject(xp.CODE_NO_STAGED, "No hay operaciones preparadas en la transacción.")
@@ -1428,6 +1435,10 @@ class StudioDocumentSession:
         return self._finish(result)
 
     def preflight(self) -> Dict[str, Any]:
+        with self._tx_lock:
+            return self._preflight_locked()
+
+    def _preflight_locked(self) -> Dict[str, Any]:
         """Verifica los cambios en segundo plano sin publicar ni conservar un archivo.
 
         Es la misma autoridad física que la exportación (stage → export temporal → verifier),

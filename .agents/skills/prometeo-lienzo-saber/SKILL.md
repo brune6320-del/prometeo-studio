@@ -3,7 +3,7 @@ name: prometeo-lienzo-saber
 description: Principios de lienzo, gesto, documento y diseño destilados de papers y estudios (Warburg, VIKI, Shneiderman, Lucero, Sensecape, Thinkink, Hara, Fukasawa, EditTrans, LaTeX2Layout). Úsala antes de diseñar o revisar cualquier interacción del tablero de Prometeo.
 ---
 
-# Saber del lienzo (versión 1.4 · 25-oct-2026)
+# Saber del lienzo (versión 1.5 · 26-oct-2026)
 
 Cada regla tiene: de dónde sale, qué hacer y cómo comprobarlo. Se actualiza a diario con lecturas nuevas (ver /mnt/project-files/prometeo/lecturas/). Una regla que falla su prueba dos veces se reescribe o se borra.
 
@@ -58,6 +58,9 @@ Cada regla tiene: de dónde sale, qué hacer y cómo comprobarlo. Se actualiza a
    Prueba: editar y cerrar en el mismo frame; al reabrir, el cambio está.
 20. **Definición de terminado** (A-1). Ninguna herramienta nueva entra sin borrado, deshacer, teclado, estado vacío y su prueba.
    Prueba: checklist en la skill y un test por herramienta.
+21. **Cultura de ahorro** (Fukasawa, *Without Thought*; Shneiderman, manipulación directa; SUPER-4). La acción más frecuente cuesta un gesto. Añadir algo = 1 clic o 1 tecla. Mover = arrastrar desde cualquier parte. Unir = arrastrar desde el borde. Ningún botón «Confirmar/Añadir» si el gesto ya expresó la intención; el texto explica al pasar el puntero, no antes ni después.
+   Hacer: contar los clics de nota, imagen, enlace, columna y marco antes y después de cada cambio de interacción; una tarea que suba de clics se rechaza.
+   Prueba: Playwright cuenta los clics por tarea y la tabla no sube respecto a la anterior.
 
 ## Registro de aprendizaje
 - 25-oct: v1 con 9 reglas.
@@ -65,3 +68,4 @@ Cada regla tiene: de dónde sale, qué hacer y cómo comprobarlo. Se actualiza a
 - 25-oct (entrenamiento): Bruno no pudo «borrar rápido todo». Revisión: no había Supr, ni Cmd+A, y el borrado usaba window.confirm. Nace la regla 10 (v1.2); el arreglo va a T-2.
 - 25-oct (lecturas del día): v1.3. Regla 8 reescrita: «lo que haces no se confirma; lo que propone la máquina, sí» (resuelve la tensión con la regla 10) y suma que la IA se guía por lo curado (Sanna et al.). Regla 10 suma a Blender como fuente. Nuevas 11 (toca solo lo que cambia, EditTrans) y 12 (la verdad se fabrica, LaTeX2Layout), las dos del pilar documentos.
 - 25-oct (auditoría A-1 de DeepSeek): v1.4. Entran 13 a 20 desde los principios de la auditoría, fusionando los repetidos (su «borrar es inmediato; olvidar no» va dentro de la 10; su «todo objeto tiene asas» y «teclado no encerrado» se juntan en la 15). En la 18 se corrige la síntesis D7: nada de puente a Acrobat, porque la meta de Bruno es superarlo.
+- 26-oct (tacto de SUPER-4): v1.5. Entra la 21 tras probar Forja 4 con las manos: añadir exigía un paso de más, mover pedía acertar una esquina y unir dependía de un botón escondido. La regla no copia a Canva ni a Figma: exige que el gesto ya diga la intención y que la explicación espere al puntero.
