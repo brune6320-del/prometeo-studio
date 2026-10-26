@@ -11,3 +11,7 @@ __pycache__/
 *.jpg
 *.pdf
 *.npz
+*.cff
+*.bin
+*.traineddata
+*.jpeg

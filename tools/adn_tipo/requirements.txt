@@ -6,3 +6,4 @@ scikit-image==0.25.2
 fonttools==4.60.1
 pyspellchecker==0.8.3
 pytesseract==0.3.13
+certifi==2026.10.23
