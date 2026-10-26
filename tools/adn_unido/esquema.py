@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validador estricto del contrato de salida de ADN Unido (<nombre>.ficha.json v1.0.0 · Fase 4c)."""
+"""Validador estricto del contrato de salida de ADN Unido (<nombre>.ficha.json v1.0.0 · Fase 4d)."""
 
 from __future__ import annotations
 
@@ -24,7 +24,9 @@ CNN_MOTIVO_ESPERADO = "pesos.pt se entrenan en Colab (D-10), aún no entrenados"
 
 UMBRAL_FRACCION_PALABRAS_REALES = 0.50
 UMBRAL_CONFIANZA_TIPO = 0.35
-UMBRAL_SESGO_ANTON = 3.0 * (1.0 / 12.0)  # 0.25 (25.0%)
+UMBRAL_ACIERTO_REGIMEN_C = 0.50
+UMBRAL_ANTON_REGIMEN_C = 2.0 * (1.0 / 12.0)  # 0.1667 (16.67%)
+UMBRAL_SESGO_ANTON = 3.0 * (1.0 / 12.0)      # 0.2500 (25.00%)
 IDIOMAS_SPELLCHECKER = ("es", "en", "de", "fr")
 
 CLAVES_RAIZ_UNIDO = (
@@ -72,7 +74,7 @@ def calcular_sha256_ficha_sin_fecha(ficha: Dict[str, Any]) -> str:
 
 
 def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
-    """Valida que una ficha <nombre>.ficha.json cumpla el contrato v1.0.0 (Fase 4c) de tools/adn_unido/."""
+    """Valida que una ficha <nombre>.ficha.json cumpla el contrato v1.0.0 (Fase 4d) de tools/adn_unido/."""
     errores: List[str] = []
 
     if not isinstance(ficha, dict):
@@ -105,6 +107,8 @@ def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
             errores.append("tipo.fuente_detectada debe ser un string no vacío.")
 
         if estado_t in ("calculado_camino_b_sin_cnn", "sin_texto_ocr"):
+            if tipo.get("regimen_recorte") != "C_nativo_por_caracter":
+                errores.append("tipo.regimen_recorte debe ser 'C_nativo_por_caracter' en Fase 4d.")
             if not isinstance(tipo.get("fiable"), bool):
                 errores.append("tipo.fiable debe ser un booleano explícito en carteles.")
             motivo_fiab = tipo.get("motivo_fiabilidad")
@@ -128,7 +132,7 @@ def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
 
             filtro_ocr = tipo.get("filtro_ocr")
             if not isinstance(filtro_ocr, dict):
-                errores.append("tipo.filtro_ocr obligatorio en carteles (Fase 4c).")
+                errores.append("tipo.filtro_ocr obligatorio en carteles.")
             else:
                 frac = filtro_ocr.get("fraccion_palabras_reales")
                 if not isinstance(frac, (int, float)) or not (0.0 <= float(frac) <= 1.0):
@@ -140,6 +144,9 @@ def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
 
             fiable_val = bool(tipo.get("fiable"))
             metricas_l = tipo.get("metricas_letra")
+            sesgo_blk = tipo.get("sesgo_vecino", {})
+            es_sesgado = bool(sesgo_blk.get("es_sesgado", False))
+
             if not fiable_val:
                 if metricas_l != "no_fiable":
                     errores.append(
@@ -149,10 +156,14 @@ def validar_ficha_unida(ficha: Dict[str, Any]) -> Tuple[bool, List[str]]:
                 if not isinstance(metricas_l, dict):
                     errores.append("Cuando tipo.fiable == true, tipo.metricas_letra debe ser un dict.")
                 else:
-                    sesgo_blk = tipo.get("sesgo_vecino", {})
-                    if sesgo_blk.get("es_sesgado") and metricas_l.get("fuente_vecino_top1") != "sesgado":
+                    fv1 = metricas_l.get("fuente_vecino_top1")
+                    if es_sesgado and fv1 != "sesgado":
                         errores.append(
                             "Cuando sesgo_vecino.es_sesgado == true, metricas_letra.fuente_vecino_top1 debe marcarse como 'sesgado'."
+                        )
+                    if not es_sesgado and fv1 in (None, "", "sesgado", "no_calculado"):
+                        errores.append(
+                            f"Cuando el Régimen C cumple el prerregistro (es_sesgado == false), fuente_vecino_top1 debe ser la familia detectada, no '{fv1}'."
                         )
         elif estado_t == "no_calculado":
             motivo = tipo.get("motivo")

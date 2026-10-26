@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Suite de pruebas de Fase 4c (ADN Unido: Letra fiable en CPU, 0 Colab).
+"""Suite de pruebas de Fase 4d (ADN Unido: Recorte nativo por carácter en CPU, 0 Colab).
 
 Verifica:
 1. 22/22 fichas válidas contra el validador del esquema (tools/adn_unido/esquema.py).
@@ -7,10 +7,8 @@ Verifica:
 3. Integridad del lote: ningún cartel/pieza se pierde ni se duplica (22 entradas únicas).
 4. Inmutabilidad de D-10: tools/adn_tipo/ sigue idéntico byte a byte al commit dc5ddd5
    (tree Git SHA-1 fe5ee96d398e6b6fb1acaa3ff00004f765ff8173 y 42/42 blobs verificados).
-5. Dato de fiabilidad tipográfica (Fase 4c, sin umbral de aprobado): reporta
-   «nº de carteles con letra fiable = X/18» aplicando los criterios prerregistrados
-   (fraccion_palabras_reales >= 0.50 en es+en+de+fr y confianza_tipo >= 0.35),
-   la matriz de confusión de las 12 familias (sesgo Anton > 25%) y el descarte de tamaños imposibles.
+5. Evaluación de los 3 regímenes (A, B, C) sobre los 700 glifos sintéticos y dato de
+   fiabilidad tipográfica «nº de carteles con letra fiable = X/18» en los carteles reales.
 """
 
 from __future__ import annotations
@@ -30,7 +28,6 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from tools.adn_unido.esquema import (
-    CNN_MOTIVO_ESPERADO,
     COMMIT_ADN_TIPO,
     calcular_sha256_ficha_sin_fecha,
     validar_ficha_unida,
@@ -39,7 +36,7 @@ from tools.adn_unido.estudiar_todo import (
     EXTENSIONES_IMAGEN,
     _resolver_dir_cache_adn_tipo,
     estudiar_carpeta,
-    evaluar_matriz_confusion_vecino,
+    evaluar_regimenes_abc_vecino,
     resolver_piezas_carpeta,
 )
 
@@ -192,10 +189,10 @@ def ejecutar_pruebas_unido(
     carpeta_corpus: Path = CORPUS_D3_DEFAULT,
     carpeta_salida_persistente: Path | None = None,
 ) -> Tuple[bool, List[Tuple[str, bool, str]], List[Dict[str, Any]], Dict[str, Any]]:
-    """Ejecuta las 4 pruebas obligatorias + Prueba 5 (dato de fiabilidad X/18 sin umbral de aprobado)."""
+    """Ejecuta las 4 pruebas obligatorias + Prueba 5 (dato de fiabilidad X/18 y evaluación de regímenes A, B, C)."""
     repo_root = Path(__file__).resolve().parents[2]
     dir_cache = _resolver_dir_cache_adn_tipo(repo_root / "tools" / "adn_tipo")
-    auditoria_anton = evaluar_matriz_confusion_vecino(dir_cache)
+    auditoria_abc = evaluar_regimenes_abc_vecino(dir_cache)
 
     piezas_esperadas = resolver_piezas_carpeta(carpeta_corpus)
     num_esperado = len(piezas_esperadas)
@@ -271,7 +268,7 @@ def ejecutar_pruebas_unido(
         # Prueba 4: tools/adn_tipo/ idéntico byte a byte a dc5ddd5
         ok_p4, msg_p4 = verificar_identidad_adn_tipo(repo_root, COMMIT_ADN_TIPO)
 
-        # Prueba 5 (Fase 4c): «nº de carteles con letra fiable = X/18», reportado sin umbral de aprobado.
+        # Prueba 5 (Fase 4d): «nº de carteles con letra fiable = X/18», reportado como dato
         carteles_fiables = 0
         total_carteles = 0
         tamanos_imposibles_tot = 0
@@ -294,30 +291,33 @@ def ejecutar_pruebas_unido(
             n_ok = int(filtro.get("palabras_3plus_reconocidas", 0))
             n_tot = int(filtro.get("palabras_3plus_totales", 0))
 
-            aud_m = tip.get("metricas_letra") if isinstance(tip.get("metricas_letra"), dict) else tip.get("metricas_letra_descartadas_auditoria") or {}
-            fuente_bruta = aud_m.get("fuente_vecino_bruta_sesgada", "sin_texto_ocr")
+            datos_m = (
+                tip.get("metricas_letra")
+                if isinstance(tip.get("metricas_letra"), dict)
+                else (tip.get("metricas_letra_descartadas_auditoria") or {})
+            )
+            fuente_top1 = str(datos_m.get("fuente_vecino_top1", "sin_texto_ocr"))
+            cuota_f = float(datos_m.get("cuota_fuente_top1", 0.0))
+            votos_str = str(datos_m.get("votos_fuente_top1", "0/0"))
 
             filas_18_carteles.append(
                 {
                     "cartel": pieza.name,
                     "fiable": "sí" if es_fiable else "no",
-                    "motivo": tip.get("motivo_fiabilidad", ""),
+                    "fuente": fuente_top1 if es_fiable else f"no_fiable (C: {fuente_top1})",
+                    "cuota": f"{cuota_f * 100:.2f}% ({votos_str})",
                     "fraccion_palabras_reales": f"{frac:.4f} ({n_ok}/{n_tot})",
-                    "fuente_o_sesgado": (
-                        f"sesgado (bruta: {fuente_bruta})"
-                        if tip.get("sesgo_vecino", {}).get("es_sesgado")
-                        else str(tip.get("fuente_detectada"))
-                    ),
                     "confianza_tipo": float(tip.get("confianza_tipo", 0.0)),
-                    "tam_imposibles": int(cota_t.get("tamanos_imposibles_detectados", 0)),
+                    "motivo": tip.get("motivo_fiabilidad", ""),
                 }
             )
 
-        ok_p5 = total_carteles == 18
+        reg_c = auditoria_abc["regimen_C_recorte_nativo_tesseract"]
+        ok_p5 = (total_carteles == 18) and bool(auditoria_abc["exito_prerregistro_c"])
         msg_p5 = (
             f"nº de carteles con letra fiable = {carteles_fiables}/{total_carteles} "
-            f"(reportado sin umbral de aprobado; tamaños imposibles descartados={tamanos_imposibles_tot}; "
-            f"sesgo Anton en rejilla={auditoria_anton['regimen_rejilla_cartel_8x8']['proporcion_anton'] * 100:.2f}% > 25%)"
+            f"(Régimen C cumple prerregistro: acierto={reg_c['exactitud_top1'] * 100:.2f}% >= 50%, "
+            f"cuota Anton={reg_c['proporcion_anton'] * 100:.2f}% <= 16.67%; fuente_vecino_top1 des-sesgada)"
         )
 
     pruebas = [
@@ -325,15 +325,15 @@ def ejecutar_pruebas_unido(
         ("2. Determinismo estricto (2 corridas sin fecha_utc)", ok_p2, msg_p2),
         ("3. Integridad del lote (0 pérdidas, 0 duplicados)", ok_p3, msg_p3),
         ("4. Inmutabilidad byte a byte de tools/adn_tipo/ (dc5ddd5)", ok_p4, msg_p4),
-        ("5. Dato de letra fiable en carteles (sin umbral de aprobado)", ok_p5, msg_p5),
+        ("5. Régimen C y dato de letra fiable en carteles (sin umbral de aprobado)", ok_p5, msg_p5),
     ]
     todo_ok = all(ok for _, ok, _ in pruebas)
-    return todo_ok, pruebas, filas_18_carteles, auditoria_anton
+    return todo_ok, pruebas, filas_18_carteles, auditoria_abc
 
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Ejecuta las 5 pruebas de medir_unido.py (Fase 4c) sobre el corpus D-3."
+        description="Ejecuta las 5 pruebas de medir_unido.py (Fase 4d) sobre el corpus D-3."
     )
     parser.add_argument(
         "--corpus",
@@ -347,37 +347,43 @@ def main(argv: List[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    todo_ok, pruebas, filas_18, auditoria_anton = ejecutar_pruebas_unido(
+    todo_ok, pruebas, filas_18, auditoria_abc = ejecutar_pruebas_unido(
         Path(args.corpus).expanduser().resolve(),
         Path(args.guardar_fichas).expanduser().resolve() if args.guardar_fichas else None,
     )
 
-    print("=== MEDIR_UNIDO · FASE 4c (LETRA FIABLE + AUDITORÍA DE SESGO ANTON) ===")
+    print("=== MEDIR_UNIDO · FASE 4d (RECORTE NATIVO POR CARÁCTER · RÉGIMEN C) ===")
     for nombre, ok, detalle in pruebas:
         estado = "PASS" if ok else "FAIL"
         print(f"[{estado}] {nombre}: {detalle}")
 
-    print("\n=== TABLA DE 18 CARTELES (FASE 4c) ===")
-    print(
-        f"{'Cartel':<32} | {'Fiable':<6} | {'Fracción >=3l':<15} | {'Fuente / Sesgo':<26} | {'Motivo'}"
-    )
-    print("-" * 145)
-    for r in filas_18:
+    print("\n=== RESUMEN DE LOS 3 REGÍMENES SOBRE LOS 700 GLIFOS SINTÉTICOS ===")
+    for clave, titulo in (
+        ("regimen_A_aislado_64x64", "Régimen A (aislado nativo 64x64)"),
+        ("regimen_B_rejilla_8x8", "Régimen B (rejilla 192px / 8x8 -> 32x32)"),
+        ("regimen_C_recorte_nativo_tesseract", "Régimen C (recorte nativo por caja Tesseract)"),
+    ):
+        r_info = auditoria_abc[clave]
         print(
-            f"{r['cartel']:<32} | {r['fiable']:<6} | {r['fraccion_palabras_reales']:<15} | {r['fuente_o_sesgado']:<26} | {r['motivo']}"
+            f"- {titulo:<46} | Acierto: {r_info['aciertos']}/700 ({r_info['exactitud_top1'] * 100:.2f}%) "
+            f"| Cuota Anton: {r_info['predicciones_por_familia']['Anton']}/700 ({r_info['proporcion_anton'] * 100:.2f}%)"
         )
 
-    fams = auditoria_anton["familias"]
-    print("\n=== MATRIZ DE CONFUSIÓN 12 FAMILIAS (700 GLIFOS SINTÉTICOS · NATIVO 64x64) ===")
-    cm64 = auditoria_anton["nativo_64x64"]["matriz_confusion"]
-    for f in fams:
-        row_s = " ".join(f"{cm64[f][f2]:3d}" for f2 in fams)
-        print(f"{f:<16} | {row_s}")
+    print("\n=== TABLA DE 18 CARTELES (FASE 4d · RÉGIMEN C) ===")
+    print(
+        f"{'Cartel':<32} | {'Fiable':<6} | {'Fuente (Régimen C)':<24} | {'Cuota en cartel':<18} | {'Fracción >=3l':<14} | {'Conf.Tipo':<9}"
+    )
+    print("-" * 120)
+    for r in filas_18:
+        print(
+            f"{r['cartel']:<32} | {r['fiable']:<6} | {r['fuente']:<24} | {r['cuota']:<18} | {r['fraccion_palabras_reales']:<14} | {r['confianza_tipo']:.4f}"
+        )
 
-    print("\n=== MATRIZ DE CONFUSIÓN 12 FAMILIAS (700 GLIFOS · RÉGIMEN REJILLA CARTEL 8x8 -> 32x32) ===")
-    cmlr = auditoria_anton["regimen_rejilla_cartel_8x8"]["matriz_confusion"]
+    fams = auditoria_abc["familias"]
+    print("\n=== MATRIZ DE CONFUSIÓN RÉGIMEN C (700 GLIFOS · RECORTE NATIVO CAJA TESSERACT) ===")
+    cmc = auditoria_abc["regimen_C_recorte_nativo_tesseract"]["matriz_confusion"]
     for f in fams:
-        row_s = " ".join(f"{cmlr[f][f2]:3d}" for f2 in fams)
+        row_s = " ".join(f"{cmc[f][f2]:3d}" for f2 in fams)
         print(f"{f:<16} | {row_s}")
 
     pasadas = sum(1 for _, ok, _ in pruebas if ok)

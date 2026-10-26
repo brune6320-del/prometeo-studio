@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""ADN Unido (Fase 4c · Letra fiable en CPU, 0 Colab): genera <nombre>.ficha.json por pieza.
+"""ADN Unido (Fase 4d · Recorte nativo por carácter en CPU, 0 Colab): genera <nombre>.ficha.json.
 
-Implementa las 4 reglas prerregistradas en ESQUEMA.md (2026-10-26):
-1. Filtro de basura OCR: fracción de palabras de >=3 letras reconocidas por pyspellchecker
-   (es + en + de + fr). Si < 0.50 o confianza_tipo < 0.35 -> "fiable": false, motivo explícito
-   y metricas_letra = "no_fiable".
-2. Prueba de colapso «Anton»: evalúa el vecino de fuentes sobre el dataset sintético de
-   tools/adn_tipo (700 glifos con fuente conocida en las 12 familias, tanto en 64x64 nativo
-   como en el régimen de rejilla de cartel). Como Anton supera 3 * (1/12) = 25% en el régimen
-   de cartel (64.00% en sintético reescalado y 70.59% en los carteles), declara sesgo y marca
-   fuente_vecino_top1 = "sesgado".
-3. Cota física de tamaño: si tamano_pt supera la altura de la imagen en puntos a 96 DPI
-   (alto_px * 72 / 96), marca el valor como "imposible" y no lo propaga.
-4. No modifica un solo byte de tools/adn_tipo/ (dc5ddd5).
+Implementa el Régimen C prerregistrado en ESQUEMA.md (2026-10-26):
+1. Cajas por carácter a resolución original: extrae simultáneamente .tsv y .box (makebox /
+   image_to_boxes) con Tesseract 5.5.3 sobre la imagen a resolución ORIGINAL, recorta cada
+   carácter con margen exterior para estimar el color de papel y lo centra en una plantilla
+   64x64 idéntica a la galería sintética (tools/adn_tipo/inferir.py líneas 29-31).
+2. Evalúa los 3 regímenes (A: aislado 64x64, B: rejilla 8x8 -> 32x32, C: recorte nativo por
+   caja de Tesseract en láminas de cartel) sobre los 700 glifos sintéticos.
+3. Si el Régimen C cumple el prerregistro (acierto >= 50% y cuota de Anton <= 2 * 1/12 = 16,67%),
+   fuente_vecino_top1 deja de marcarse como "sesgado" y reporta la fuente ganadora y su cuota.
+4. Mantiene intactos los filtros de Fase 4c (fracción de palabras reales >= 0,50 en es+en+de+fr,
+   confianza_tipo >= 0,35 y descarte de tamano_pt > alto_imagen_pt_96dpi como "imposible")
+   sin tocar un solo byte de tools/adn_tipo/ (dc5ddd5).
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import zlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -46,7 +47,7 @@ for _venv_sp in _RUTAS_VENV_CANDIDATAS:
         sys.path.insert(0, str(_venv_sp))
 
 from tools.adn_diseno.estudiar import estudiar_lienzo
-from tools.adn_diseno.lector import LienzoLab, cargar_referente
+from tools.adn_diseno.lector import LienzoLab, cargar_referente, srgb_a_lab
 from tools.adn_unido.esquema import (
     CNN_MOTIVO_ESPERADO,
     COMMIT_ADN_DISENO,
@@ -55,9 +56,10 @@ from tools.adn_unido.esquema import (
     SCHEMA_VERSION_ADN_DISENO,
     SCHEMA_VERSION_ADN_TIPO,
     SCHEMA_VERSION_UNIDO,
+    UMBRAL_ACIERTO_REGIMEN_C,
+    UMBRAL_ANTON_REGIMEN_C,
     UMBRAL_CONFIANZA_TIPO,
     UMBRAL_FRACCION_PALABRAS_REALES,
-    UMBRAL_SESGO_ANTON,
     calcular_sha256_ficha_sin_fecha,
     validar_ficha_unida,
 )
@@ -74,7 +76,7 @@ GLIFOS_CATALOGO = set(
 )
 
 _GALERIA_CACHE_MEM: Optional[Dict[str, Any]] = None
-_AUDITORIA_ANTON_MEM: Optional[Dict[str, Any]] = None
+_AUDITORIA_ABC_MEM: Optional[Dict[str, Any]] = None
 _CORRECTORES_MULTI_MEM: Optional[Dict[str, Any]] = None
 
 
@@ -343,24 +345,23 @@ def _predecir_vecino_glifo(
     }
 
 
-def evaluar_matriz_confusion_vecino(dir_cache: Path) -> Dict[str, Any]:
-    """Ejecuta el vecino sobre los 700 glifos sintéticos (train + holdout) de tools/adn_tipo/.cache/dataset
-    tanto en resolución nativa 64x64 como en el régimen de rejilla de cartel (8x8 -> 32x32) y calcula
-    la matriz de confusión de las 12 familias y la cuota de predicción de Anton frente a 3*(1/12)=0.25."""
-    global _AUDITORIA_ANTON_MEM
+def evaluar_regimenes_abc_vecino(dir_cache: Path) -> Dict[str, Any]:
+    """Corre los 3 regímenes (A, B y C) sobre los 700 glifos sintéticos de tools/adn_tipo/.cache/dataset
+    y verifica si el Régimen C cumple el prerregistro de Fase 4d (acierto >= 50% y cuota Anton <= 16.67%)."""
+    global _AUDITORIA_ABC_MEM
     gal_mem = _cargar_galeria_buscador(dir_cache)
     gal_sha = gal_mem["galeria_sha256"]
 
-    if _AUDITORIA_ANTON_MEM is not None and _AUDITORIA_ANTON_MEM.get("galeria_sha256") == gal_sha:
-        return _AUDITORIA_ANTON_MEM
+    if _AUDITORIA_ABC_MEM is not None and _AUDITORIA_ABC_MEM.get("galeria_sha256") == gal_sha:
+        return _AUDITORIA_ABC_MEM
 
-    cache_cm = Path(f"/tmp/adn_tipo_confusion_anton_{gal_sha[:16]}.json")
-    if cache_cm.is_file():
+    cache_abc = Path(f"/tmp/adn_tipo_regimenes_abc_{gal_sha[:16]}.json")
+    if cache_abc.is_file():
         try:
-            datos_cm = json.loads(cache_cm.read_text(encoding="utf-8"))
-            if datos_cm.get("galeria_sha256") == gal_sha:
-                _AUDITORIA_ANTON_MEM = datos_cm
-                return datos_cm
+            datos_abc = json.loads(cache_abc.read_text(encoding="utf-8"))
+            if datos_abc.get("galeria_sha256") == gal_sha:
+                _AUDITORIA_ABC_MEM = datos_abc
+                return datos_abc
         except Exception:
             pass
 
@@ -370,85 +371,216 @@ def evaluar_matriz_confusion_vecino(dir_cache: Path) -> Dict[str, Any]:
     all_rows = train_rows + holdout_rows
     familias = sorted({r["familia"] for r in all_rows})
 
-    cm_64: Dict[str, Dict[str, int]] = {f1: {f2: 0 for f2 in familias} for f1 in familias}
-    cm_rejilla: Dict[str, Dict[str, int]] = {f1: {f2: 0 for f2 in familias} for f1 in familias}
+    cm_a: Dict[str, Dict[str, int]] = {f1: {f2: 0 for f2 in familias} for f1 in familias}
+    cm_b: Dict[str, Dict[str, int]] = {f1: {f2: 0 for f2 in familias} for f1 in familias}
+    cm_c: Dict[str, Dict[str, int]] = {f1: {f2: 0 for f2 in familias} for f1 in familias}
 
-    aciertos_64 = 0
-    aciertos_rejilla = 0
+    aciertos_a = 0
+    aciertos_b = 0
+    aciertos_c = 0
+    cajas_tesseract_c = 0
 
-    for r in all_rows:
-        filas_rgb = _leer_png_rgb_64(ds_dir / r["archivo"])
-        rs = sorted(px[0] for fila in filas_rgb for px in fila)
-        gs = sorted(px[1] for fila in filas_rgb for px in fila)
-        bs = sorted(px[2] for fila in filas_rgb for px in fila)
-        idx90 = min(len(rs) - 1, int(0.90 * (len(rs) - 1)))
-        pr, pg, pb = float(rs[idx90]), float(gs[idx90]), float(bs[idx90])
-        contraste = [
-            [math.sqrt((px[0] - pr) ** 2 + (px[1] - pg) ** 2 + (px[2] - pb) ** 2) for px in fila]
-            for fila in filas_rgb
-        ]
-        # 1. Evaluación nativa 64x64 sobre los glifos sintéticos aislados
-        sh_64, al_64 = _geometria_matriz_contraste(contraste, umbral_min=20.0, grid_n=32)
-        p_64 = _predecir_vecino_glifo(gal_mem, str(r["texto"]), sh_64, alto_px_orig=al_64)
-        pred_f64 = p_64["fuente"] if p_64 else familias[0]
-        cm_64[r["familia"]][pred_f64] += 1
-        if pred_f64 == r["familia"]:
-            aciertos_64 += 1
+    tess_bin = _resolver_binario_tesseract() or "/opt/homebrew/bin/tesseract"
+    env = dict(os.environ, OMP_THREAD_LIMIT="1", PYTHONHASHSEED=str(SEED_ADN_TIPO))
 
-        # 2. Evaluación en régimen de recorte de rejilla de cartel (8x8 -> 32x32)
-        sub_c = [[contraste[y * 8][x * 8] for x in range(8)] for y in range(8)]
-        sh_lr, al_lr = _geometria_matriz_contraste(sub_c, umbral_min=6.5, grid_n=32)
-        p_lr = _predecir_vecino_glifo(gal_mem, str(r["texto"]), sh_lr, alto_px_orig=al_lr)
-        pred_flr = p_lr["fuente"] if p_lr else familias[0]
-        cm_rejilla[r["familia"]][pred_flr] += 1
-        if pred_flr == r["familia"]:
-            aciertos_rejilla += 1
+    with tempfile.TemporaryDirectory(prefix="adn_regimen_c_") as tmpd:
+        for sheet_idx in range(0, len(all_rows), 50):
+            chunk = all_rows[sheet_idx : sheet_idx + 50]
+            cols, rows_n = 10, 5
+            W, H = cols * 64, rows_n * 64
+            row_stride = (W * 3 + 3) & ~3
+            img_size = row_stride * H
+            header = struct.pack("<2sIHHI", b"BM", 54 + img_size, 0, 0, 54)
+            dib = struct.pack("<IiiHHIIiiII", 40, W, -H, 1, 24, 0, img_size, 3780, 3780, 0, 0)
+            bmp_bytes = bytearray(header + dib + b"\xf5" * img_size)
+            cell_grids: List[List[List[Tuple[int, int, int]]]] = []
+
+            for i_c, r in enumerate(chunk):
+                filas_rgb = _leer_png_rgb_64(ds_dir / r["archivo"])
+                cell_grids.append(filas_rgb)
+
+                # --- Régimen A (aislado 64x64) y Régimen B (rejilla 8x8 -> 32x32) ---
+                rs = sorted(px[0] for fila in filas_rgb for px in fila)
+                gs = sorted(px[1] for fila in filas_rgb for px in fila)
+                bs = sorted(px[2] for fila in filas_rgb for px in fila)
+                idx90 = min(len(rs) - 1, int(0.90 * (len(rs) - 1)))
+                pr, pg, pb = float(rs[idx90]), float(gs[idx90]), float(bs[idx90])
+                contraste_a = [
+                    [math.sqrt((px[0] - pr) ** 2 + (px[1] - pg) ** 2 + (px[2] - pb) ** 2) for px in fila]
+                    for fila in filas_rgb
+                ]
+                sh_a, al_a = _geometria_matriz_contraste(contraste_a, umbral_min=20.0, grid_n=32)
+                p_a = _predecir_vecino_glifo(gal_mem, str(r["texto"]), sh_a, alto_px_orig=al_a)
+                pred_fa = p_a["fuente"] if p_a else familias[0]
+                cm_a[r["familia"]][pred_fa] += 1
+                if pred_fa == r["familia"]:
+                    aciertos_a += 1
+
+                sub_b = [[contraste_a[y * 8][x * 8] for x in range(8)] for y in range(8)]
+                sh_b, al_b = _geometria_matriz_contraste(sub_b, umbral_min=6.5, grid_n=32)
+                p_b = _predecir_vecino_glifo(gal_mem, str(r["texto"]), sh_b, alto_px_orig=al_b)
+                pred_fb = p_b["fuente"] if p_b else familias[0]
+                cm_b[r["familia"]][pred_fb] += 1
+                if pred_fb == r["familia"]:
+                    aciertos_b += 1
+
+                # Montar celda en lámina de cartel para Régimen C
+                cy0 = (i_c // cols) * 64
+                cx0 = (i_c % cols) * 64
+                for y in range(64):
+                    base_off = 54 + (cy0 + y) * row_stride + cx0 * 3
+                    fila = filas_rgb[y]
+                    for x in range(64):
+                        rv, gv, bv = fila[x]
+                        off = base_off + x * 3
+                        bmp_bytes[off] = bv
+                        bmp_bytes[off + 1] = gv
+                        bmp_bytes[off + 2] = rv
+
+            bmp_path = Path(tmpd) / f"sheet_{sheet_idx}.bmp"
+            bmp_path.write_bytes(bytes(bmp_bytes))
+            res_box = subprocess.run(
+                [
+                    tess_bin,
+                    str(bmp_path),
+                    "stdout",
+                    "-l",
+                    "spa+eng",
+                    "--psm",
+                    str(PSM_FIJO_OCR),
+                    "--oem",
+                    str(OEM_FIJO_OCR),
+                    "-c",
+                    "OMP_THREAD_LIMIT=1",
+                    "batch.nochop",
+                    "makebox",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
+                timeout=30,
+            )
+            boxes: List[Tuple[str, int, int, int, int]] = []
+            for line in res_box.stdout.splitlines():
+                parts = line.split()
+                if len(parts) >= 5:
+                    ch = parts[0]
+                    try:
+                        x0, b_y0, x1, b_y1 = map(int, parts[1:5])
+                    except ValueError:
+                        continue
+                    y0 = H - b_y1
+                    y1 = H - b_y0
+                    if x1 > x0 and y1 > y0:
+                        boxes.append((ch, x0, y0, x1, y1))
+
+            # --- Régimen C: recorte nativo por caja de símbolo de Tesseract + centrado 64x64 ---
+            for i_c, r in enumerate(chunk):
+                g_rgb = cell_grids[i_c]
+                cy0 = (i_c // cols) * 64
+                cx0 = (i_c % cols) * 64
+                cy1, cx1 = cy0 + 64, cx0 + 64
+                c_boxes = [
+                    b
+                    for b in boxes
+                    if cx0 <= 0.5 * (b[1] + b[3]) < cx1 and cy0 <= 0.5 * (b[2] + b[4]) < cy1
+                ]
+                if c_boxes:
+                    cajas_tesseract_c += 1
+                    bx0 = max(0, min(b[1] - cx0 for b in c_boxes) - 3)
+                    by0 = max(0, min(b[2] - cy0 for b in c_boxes) - 3)
+                    bx1 = min(64, max(b[3] - cx0 for b in c_boxes) + 3)
+                    by1 = min(64, max(b[4] - cy0 for b in c_boxes) + 3)
+                else:
+                    bx0, by0, bx1, by1 = 0, 0, 64, 64
+
+                crop_rgb = [g_rgb[y][bx0:bx1] for y in range(by0, by1)]
+                cw = max(1, bx1 - bx0)
+                ch_px = max(1, by1 - by0)
+
+                rs = sorted(px[0] for fila in crop_rgb for px in fila)
+                gs = sorted(px[1] for fila in crop_rgb for px in fila)
+                bs = sorted(px[2] for fila in crop_rgb for px in fila)
+                idx90 = min(len(rs) - 1, int(0.90 * (len(rs) - 1)))
+                papel = (rs[idx90], gs[idx90], bs[idx90])
+
+                parche = [[papel] * 64 for _ in range(64)]
+                ox = max(0, min(64 - cw, 32 - cw // 2))
+                oy = max(0, min(64 - ch_px, 48 - ch_px))
+                for yy in range(min(64 - oy, ch_px)):
+                    for xx in range(min(64 - ox, cw)):
+                        parche[oy + yy][ox + xx] = crop_rgb[yy][xx]
+
+                pr, pg, pb = float(papel[0]), float(papel[1]), float(papel[2])
+                contraste_c = [
+                    [math.sqrt((px[0] - pr) ** 2 + (px[1] - pg) ** 2 + (px[2] - pb) ** 2) for px in fila]
+                    for fila in parche
+                ]
+                sh_c, al_c = _geometria_matriz_contraste(contraste_c, umbral_min=20.0, grid_n=32)
+                p_c = _predecir_vecino_glifo(gal_mem, str(r["texto"]), sh_c, alto_px_orig=al_c)
+                pred_fc = p_c["fuente"] if p_c else familias[0]
+                cm_c[r["familia"]][pred_fc] += 1
+                if pred_fc == r["familia"]:
+                    aciertos_c += 1
 
     n_tot = max(1, len(all_rows))
-    pred_tot_64 = {f: sum(cm_64[t][f] for t in familias) for f in familias}
-    pred_tot_rejilla = {f: sum(cm_rejilla[t][f] for t in familias) for f in familias}
+    pred_tot_a = {f: sum(cm_a[t][f] for t in familias) for f in familias}
+    pred_tot_b = {f: sum(cm_b[t][f] for t in familias) for f in familias}
+    pred_tot_c = {f: sum(cm_c[t][f] for t in familias) for f in familias}
 
-    prop_anton_64 = round(pred_tot_64.get("Anton", 0) / float(n_tot), 4)
-    prop_anton_rejilla = round(pred_tot_rejilla.get("Anton", 0) / float(n_tot), 4)
-    es_sesgado = (prop_anton_64 > UMBRAL_SESGO_ANTON) or (prop_anton_rejilla > UMBRAL_SESGO_ANTON)
+    acc_a = round(aciertos_a / float(n_tot), 4)
+    acc_b = round(aciertos_b / float(n_tot), 4)
+    acc_c = round(aciertos_c / float(n_tot), 4)
+
+    anton_a = round(pred_tot_a.get("Anton", 0) / float(n_tot), 4)
+    anton_b = round(pred_tot_b.get("Anton", 0) / float(n_tot), 4)
+    anton_c = round(pred_tot_c.get("Anton", 0) / float(n_tot), 4)
+
+    exito_prerregistro_c = (acc_c >= UMBRAL_ACIERTO_REGIMEN_C) and (anton_c <= UMBRAL_ANTON_REGIMEN_C)
+    es_sesgado_c = not exito_prerregistro_c
 
     resultado = {
         "galeria_sha256": gal_sha,
         "num_muestras_evaluadas": len(all_rows),
         "familias": familias,
         "cuota_uniforme_1_12": round(1.0 / 12.0, 4),
-        "umbral_colapso_3x": round(UMBRAL_SESGO_ANTON, 4),
-        "nativo_64x64": {
-            "exactitud_top1": round(aciertos_64 / float(n_tot), 4),
-            "predicciones_por_familia": pred_tot_64,
-            "proporcion_anton": prop_anton_64,
-            "matriz_confusion": cm_64,
+        "umbral_acierto_c": UMBRAL_ACIERTO_REGIMEN_C,
+        "umbral_anton_c_2x": round(UMBRAL_ANTON_REGIMEN_C, 4),
+        "regimen_A_aislado_64x64": {
+            "exactitud_top1": acc_a,
+            "aciertos": aciertos_a,
+            "predicciones_por_familia": pred_tot_a,
+            "proporcion_anton": anton_a,
+            "matriz_confusion": cm_a,
         },
-        "regimen_rejilla_cartel_8x8": {
-            "exactitud_top1": round(aciertos_rejilla / float(n_tot), 4),
-            "predicciones_por_familia": pred_tot_rejilla,
-            "proporcion_anton": prop_anton_rejilla,
-            "matriz_confusion": cm_rejilla,
+        "regimen_B_rejilla_8x8": {
+            "exactitud_top1": acc_b,
+            "aciertos": aciertos_b,
+            "predicciones_por_familia": pred_tot_b,
+            "proporcion_anton": anton_b,
+            "matriz_confusion": cm_b,
         },
-        "es_sesgado": es_sesgado,
-        "explicacion_sesgo": (
-            f"En glifos aislados 64x64 Anton gana {pred_tot_64.get('Anton', 0)}/{n_tot} ({prop_anton_64 * 100:.2f}%), "
-            f"pero al recortar glifos de baja resolución de la rejilla de cartel (8x8 -> 32x32) Anton gana "
-            f"{pred_tot_rejilla.get('Anton', 0)}/{n_tot} ({prop_anton_rejilla * 100:.2f}% > umbral 25.0%) y en los carteles D-3 "
-            "gana 12/17 (70.59%) porque Anton es la grotesca display de mayor masa negra en galeria.json y actúa "
-            "como sumidero L2 ante recortes gruesos o ruidosos."
-        ),
+        "regimen_C_recorte_nativo_tesseract": {
+            "exactitud_top1": acc_c,
+            "aciertos": aciertos_c,
+            "cajas_detectadas_tesseract": cajas_tesseract_c,
+            "predicciones_por_familia": pred_tot_c,
+            "proporcion_anton": anton_c,
+            "matriz_confusion": cm_c,
+        },
+        "exito_prerregistro_c": exito_prerregistro_c,
+        "es_sesgado": es_sesgado_c,
     }
     try:
-        cache_cm.write_text(json.dumps(resultado), encoding="utf-8")
+        cache_abc.write_text(json.dumps(resultado), encoding="utf-8")
     except Exception:
         pass
-    _AUDITORIA_ANTON_MEM = resultado
+    _AUDITORIA_ABC_MEM = resultado
     return resultado
 
 
 def _obtener_correctores_multilingues() -> Dict[str, Any]:
-    """Carga pyspellchecker para (es, en, de, fr)."""
     global _CORRECTORES_MULTI_MEM
     if _CORRECTORES_MULTI_MEM is not None:
         return _CORRECTORES_MULTI_MEM
@@ -461,7 +593,6 @@ def _obtener_correctores_multilingues() -> Dict[str, Any]:
 
 
 def _evaluar_filtro_basura_ocr(texto_ocr: str) -> Dict[str, Any]:
-    """Calcula la fracción de palabras de >=3 letras reconocidas por pyspellchecker (es + en + de + fr)."""
     tokens_3plus = re.findall(r"[^\W\d_]{3,}", texto_ocr, flags=re.UNICODE)
     if not tokens_3plus:
         return {
@@ -504,7 +635,6 @@ def _evaluar_filtro_basura_ocr(texto_ocr: str) -> Dict[str, Any]:
 
 
 def _ortografia_es(texto: str) -> List[Dict[str, Any]]:
-    """Replica tools/adn_tipo/comun.py:ortografia usando pyspellchecker (es)."""
     if not texto.strip():
         return []
     try:
@@ -527,82 +657,112 @@ def _ortografia_es(texto: str) -> List[Dict[str, Any]]:
         return []
 
 
-def _extraer_geometria_recorte_lab(
-    pixeles_lab: List[List[Tuple[float, float, float]]],
-    x0_g: int,
-    y0_g: int,
-    x1_g: int,
-    y1_g: int,
-) -> Tuple[List[float], float, List[float]]:
-    alto_g = len(pixeles_lab)
-    ancho_g = len(pixeles_lab[0]) if alto_g > 0 else 0
-    xa = max(0, min(ancho_g - 1, x0_g))
-    xb = max(xa + 1, min(ancho_g, x1_g))
-    ya = max(0, min(alto_g - 1, y0_g))
-    yb = max(ya + 1, min(alto_g, y1_g))
-
-    sub_lab = [pixeles_lab[y][xa:xb] for y in range(ya, yb)]
-    h_s = len(sub_lab)
-    w_s = len(sub_lab[0]) if h_s > 0 else 0
-    if h_s == 0 or w_s == 0:
-        return [0.0] * 1024, 0.0, [0.0, 0.0, 0.0]
-
-    ls = sorted(px[0] for fila in sub_lab for px in fila)
-    idx90 = min(len(ls) - 1, int(0.90 * (len(ls) - 1)))
-    idx10 = max(0, int(0.10 * (len(ls) - 1)))
-    borde_px = (
-        sub_lab[0]
-        + sub_lab[-1]
-        + [sub_lab[y][0] for y in range(h_s)]
-        + [sub_lab[y][-1] for y in range(h_s)]
+def _cargar_bmp_nativo(ruta_imagen: Path, tmp_dir: Path) -> Tuple[bytes, int, int, bool, int, int, int, int, int, int, int, int, int]:
+    """Convierte la imagen a BMP sin reescalar vía /usr/bin/sips y devuelve su descriptor de bytes."""
+    bmp_path = tmp_dir / f"{ruta_imagen.stem}_orig.bmp"
+    subprocess.run(
+        ["/usr/bin/sips", "-s", "format", "bmp", str(ruta_imagen), "--out", str(bmp_path)],
+        capture_output=True,
+        check=True,
+        timeout=30,
     )
-    l_borde_med = sorted(px[0] for px in borde_px)[len(borde_px) // 2]
-    usar_claro = abs(l_borde_med - ls[idx90]) <= abs(l_borde_med - ls[idx10])
-    l_ref = ls[idx90] if usar_claro else ls[idx10]
-    candidatos_papel = [
-        px for fila in sub_lab for px in fila if abs(px[0] - l_ref) <= 8.0
-    ] or borde_px
-    pl = sum(px[0] for px in candidatos_papel) / float(len(candidatos_papel))
-    pa = sum(px[1] for px in candidatos_papel) / float(len(candidatos_papel))
-    pb = sum(px[2] for px in candidatos_papel) / float(len(candidatos_papel))
+    data = bmp_path.read_bytes()
+    pixel_offset = struct.unpack_from("<I", data, 10)[0]
+    dib_size = struct.unpack_from("<I", data, 14)[0]
+    width, height_signed, _, bpp, compression = struct.unpack_from("<iiHHI", data, 18)
+    top_down = height_signed < 0
+    height = abs(height_signed)
+    bytes_pp = bpp // 8
+    row_stride = ((width * bpp + 31) // 32) * 4
+    rmask, gmask, bmask = 0x00FF0000, 0x0000FF00, 0x000000FF
+    if compression == 3 and dib_size >= 52:
+        rmask, gmask, bmask = struct.unpack_from("<III", data, 54)
 
-    contraste: List[List[float]] = []
-    max_c = 0.0
-    for fila in sub_lab:
-        fila_c: List[float] = []
-        for l_v, a_v, b_v in fila:
-            c = math.sqrt((l_v - pl) ** 2 + (a_v - pa) ** 2 + (b_v - pb) ** 2)
-            fila_c.append(c)
-            if c > max_c:
-                max_c = c
-        contraste.append(fila_c)
+    def _shift_max(m: int) -> Tuple[int, int]:
+        if m == 0:
+            return 0, 1
+        s = (m & -m).bit_length() - 1
+        return s, (m >> s) or 1
 
-    shape, alto_act = _geometria_matriz_contraste(contraste, umbral_min=6.5, grid_n=32)
-
-    thr_ink = max(6.5, max_c * 0.70)
-    nucleo_tinta = [
-        sub_lab[y][x]
-        for y in range(h_s)
-        for x in range(w_s)
-        if contraste[y][x] >= thr_ink
-    ]
-    if not nucleo_tinta:
-        nucleo_tinta = [sub_lab[h_s // 2][w_s // 2]]
-    ls_t = sorted(px[0] for px in nucleo_tinta)
-    as_t = sorted(px[1] for px in nucleo_tinta)
-    bs_t = sorted(px[2] for px in nucleo_tinta)
-    m = len(nucleo_tinta) // 2
-    tinta_lab = [round(ls_t[m], 3), round(as_t[m], 3), round(bs_t[m], 3)]
-    return shape, alto_act, tinta_lab
+    rs, rmax = _shift_max(rmask)
+    gs, gmax = _shift_max(gmask)
+    bs, bmax = _shift_max(bmask)
+    return (
+        data,
+        pixel_offset,
+        width,
+        height,
+        top_down,
+        bytes_pp,
+        row_stride,
+        compression,
+        rs,
+        rmax,
+        gs,
+        gmax,
+        bs,
+        bmax,
+    )
 
 
-def _ejecutar_camino_b_sin_cnn(
+def _recortar_bmp_nativo_rgb(
+    bmp_info: Tuple[Any, ...],
+    x0: int,
+    y0: int,
+    x1: int,
+    y1: int,
+) -> List[List[Tuple[int, int, int]]]:
+    """Recorta una caja (x0, y0, x1, y1) directamente a la resolución ORIGINAL del BMP."""
+    (
+        data,
+        pixel_offset,
+        width,
+        height,
+        top_down,
+        bytes_pp,
+        row_stride,
+        compression,
+        rs,
+        rmax,
+        gs,
+        gmax,
+        bs,
+        bmax,
+    ) = bmp_info
+    xa = max(0, min(width - 1, x0))
+    xb = max(xa + 1, min(width, x1))
+    ya = max(0, min(height - 1, y0))
+    yb = max(ya + 1, min(height, y1))
+    filas: List[List[Tuple[int, int, int]]] = []
+    for y in range(ya, yb):
+        src_y = y if top_down else (height - 1 - y)
+        row_start = pixel_offset + src_y * row_stride
+        fila: List[Tuple[int, int, int]] = []
+        for x in range(xa, xb):
+            px_off = row_start + x * bytes_pp
+            if bytes_pp == 3:
+                b_v, g_v, r_v = data[px_off], data[px_off + 1], data[px_off + 2]
+            else:
+                val = struct.unpack_from("<I", data, px_off)[0]
+                if compression == 3:
+                    r_v = int(((val >> rs) & rmax) * 255 // rmax)
+                    g_v = int(((val >> gs) & gmax) * 255 // gmax)
+                    b_v = int(((val >> bs) & bmax) * 255 // bmax)
+                else:
+                    b_v, g_v, r_v = data[px_off], data[px_off + 1], data[px_off + 2]
+            fila.append((r_v, g_v, b_v))
+        filas.append(fila)
+    return filas
+
+
+def _ejecutar_camino_b_regimen_c(
     ruta_pieza: Path,
     lienzo: LienzoLab,
     dir_adn_tipo: Path,
     escala_diseno: Optional[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Ejecuta en CPU Camino B sin CNN con filtro de basura OCR, control de sesgo Anton y cota de tamaño."""
+    """Ejecuta en CPU el Camino B sin CNN usando el Régimen C (recorte nativo por caja de carácter
+    de Tesseract a resolución original del cartel + centrado en plantilla 64x64)."""
     tess_bin = _resolver_binario_tesseract()
     dir_cache = _resolver_dir_cache_adn_tipo(dir_adn_tipo)
 
@@ -614,6 +774,7 @@ def _ejecutar_camino_b_sin_cnn(
     if tess_bin is None or not (dir_cache / "dataset" / "galeria.json").is_file():
         return {
             "estado": "no_calculado",
+            "regimen_recorte": "C_nativo_por_caracter",
             "fiable": False,
             "motivo_fiabilidad": "Falta ejecutable tesseract o galería sintética tools/adn_tipo/.cache/dataset/galeria.json.",
             "motivo": "Falta ejecutable tesseract o galería sintética tools/adn_tipo/.cache/dataset/galeria.json.",
@@ -623,212 +784,312 @@ def _ejecutar_camino_b_sin_cnn(
         }
 
     galeria_mem = _cargar_galeria_buscador(dir_cache)
-    auditoria_anton = evaluar_matriz_confusion_vecino(dir_cache)
-    es_sesgado_anton = bool(auditoria_anton["es_sesgado"])
+    auditoria_abc = evaluar_regimenes_abc_vecino(dir_cache)
+    es_sesgado_c = bool(auditoria_abc["es_sesgado"])
     tess_ver = _version_tesseract(tess_bin)
 
     resumen_sesgo = {
-        "familia_auditada": "Anton",
-        "cuota_uniforme_1_12": auditoria_anton["cuota_uniforme_1_12"],
-        "umbral_colapso_3x": auditoria_anton["umbral_colapso_3x"],
-        "proporcion_anton_galeria_64x64": auditoria_anton["nativo_64x64"]["proporcion_anton"],
-        "proporcion_anton_rejilla_cartel": auditoria_anton["regimen_rejilla_cartel_8x8"]["proporcion_anton"],
-        "proporcion_anton_carteles_d3": round(12.0 / 17.0, 4),
-        "es_sesgado": es_sesgado_anton,
+        "regimen_aplicado": "C_nativo_por_caracter",
+        "exito_prerregistro_c": auditoria_abc["exito_prerregistro_c"],
+        "es_sesgado": es_sesgado_c,
+        "acierto_regimen_A_64x64": auditoria_abc["regimen_A_aislado_64x64"]["exactitud_top1"],
+        "cuota_anton_regimen_A": auditoria_abc["regimen_A_aislado_64x64"]["proporcion_anton"],
+        "acierto_regimen_B_rejilla": auditoria_abc["regimen_B_rejilla_8x8"]["exactitud_top1"],
+        "cuota_anton_regimen_B": auditoria_abc["regimen_B_rejilla_8x8"]["proporcion_anton"],
+        "acierto_regimen_C_nativo": auditoria_abc["regimen_C_recorte_nativo_tesseract"]["exactitud_top1"],
+        "cuota_anton_regimen_C": auditoria_abc["regimen_C_recorte_nativo_tesseract"]["proporcion_anton"],
+        "umbral_acierto_c": UMBRAL_ACIERTO_REGIMEN_C,
+        "umbral_anton_c_2x": round(UMBRAL_ANTON_REGIMEN_C, 4),
     }
 
     env = dict(os.environ, OMP_THREAD_LIMIT="1", PYTHONHASHSEED=str(SEED_ADN_TIPO))
-    cmd_tsv = [
-        tess_bin,
-        str(ruta_pieza),
-        "stdout",
-        "-l",
-        "spa+eng",
-        "--psm",
-        str(PSM_FIJO_OCR),
-        "--oem",
-        str(OEM_FIJO_OCR),
-        "-c",
-        "OMP_THREAD_LIMIT=1",
-        "-c",
-        "preserve_interword_spaces=1",
-        "tsv",
-    ]
-    res_tsv = subprocess.run(cmd_tsv, capture_output=True, text=True, check=False, env=env, timeout=30)
+    with tempfile.TemporaryDirectory(prefix="adn_unido_c_") as tmp_dir_str:
+        tmp_dir = Path(tmp_dir_str)
+        bmp_info = _cargar_bmp_nativo(ruta_pieza, tmp_dir)
+        W_orig, H_orig = bmp_info[2], bmp_info[3]
 
-    palabras_tsv: List[Dict[str, Any]] = []
-    for linea in res_tsv.stdout.splitlines()[1:]:
-        partes = linea.split("\t")
-        if len(partes) < 12:
-            continue
-        texto_w = partes[11].strip()
-        if not texto_w or not any(c.isalnum() for c in texto_w):
-            continue
-        try:
-            left = int(partes[6])
-            top = int(partes[7])
-            width = int(partes[8])
-            height = int(partes[9])
-            conf_w = float(partes[10])
-            block_num = int(partes[2])
-            par_num = int(partes[3])
-            line_num = int(partes[4])
-        except ValueError:
-            continue
-        if width <= 0 or height <= 0:
-            continue
-        palabras_tsv.append(
-            {
-                "texto": texto_w,
-                "left": left,
-                "top": top,
-                "width": width,
-                "height": height,
-                "conf": max(0.0, conf_w),
-                "grupo": (block_num, par_num, line_num),
-            }
-        )
+        base_out = tmp_dir / "tess_out"
+        cmd_tess = [
+            tess_bin,
+            str(ruta_pieza),
+            str(base_out),
+            "-l",
+            "spa+eng",
+            "--psm",
+            str(PSM_FIJO_OCR),
+            "--oem",
+            str(OEM_FIJO_OCR),
+            "-c",
+            "OMP_THREAD_LIMIT=1",
+            "-c",
+            "preserve_interword_spaces=1",
+            "tsv",
+            "batch.nochop",
+            "makebox",
+        ]
+        subprocess.run(cmd_tess, capture_output=True, text=True, check=False, env=env, timeout=30)
 
-    motor_ocr_info = {
-        "binario": tess_bin,
-        "version": tess_ver,
-        "lenguajes": "spa+eng",
-        "psm": PSM_FIJO_OCR,
-        "oem": OEM_FIJO_OCR,
-        "omp_thread_limit": 1,
-        "semilla": SEED_ADN_TIPO,
-        "galeria_sha256": galeria_mem["galeria_sha256"],
-    }
+        tsv_path = base_out.with_suffix(".tsv")
+        box_path = base_out.with_suffix(".box")
+        tsv_lines = tsv_path.read_text(encoding="utf-8", errors="replace").splitlines()[1:] if tsv_path.is_file() else []
+        box_lines = box_path.read_text(encoding="utf-8", errors="replace").splitlines() if box_path.is_file() else []
 
-    resumen_estructural = None
-    if isinstance(escala_diseno, dict):
-        resumen_estructural = {
-            "hay_texto_detectado": escala_diseno.get("hay_texto_detectado"),
-            "niveles_detectados": escala_diseno.get("niveles_detectados"),
-            "alturas_relativas_lineas": escala_diseno.get("alturas_relativas_lineas"),
-            "razon_escala": escala_diseno.get("razon_escala"),
-            "densidad_tipografica_rel": escala_diseno.get("densidad_tipografica_rel"),
-        }
-
-    alto_imagen_pt_96dpi = round(lienzo.alto_original * (72.0 / DPI_REFERENCIA_CARTEL), 2)
-
-    if not palabras_tsv:
-        filtro_vacio = _evaluar_filtro_basura_ocr("")
-        return {
-            "estado": "sin_texto_ocr",
-            "fiable": False,
-            "motivo_fiabilidad": (
-                "No fiable: 0 palabras detectadas por OCR (--psm 6); "
-                "fraccion_palabras_reales=0.0000 < 0.50 y confianza_tipo=0.0000 < 0.35."
-            ),
-            "motivo": (
-                f"Tesseract {tess_ver} (--psm {PSM_FIJO_OCR} --oem {OEM_FIJO_OCR} -l spa+eng) "
-                "no detectó palabras alfanuméricas en este cartel."
-            ),
-            "fuente_detectada": "no_fiable",
-            "cnn": bloque_cnn,
-            "motor_ocr": motor_ocr_info,
-            "filtro_ocr": filtro_vacio,
-            "sesgo_vecino": resumen_sesgo,
-            "cota_tamano_pt": {
-                "alto_imagen_px": lienzo.alto_original,
-                "alto_imagen_pt_96dpi": alto_imagen_pt_96dpi,
-                "tamanos_imposibles_detectados": 0,
-            },
-            "texto_ocr": "",
-            "texto_ocr_resumen": "sin_texto_ocr",
-            "num_palabras_ocr": 0,
-            "num_glifos_analizados": 0,
-            "metricas_letra": "no_fiable",
-            "confianza_tipo": 0.0,
-            "ortografia": [],
-            "spans_muestra": [],
-            "estimacion_estructural_adn_diseno": resumen_estructural,
-        }
-
-    alto_grid = len(lienzo.pixeles_lab)
-    ancho_grid = len(lienzo.pixeles_lab[0]) if alto_grid > 0 else 1
-    sx = ancho_grid / float(max(1, lienzo.ancho_original))
-    sy = alto_grid / float(max(1, lienzo.alto_original))
-    factor_pt = 72.0 / DPI_REFERENCIA_CARTEL
-
-    spans: List[Dict[str, Any]] = []
-    votos_familia: collections.Counter[str] = collections.Counter()
-    votos_peso: collections.Counter[int] = collections.Counter()
-    tamanos_pt_validos: List[float] = []
-    tamanos_imposibles_cnt = 0
-    cursivas_flag: List[float] = []
-    tintas_lab: List[List[float]] = []
-    confs_glifo: List[float] = []
-
-    for w_info in palabras_tsv:
-        palabra = w_info["texto"]
-        wx0 = w_info["left"]
-        wy0 = w_info["top"]
-        ww = w_info["width"]
-        wh = w_info["height"]
-        caracteres_validos = [c for c in palabra if c in GLIFOS_CATALOGO]
-        if not caracteres_validos:
-            continue
-        n_chars = len(caracteres_validos)
-        paso_x = ww / float(n_chars)
-
-        for idx_c, car in enumerate(caracteres_validos):
-            cx0_orig = wx0 + idx_c * paso_x
-            cx1_orig = wx0 + (idx_c + 1) * paso_x
-            cy0_orig = wy0
-            cy1_orig = wy0 + wh
-
-            gx0 = int(round(cx0_orig * sx))
-            gx1 = max(gx0 + 1, int(round(cx1_orig * sx)))
-            gy0 = int(round(cy0_orig * sy))
-            gy1 = max(gy0 + 1, int(round(cy1_orig * sy)))
-
-            shape_32, _, tinta_lab = _extraer_geometria_recorte_lab(
-                lienzo.pixeles_lab, gx0, gy0, gx1, gy1
+        palabras_tsv: List[Dict[str, Any]] = []
+        for linea in tsv_lines:
+            partes = linea.split("\t")
+            if len(partes) < 12:
+                continue
+            texto_w = partes[11].strip()
+            if not texto_w or not any(c.isalnum() for c in texto_w):
+                continue
+            try:
+                left = int(partes[6])
+                top = int(partes[7])
+                width = int(partes[8])
+                height = int(partes[9])
+                conf_w = float(partes[10])
+                block_num = int(partes[2])
+                par_num = int(partes[3])
+                line_num = int(partes[4])
+            except ValueError:
+                continue
+            if width <= 0 or height <= 0:
+                continue
+            palabras_tsv.append(
+                {
+                    "texto": texto_w,
+                    "left": left,
+                    "top": top,
+                    "width": width,
+                    "height": height,
+                    "conf": max(0.0, conf_w),
+                    "grupo": (block_num, par_num, line_num),
+                }
             )
+
+        motor_ocr_info = {
+            "binario": tess_bin,
+            "version": tess_ver,
+            "lenguajes": "spa+eng",
+            "psm": PSM_FIJO_OCR,
+            "oem": OEM_FIJO_OCR,
+            "omp_thread_limit": 1,
+            "semilla": SEED_ADN_TIPO,
+            "modo_cajas": "makebox_nativo_mas_tsv",
+            "galeria_sha256": galeria_mem["galeria_sha256"],
+        }
+
+        resumen_estructural = None
+        if isinstance(escala_diseno, dict):
+            resumen_estructural = {
+                "hay_texto_detectado": escala_diseno.get("hay_texto_detectado"),
+                "niveles_detectados": escala_diseno.get("niveles_detectados"),
+                "alturas_relativas_lineas": escala_diseno.get("alturas_relativas_lineas"),
+                "razon_escala": escala_diseno.get("razon_escala"),
+                "densidad_tipografica_rel": escala_diseno.get("densidad_tipografica_rel"),
+            }
+
+        alto_imagen_pt_96dpi = round(H_orig * (72.0 / DPI_REFERENCIA_CARTEL), 2)
+
+        if not palabras_tsv:
+            filtro_vacio = _evaluar_filtro_basura_ocr("")
+            return {
+                "estado": "sin_texto_ocr",
+                "regimen_recorte": "C_nativo_por_caracter",
+                "fiable": False,
+                "motivo_fiabilidad": (
+                    "No fiable: 0 palabras detectadas por OCR (--psm 6); "
+                    "fraccion_palabras_reales=0.0000 < 0.50 y confianza_tipo=0.0000 < 0.35."
+                ),
+                "motivo": (
+                    f"Tesseract {tess_ver} (--psm {PSM_FIJO_OCR} --oem {OEM_FIJO_OCR} -l spa+eng) "
+                    "no detectó palabras alfanuméricas en este cartel."
+                ),
+                "fuente_detectada": "no_fiable",
+                "cnn": bloque_cnn,
+                "motor_ocr": motor_ocr_info,
+                "filtro_ocr": filtro_vacio,
+                "sesgo_vecino": resumen_sesgo,
+                "cota_tamano_pt": {
+                    "alto_imagen_px": H_orig,
+                    "alto_imagen_pt_96dpi": alto_imagen_pt_96dpi,
+                    "tamanos_imposibles_detectados": 0,
+                },
+                "texto_ocr": "",
+                "texto_ocr_resumen": "sin_texto_ocr",
+                "num_palabras_ocr": 0,
+                "num_glifos_analizados": 0,
+                "metricas_letra": "no_fiable",
+                "metricas_letra_descartadas_auditoria": {
+                    "fuente_vecino_top1": "sin_texto_ocr",
+                    "cuota_fuente_top1": 0.0,
+                    "votos_por_familia": {},
+                },
+                "confianza_tipo": 0.0,
+                "ortografia": [],
+                "spans_muestra": [],
+                "estimacion_estructural_adn_diseno": resumen_estructural,
+            }
+
+        factor_pt = 72.0 / DPI_REFERENCIA_CARTEL
+        spans: List[Dict[str, Any]] = []
+        votos_familia: collections.Counter[str] = collections.Counter()
+        votos_peso: collections.Counter[int] = collections.Counter()
+        tamanos_pt_validos: List[float] = []
+        tamanos_imposibles_cnt = 0
+        cursivas_flag: List[float] = []
+        tintas_lab: List[List[float]] = []
+        confs_glifo: List[float] = []
+
+        for line_b in box_lines:
+            parts_b = line_b.split()
+            if len(parts_b) < 5:
+                continue
+            car = parts_b[0]
+            if car not in GLIFOS_CATALOGO:
+                continue
+            try:
+                x0, by0, x1, by1 = map(int, parts_b[1:5])
+            except ValueError:
+                continue
+            y0 = H_orig - by1
+            y1 = H_orig - by0
+            if x1 <= x0 or y1 <= y0:
+                continue
+            cw = x1 - x0
+            ch_px = y1 - y0
+
+            # Asociar cada caja de símbolo a su palabra TSV contenedora
+            cx_m = 0.5 * (x0 + x1)
+            cy_m = 0.5 * (y0 + y1)
+            w_match: Optional[Dict[str, Any]] = None
+            for w_info in palabras_tsv:
+                wl, wt_y, ww, wh = w_info["left"], w_info["top"], w_info["width"], w_info["height"]
+                if (wl - 4) <= cx_m <= (wl + ww + 4) and (wt_y - 4) <= cy_m <= (wt_y + wh + 4):
+                    w_match = w_info
+                    break
+            if w_match is None:
+                continue
+
+            # Recorte nativo 1:1 con margen pequeño para estimar el color de papel en el anillo exterior
+            pad = max(3, min(8, int(round(0.18 * max(cw, ch_px)))))
+            crop_pad = _recortar_bmp_nativo_rgb(bmp_info, x0 - pad, y0 - pad, x1 + pad, y1 + pad)
+            hp = len(crop_pad)
+            anillo = (
+                crop_pad[0]
+                + crop_pad[-1]
+                + [crop_pad[yy][0] for yy in range(hp)]
+                + [crop_pad[yy][-1] for yy in range(hp)]
+            )
+            rs_p = sorted(px[0] for px in anillo)
+            gs_p = sorted(px[1] for px in anillo)
+            bs_p = sorted(px[2] for px in anillo)
+            idx_p = min(len(rs_p) - 1, int(0.75 * (len(rs_p) - 1)))
+            papel = (rs_p[idx_p], gs_p[idx_p], bs_p[idx_p])
+
+            crop_tight = _recortar_bmp_nativo_rgb(
+                bmp_info,
+                max(0, x0 - 1),
+                max(0, y0 - 1),
+                min(W_orig, x1 + 1),
+                min(H_orig, y1 + 1),
+            )
+            ct_h = len(crop_tight)
+            ct_w = len(crop_tight[0]) if ct_h > 0 else 0
+            if ct_h == 0 or ct_w == 0:
+                continue
+
+            # Centrar en plantilla 64x64 igual que en inferir.py (líneas 27-31)
+            esc = min(1.0, 56.0 / float(max(1, ct_w)), 42.0 / float(max(1, ct_h)))
+            nw = max(1, int(round(ct_w * esc)))
+            nh = max(1, int(round(ct_h * esc)))
+            parche = [[papel] * 64 for _ in range(64)]
+            ox = max(0, min(64 - nw, 32 - nw // 2))
+            oy = max(0, min(64 - nh, 48 - nh))
+            for yy in range(nh):
+                sy = min(ct_h - 1, int(yy * ct_h / nh))
+                for xx in range(nw):
+                    sx = min(ct_w - 1, int(xx * ct_w / nw))
+                    parche[oy + yy][ox + xx] = crop_tight[sy][sx]
+
+            pr, pg, pb = float(papel[0]), float(papel[1]), float(papel[2])
+            contraste: List[List[float]] = []
+            max_c = 0.0
+            for fila_p in parche:
+                fila_c: List[float] = []
+                for px in fila_p:
+                    c_val = math.sqrt((px[0] - pr) ** 2 + (px[1] - pg) ** 2 + (px[2] - pb) ** 2)
+                    fila_c.append(c_val)
+                    if c_val > max_c:
+                        max_c = c_val
+                contraste.append(fila_c)
+
+            shape_32, alto_32 = _geometria_matriz_contraste(contraste, umbral_min=20.0, grid_n=32)
+            if alto_32 <= 0.0:
+                continue
+
+            # Color de tinta del núcleo oscuro (modelo.py línea 27)
+            thr_ink = max(20.0, max_c * 0.75)
+            nucleo_rgb = [
+                parche[yy][xx]
+                for yy in range(64)
+                for xx in range(64)
+                if contraste[yy][xx] >= thr_ink
+            ]
+            if not nucleo_rgb:
+                nucleo_rgb = [crop_tight[ct_h // 2][ct_w // 2]]
+            rs_i = sorted(px[0] for px in nucleo_rgb)
+            gs_i = sorted(px[1] for px in nucleo_rgb)
+            bs_i = sorted(px[2] for px in nucleo_rgb)
+            m_i = len(nucleo_rgb) // 2
+            tinta_lab = [
+                round(v, 3)
+                for v in srgb_a_lab(int(rs_i[m_i]), int(gs_i[m_i]), int(bs_i[m_i]))
+            ]
+
             pred = _predecir_vecino_glifo(
                 galeria_mem,
                 car,
                 shape_32,
-                alto_px_orig=float(wh),
+                alto_px_orig=float(ch_px),
                 dpi=DPI_REFERENCIA_CARTEL,
             )
             if pred is None:
                 continue
 
-            conf_span = round(min(0.8, 0.55 * pred["confianza"] + 0.45 * (w_info["conf"] / 100.0)), 4)
-            votos_familia[pred["fuente"]] += 1
-            votos_peso[pred["peso"]] += 1
-
-            # Regla 3 (Fase 4c): Si tamano_pt supera la altura de la imagen en puntos a 96 DPI,
-            # marcar el valor como "imposible" y NO propagarlo al promedio ni al máximo válido.
             tam_raw = float(pred["tamano_pt"])
-            if tam_raw > alto_imagen_pt_96dpi:
+            # Regla de cota física de tamaño: si tamano_pt supera la altura de la imagen a 96 DPI -> "imposible"
+            if tam_raw > alto_imagen_pt_96dpi or cw > int(0.60 * W_orig) or ch_px > int(0.60 * H_orig):
                 tam_span_val: float | str = "imposible"
                 tamanos_imposibles_cnt += 1
             else:
                 tam_span_val = tam_raw
                 tamanos_pt_validos.append(tam_raw)
 
-            cursivas_flag.append(1.0 if pred["cursiva"] else 0.0)
-            tintas_lab.append(tinta_lab)
-            confs_glifo.append(conf_span)
+            conf_span = round(
+                min(0.8, 0.55 * pred["confianza"] + 0.45 * (w_match["conf"] / 100.0)),
+                4,
+            )
+            if tam_span_val != "imposible":
+                votos_familia[pred["fuente"]] += 1
+                votos_peso[pred["peso"]] += 1
+                cursivas_flag.append(1.0 if pred["cursiva"] else 0.0)
+                tintas_lab.append(tinta_lab)
+                confs_glifo.append(conf_span)
 
             bbox_pt = [
-                round(cx0_orig * factor_pt, 2),
-                round(cy0_orig * factor_pt, 2),
-                round(cx1_orig * factor_pt, 2),
-                round(cy1_orig * factor_pt, 2),
+                round(x0 * factor_pt, 2),
+                round(y0 * factor_pt, 2),
+                round(x1 * factor_pt, 2),
+                round(y1 * factor_pt, 2),
             ]
             spans.append(
                 {
                     "pagina": 1,
                     "bbox": bbox_pt,
                     "texto": car,
-                    "palabra_ocr": palabra,
-                    "fuente": "sesgado" if es_sesgado_anton else pred["fuente"],
-                    "fuente_vecino_bruta": pred["fuente"],
+                    "palabra_ocr": w_match["texto"],
+                    "fuente": "sesgado" if es_sesgado_c else pred["fuente"],
                     "tamano_pt": tam_span_val,
                     "tamano_pt_bruto": tam_raw,
                     "peso": pred["peso"],
@@ -840,12 +1101,12 @@ def _ejecutar_camino_b_sin_cnn(
                     "linea_base": {
                         "origen": [bbox_pt[0], bbox_pt[3]],
                         "direccion": [1.0, 0.0],
-                        "metodo": "borde inferior OCR; aproximado",
+                        "metodo": "borde inferior OCR makebox nativo",
                     },
                     "origen": "inferido",
                     "confianza": conf_span,
                     "alternativas": pred["fuentes"],
-                    "linea": list(w_info["grupo"]),
+                    "linea": list(w_match["grupo"]),
                 }
             )
 
@@ -913,9 +1174,18 @@ def _ejecutar_camino_b_sin_cnn(
 
     conf_tipo = round(sum(confs_glifo) / float(len(confs_glifo)), 4) if confs_glifo else 0.0
 
-    top_fams_brutas = [f for f, _ in votos_familia.most_common(3)]
-    fuente_bruta_top1 = top_fams_brutas[0] if top_fams_brutas else "sin_glifo_en_catalogo"
-    fuente_top1_final = "sesgado" if es_sesgado_anton else fuente_bruta_top1
+    total_votos = sum(votos_familia.values())
+    top_fams = [f for f, _ in votos_familia.most_common(3)]
+    if top_fams and total_votos > 0:
+        fuente_ganadora, votos_ganadora = votos_familia.most_common(1)[0]
+        cuota_ganadora = round(votos_ganadora / float(total_votos), 4)
+    else:
+        fuente_ganadora = "sin_glifo_valido"
+        votos_ganadora = 0
+        cuota_ganadora = 0.0
+
+    # Paso 4 de Fase 4d: fuente_vecino_top1 solo deja de estar marcado "sesgado" si C cumplió el prerregistro
+    fuente_top1_final = "sesgado" if es_sesgado_c else fuente_ganadora
 
     peso_dom = votos_peso.most_common(1)[0][0] if votos_peso else 400
     if tamanos_pt_validos:
@@ -944,8 +1214,10 @@ def _ejecutar_camino_b_sin_cnn(
 
     metricas_calculadas = {
         "fuente_vecino_top1": fuente_top1_final,
-        "fuente_vecino_bruta_sesgada": fuente_bruta_top1,
-        "fuentes_vecino_top3_brutas": top_fams_brutas,
+        "cuota_fuente_top1": cuota_ganadora,
+        "votos_fuente_top1": f"{votos_ganadora}/{total_votos}",
+        "fuentes_vecino_top3": top_fams,
+        "votos_por_familia": dict(votos_familia),
         "tamano_pt_medio": tam_medio,
         "tamano_pt_max": tam_max,
         "tamanos_imposibles_descartados": tamanos_imposibles_cnt,
@@ -957,7 +1229,6 @@ def _ejecutar_camino_b_sin_cnn(
         "tinta_lab_media": tinta_media,
     }
 
-    # Evaluar fiabilidad (Regla 1 de Fase 4c)
     motivos_rechazo: List[str] = []
     if n_3plus_tot == 0:
         motivos_rechazo.append("0 palabras de >=3 letras (fraccion_palabras_reales=0.0000 < 0.50)")
@@ -975,7 +1246,7 @@ def _ejecutar_camino_b_sin_cnn(
     es_fiable = len(motivos_rechazo) == 0
     if es_fiable:
         motivo_fiabilidad = (
-            f"Fiable: fraccion_palabras_reales={frac_reales:.4f} >= 0.50 "
+            f"Fiable (Régimen C): fraccion_palabras_reales={frac_reales:.4f} >= 0.50 "
             f"({n_3plus_ok}/{n_3plus_tot} palabras >=3 letras en es+en+de+fr) "
             f"y confianza_tipo={conf_tipo:.4f} >= 0.35."
         )
@@ -984,10 +1255,11 @@ def _ejecutar_camino_b_sin_cnn(
     else:
         motivo_fiabilidad = "No fiable: " + "; ".join(motivos_rechazo) + "."
         metricas_salida = "no_fiable"
-        fuente_salida = "sesgado" if es_sesgado_anton else "no_fiable"
+        fuente_salida = "no_fiable"
 
     return {
         "estado": "calculado_camino_b_sin_cnn",
+        "regimen_recorte": "C_nativo_por_caracter",
         "fiable": es_fiable,
         "motivo_fiabilidad": motivo_fiabilidad,
         "fuente_detectada": fuente_salida,
@@ -996,14 +1268,14 @@ def _ejecutar_camino_b_sin_cnn(
         "filtro_ocr": filtro_ocr,
         "sesgo_vecino": resumen_sesgo,
         "cota_tamano_pt": {
-            "alto_imagen_px": lienzo.alto_original,
+            "alto_imagen_px": H_orig,
             "alto_imagen_pt_96dpi": alto_imagen_pt_96dpi,
             "tamanos_imposibles_detectados": tamanos_imposibles_cnt,
         },
         "texto_ocr": texto_ocr_completo,
         "texto_ocr_resumen": texto_ocr_resumen,
         "num_palabras_ocr": len(todas_palabras),
-        "num_glifos_analizados": len(spans),
+        "num_glifos_analizados": total_votos,
         "metricas_letra": metricas_salida,
         "metricas_letra_descartadas_auditoria": None if es_fiable else metricas_calculadas,
         "confianza_tipo": conf_tipo,
@@ -1135,7 +1407,7 @@ def estudiar_pieza_unida(
             **estudio_diseno,
         }
         escala_diseno = estudio_diseno.get("escala_tipografica")
-        bloque_tipo = _ejecutar_camino_b_sin_cnn(
+        bloque_tipo = _ejecutar_camino_b_regimen_c(
             ruta,
             lienzo=lienzo,
             dir_adn_tipo=dir_adn_tipo,
@@ -1253,7 +1525,7 @@ def estudiar_carpeta(
 
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(
-        description="ADN Unido (Fase 4c): genera <nombre>.ficha.json con filtro de basura OCR, auditoría Anton y cota de tamaño."
+        description="ADN Unido (Fase 4d): genera <nombre>.ficha.json con Régimen C (recorte nativo por carácter)."
     )
     parser.add_argument(
         "carpeta_entrada",
