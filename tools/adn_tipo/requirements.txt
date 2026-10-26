@@ -1,0 +1,8 @@
+numpy==1.26.4
+Pillow==11.3.0
+PyMuPDF==1.26.5
+torch==2.8.0
+scikit-image==0.25.2
+fonttools==4.60.1
+pyspellchecker==0.8.3
+pytesseract==0.3.13
