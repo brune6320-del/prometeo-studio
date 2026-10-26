@@ -1,0 +1,23 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+
+# Prohibido subir imágenes ni pesos a git (D-11)
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.webp
+*.tiff
+*.gif
+*.pdf
+*.mp4
+*.mov
+*.pt
+*.pth
+*.onnx
+*.safetensors
+*.bin
+*.ckpt
