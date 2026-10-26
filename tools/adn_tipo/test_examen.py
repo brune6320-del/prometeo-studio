@@ -23,6 +23,7 @@ class BuscadorFalso:
 
 class ExamenTest(unittest.TestCase):
     def setUp(self):
+        (ROOT/'.cache').mkdir(parents=True, exist_ok=True)
         self.temp=tempfile.TemporaryDirectory(dir=ROOT/'.cache')
         self.root=Path(self.temp.name);self.pdfs=self.root/'pdfs';self.pdfs.mkdir()
         self.sello=self.root/'examen-sellado.json'

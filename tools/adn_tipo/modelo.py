@@ -5,9 +5,9 @@ import numpy as np
 from PIL import Image
 import torch
 from torch import nn
-from comun import leer, sha256
 
 def cargar_imagen(root, fila):
+    from comun import sha256
     path = (Path(root) / fila['archivo']).resolve()
     if Path(root).resolve() not in path.parents or sha256(path) != fila['sha256']:
         raise ValueError('Ruta o SHA de imagen inválido')
@@ -36,13 +36,18 @@ class TipoNet(nn.Module):
         super().__init__()
         self.conv=nn.Sequential(nn.Conv2d(3,16,5,padding=2),nn.ReLU(),nn.MaxPool2d(2),
             nn.Conv2d(16,32,3,padding=1),nn.ReLU(),nn.MaxPool2d(2),
-            nn.Conv2d(32,48,3,padding=1),nn.ReLU(),nn.AdaptiveAvgPool2d((4,4)))
+            # tensor() fija 64x64; dos MaxPool2d(2) producen 16x16.
+            # Ventanas 4x4 sin solapamiento equivalen al adaptive 16 -> 4,
+            # cuyo backward CUDA no admite determinismo estricto.
+            nn.Conv2d(32,48,3,padding=1),nn.ReLU(),nn.AvgPool2d(4, stride=4))
         self.oculta=nn.Sequential(nn.Flatten(),nn.Linear(48*4*4,64),nn.ReLU())
         self.embedding=nn.Linear(64,32)
         self.clasificar=nn.Linear(32,clases)
         self.regresion=nn.Linear(64,4)
         with torch.no_grad(): self.regresion.bias.copy_(torch.tensor([1.,.4,0.,0.]))
     def forward(self,x):
+        if x.ndim != 4 or x.shape[1:] != (3, 64, 64):
+            raise ValueError('TipoNet requiere NCHW RGB de 64x64; usar tensor()')
         h=self.oculta(self.conv(x))
         e=nn.functional.normalize(self.embedding(h),dim=1)
         return e,self.clasificar(e),self.regresion(h)
