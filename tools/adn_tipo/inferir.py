@@ -4,13 +4,18 @@ import argparse
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageOps
-import pytesseract
 from comun import ROOT, VERSION, guardar, ortografia, sha256, validar_pagina
 from medir import Buscador
 
 def inferir(entrada,salida,galeria,pesos=None,dpi=None,propio=False,tessdata=None):
     if not propio: raise ValueError('Solo imágenes propias sin firmas/sellos de terceros')
     if dpi is None or not 50 <= dpi <= 1200: raise ValueError('DPI físico conocido requerido (50–1200)')
+    # OCR es opcional para el camino A nativo; solo importarlo al usar B.
+    # Si falta en B, fallar explícitamente: nunca simular una transcripción.
+    try:
+        import pytesseract
+    except ImportError as exc:
+        raise RuntimeError('Camino B requiere pytesseract y Tesseract español; OCR no ejecutado') from exc
     entrada,salida=Path(entrada),Path(salida)
     if salida.exists(): raise ValueError('Salida existente')
     with Image.open(entrada) as img: im=ImageOps.exif_transpose(img).convert('RGB')
@@ -44,7 +49,8 @@ def inferir(entrada,salida,galeria,pesos=None,dpi=None,propio=False,tessdata=Non
             peso=pred['peso'] if pred else None,cursiva=pred['cursiva'] if pred else None,
             inclinacion=None,tinta_lab=pred['tinta_lab'] if pred else None,interletra=None,interlinea=None,
             linea_base={'origen':[x0*factor,y1*factor],'direccion':[1.,0.],'metodo':'borde inferior OCR; aproximado'},
-            origen='inferido',confianza=min(.8,pred['confianza']) if pred else 0.,
+            origen='inferido',metodo='vecino' if pesos is None else 'cnn',
+            confianza=min(.8,pred['confianza']) if pred else 0.,
             alternativas=pred['fuentes'] if pred else [],linea=grupo,
             palabra_ocr=word,ortografia=ortografia(word or c),
             advertencias=['Escala/posición normalizadas; línea base e interletra son aproximaciones geométricas.'])
@@ -66,6 +72,7 @@ def inferir(entrada,salida,galeria,pesos=None,dpi=None,propio=False,tessdata=Non
             for s in ss: s['interlinea']=lineas[i+1][1]-y
     page=dict(version=VERSION,pagina=1,ancho_pt=im.width*factor,alto_pt=im.height*factor,
         dpi=dpi,sha256_origen=sha256(entrada),spans=spans,texto_ocr=texto,ortografia=ortografia(texto),
+        origen='inferido',metodo='vecino' if pesos is None else 'cnn',
         advertencias=['Confianza es margen de similitud, no probabilidad calibrada.',
         'OCR, fuentes fuera de catálogo y glifos >44 px de alto requieren revisión.'])
     validar_pagina(page);guardar(salida/'pagina-0001/adn.json',page)
