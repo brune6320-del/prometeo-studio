@@ -1,0 +1,12 @@
+# Nuevas dependencias del venv C3. No ejecutar contra Python sistema.
+# Python 3.9.6; torch 2.8.0 se reutiliza sin actualizarlo.
+fonttools==4.60.1
+scikit-image==0.24.0
+scipy==1.13.1
+imageio==2.37.2
+lazy-loader==0.6
+tifffile==2024.8.30
+pyspellchecker==0.8.3
+# Ya disponibles: numpy 1.26.4, Pillow 11.3.0, opencv-python 4.11.0.86,
+# PyMuPDF 1.26.5 (AGPL/comercial, preexistente: no se instala con esta lista).
+# requirements no instala ni contiene pesos ni fuentes.
