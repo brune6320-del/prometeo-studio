@@ -1,0 +1,30 @@
+test_backward_determinista_cpu (tools.adn_tipo.test_modelo.PoolDeterministaTest) ... ok
+test_backward_determinista_cuda (tools.adn_tipo.test_modelo.PoolDeterministaTest) ... skipped 'CUDA no disponible'
+test_pool_valor_y_gradiente_cpu (tools.adn_tipo.test_modelo.PoolDeterministaTest) ... ok
+test_rechaza_tamano_no_equivalente (tools.adn_tipo.test_modelo.PoolDeterministaTest) ... ok
+test_red_y_pesos_anteriores_compatibles (tools.adn_tipo.test_modelo.PoolDeterministaTest) ... ok
+test_cabeza_lineal_preserva_signo_lab_y_unidades_de_inferencia (tools.adn_tipo.test_color_v3.ColorV3Test) ... ok
+test_pesos_y_gradientes_de_la_perdida_prerregistrada (tools.adn_tipo.test_color_v3.ColorV3Test) ... ok
+test_prerregistros_sellados (tools.adn_tipo.test_color_v3.ColorV3Test) ... ok
+test_validacion_mide_color_en_lab_fisico_no_en_normalizado (tools.adn_tipo.test_color_v3.ColorV3Test) ... ok
+test_falta_motor_no_se_presenta_como_resultado (tools.adn_tipo.test_ocr_opcional.OCROpcionalTest) ... ok
+test_grupo_fuente_caracter_y_orden_independiente (tools.adn_tipo.test_v3.V3Test) ... ok
+test_documento_completo_no_cruza_particion (tools.adn_tipo.test_v3.V3Test) ... ok
+test_no_reubica_grupos_si_falta_clase (tools.adn_tipo.test_v3.V3Test) ... ok
+test_no_acepta_copia_cruzada (tools.adn_tipo.test_v3.V3Test) ... ok
+test_parada_empate_y_no_finito (tools.adn_tipo.test_v3.V3Test) ... ok
+test_ab_clave_separada_sin_respuestas_falsas (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_ab_no_acepta_doble_voto (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_adn_de_otro_origen_rechazado (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_baseline_union_sin_entrenamiento (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_contorno_con_hueco_se_conserva (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_medoid_elige_muestra_central_real (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_restauracion_exacta_y_rechazo_de_alteracion (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_solo_region_cambia_pixel_a_pixel (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_ttf_completada_reabre_sin_duplicar_glyphorder (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+test_zonas_excluidas_y_contencion (tools.letra_viva.test_letra_viva.LetraTest) ... ok
+
+----------------------------------------------------------------------
+Ran 25 tests in 0.826s
+
+OK (skipped=1)
