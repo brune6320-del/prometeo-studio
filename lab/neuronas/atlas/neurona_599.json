@@ -1,244 +1,338 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "id_neurona": "neurona_599",
   "canal_indice": 599,
   "modelo": "convnext_tiny",
   "etapa": "features.7",
-  "modalidad_corpus": "piloto_reducido",
-  "etiqueta": "espacio luminoso abierto (transición suave) frente a masa de tinta profunda (recorte claroscuro)",
+  "modalidad_corpus": "cc0_630_train441_val189",
+  "etiqueta": "Reacciona a vistas fotográficas documentales en tonos neutros con luminosidad general alta y soporte cálido marfil y pergamino (caso de «Cover»); en el extremo negativo aparecen escenas de policromía viva de alta saturación, diversidad de bloques cromáticos distintos y fondos nocturnos de claroscuro.",
   "etiquetador": "Argon",
+  "legible": true,
   "confirmada": true,
+  "confirmada_a": true,
+  "confirmada_b": true,
   "fecha": "2026-10-26",
   "sha256_pesos": "983f1562536e84ff750a1576fb08e54de751dbf2e17c0d8a4a13704341fdcd3d",
   "licencia_pesos": "BSD-3-Clause (https://github.com/pytorch/vision/blob/main/LICENSE)",
-  "sha256_prerregistro": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
-  "sha256_mosaico_local": "405032227d1d72e5fcca0e9419047623cf52cf40f43eaa07999e0ff717dd3344",
-  "prueba_apagado": {
+  "sha256_prerregistro_v1": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
+  "sha256_prerregistro_v2": "729bb150cc75e50e9ec5d2e43145f5e4d8876aa7119cc9b639f336d8c9ca1555",
+  "sha256_corpus_cc0": "f0c3483fafa8c04be6492ff62190071c8f6278beb8dec78b05110a6cabb5875f",
+  "sha256_mosaico_local": "8d6ab03ca412d4b85d693268975d298ece82f22a61975053b1cf4225e0020f5d",
+  "prueba_a_apagado_control_justo": {
     "etapa_siguiente": "classifier (LayerNorm2d(768) -> Linear(768, 1000))",
-    "unidad_excitada_k": 0,
-    "peso_conexion_w_kc": 0.13767,
-    "caida_media_top9": 0.042275,
-    "caida_media_control9": 0.010381,
-    "ratio_top9_vs_control9": 4.0724,
-    "umbral_ratio_minimo": 2.0,
-    "confirmada": true
+    "activacion_media_abs_train": 0.07482,
+    "efecto_l2_neurona_x_top9_train": 1.8792,
+    "ratio_medio_x_vs_controles": 2.9324,
+    "sorteos_ganados_de_5": 5,
+    "minimo_sorteos_requerido": 4,
+    "factor_minimo_efecto": 2.0,
+    "controles_y_sorteados": [
+      {
+        "canal_y": 675,
+        "activacion_media_abs_train": 0.07434,
+        "efecto_l2_en_top9_de_x": 0.50897,
+        "ratio_x_vs_y": 3.6922,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 132,
+        "activacion_media_abs_train": 0.07542,
+        "efecto_l2_en_top9_de_x": 0.70262,
+        "ratio_x_vs_y": 2.6746,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 632,
+        "activacion_media_abs_train": 0.07517,
+        "efecto_l2_en_top9_de_x": 0.35776,
+        "ratio_x_vs_y": 5.2527,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 491,
+        "activacion_media_abs_train": 0.07424,
+        "efecto_l2_en_top9_de_x": 0.83437,
+        "ratio_x_vs_y": 2.2522,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 419,
+        "activacion_media_abs_train": 0.07524,
+        "efecto_l2_en_top9_de_x": 0.80045,
+        "ratio_x_vs_y": 2.3477,
+        "supera_2x": true
+      }
+    ],
+    "confirmada_a": true
   },
-  "discriminadores_visuales_d_cohen": {
-    "agudeza_borde": 0.4783,
-    "contraste_tonal": -0.6578,
-    "luminosidad": 1.5933,
-    "saturacion": -0.202,
-    "calidez": 0.1194,
-    "anisotropia_vert": 0.6498
+  "prueba_b_prediccion_validacion_ciega": {
+    "split_evaluado": "validacion (189 imágenes ciegas)",
+    "escala_puntuacion": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "conteo_puntuaciones_0_a_3": {
+      "0": 47,
+      "1": 47,
+      "2": 47,
+      "3": 48
+    },
+    "positivos_reales_validacion_top20pct": 38,
+    "roc_auc_validacion": 0.76063,
+    "umbral_auc_minimo": 0.7,
+    "etiqueta_es_no_lo_se": false,
+    "confirmada_b": true
+  },
+  "coherencia_descubrimiento_train": {
+    "roc_auc_train": 0.80184,
+    "umbral_claridad_train": 0.64
   },
   "polo_pos": [
     {
       "rango": 1,
-      "id_pieza": "d3_11",
-      "sha256_imagen": "1c227d456917abc52b3237911b65a8c21ce703e7d4c2f8dfecf7d80c8e8e576f",
-      "activacion_media": 0.12184,
-      "activacion_max_celda_7x7": 0.75164,
+      "id_pieza": "cma_109337",
+      "sha256_imagen": "5b6d3cc63653572f608589315250682338f8102b089d4ac7990492d822ab114c",
+      "categoria": "grabados",
+      "url_pagina": "https://clevelandart.org/art/1927.477.1",
+      "activacion_media": 0.28102,
+      "activacion_max_celda_7x7": 0.99782,
+      "celda_7x7": [
+        3,
+        2
+      ],
+      "efecto_l2_al_apagar": 2.03301
+    },
+    {
+      "rango": 2,
+      "id_pieza": "cma_522618",
+      "sha256_imagen": "44219a61b457b3bbde6daf92231a51fdbd3bf1f33b7e28f71af490ee65286ed4",
+      "categoria": "fotografia",
+      "url_pagina": "https://clevelandart.org/art/2022.350",
+      "activacion_media": 0.2688,
+      "activacion_max_celda_7x7": 0.68879,
+      "celda_7x7": [
+        6,
+        0
+      ],
+      "efecto_l2_al_apagar": 1.8831
+    },
+    {
+      "rango": 3,
+      "id_pieza": "met_wm_60868094",
+      "sha256_imagen": "4167efdfb952163b604ba0ad831474f3dc0cb4963c73561b4891d8fc6895467f",
+      "categoria": "grabados",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:%27Jos%C3%A9_Guadalupe_Posada-_36_Grabados%27_(Mexico,_1943)_MET_DP872821.jpg",
+      "activacion_media": 0.26578,
+      "activacion_max_celda_7x7": 0.72666,
       "celda_7x7": [
         0,
         0
       ],
-      "caida_etapa_siguiente_al_apagar": 0.05965
-    },
-    {
-      "rango": 2,
-      "id_pieza": "d3_09",
-      "sha256_imagen": "177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb",
-      "activacion_media": 0.10389,
-      "activacion_max_celda_7x7": 0.32086,
-      "celda_7x7": [
-        3,
-        1
-      ],
-      "caida_etapa_siguiente_al_apagar": 0.06241
-    },
-    {
-      "rango": 3,
-      "id_pieza": "d3_10",
-      "sha256_imagen": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6",
-      "activacion_media": 0.07505,
-      "activacion_max_celda_7x7": 0.22815,
-      "celda_7x7": [
-        5,
-        2
-      ],
-      "caida_etapa_siguiente_al_apagar": 0.04491
+      "efecto_l2_al_apagar": 1.55222
     },
     {
       "rango": 4,
-      "id_pieza": "d3_19",
-      "sha256_imagen": "169726bd0361e88243d37bf9bfeb2ef525deacd39c255fa314fe191b5ce24422",
-      "activacion_media": 0.07261,
-      "activacion_max_celda_7x7": 0.63933,
+      "id_pieza": "cma_519100",
+      "sha256_imagen": "f0e3c5ce35ced6a1dfe8b5d8dcdce2740cfe21fc083bc68a0858235f8c5df8a9",
+      "categoria": "fotografia",
+      "url_pagina": "https://clevelandart.org/art/2022.116",
+      "activacion_media": 0.25983,
+      "activacion_max_celda_7x7": 0.74778,
       "celda_7x7": [
-        0,
-        6
+        4,
+        3
       ],
-      "caida_etapa_siguiente_al_apagar": 0.05216
+      "efecto_l2_al_apagar": 2.20624
     },
     {
       "rango": 5,
-      "id_pieza": "d3_04",
-      "sha256_imagen": "55207aa597a71ee6df82e2babf85156ef26fb8315a3071cf0b9e7439bd9c15c2",
-      "activacion_media": 0.05984,
-      "activacion_max_celda_7x7": 0.55355,
+      "id_pieza": "cma_160073",
+      "sha256_imagen": "52023806541d90463cc6b8be4713a73df7c72f7083eac4d4c464805b657d2d91",
+      "categoria": "fotografia",
+      "url_pagina": "https://clevelandart.org/art/1997.45",
+      "activacion_media": 0.25207,
+      "activacion_max_celda_7x7": 1.09287,
+      "celda_7x7": [
+        1,
+        3
+      ],
+      "efecto_l2_al_apagar": 1.99262
+    },
+    {
+      "rango": 6,
+      "id_pieza": "cma_155006",
+      "sha256_imagen": "1180c47c02b9fe44c2d3947810639ea9606d697df767c337e81de56b24fcded1",
+      "categoria": "fotografia",
+      "url_pagina": "https://clevelandart.org/art/1989.56",
+      "activacion_media": 0.23474,
+      "activacion_max_celda_7x7": 0.74293,
+      "celda_7x7": [
+        3,
+        3
+      ],
+      "efecto_l2_al_apagar": 1.70172
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_445581",
+      "sha256_imagen": "f20d6dbdc844d83027d24812733bc78167b636c463982c57c0c51981d71edcef",
+      "categoria": "grabados",
+      "url_pagina": "https://clevelandart.org/art/1966.413.8",
+      "activacion_media": 0.2252,
+      "activacion_max_celda_7x7": 0.50224,
+      "celda_7x7": [
+        0,
+        2
+      ],
+      "efecto_l2_al_apagar": 1.65235
+    },
+    {
+      "rango": 8,
+      "id_pieza": "cma_439492",
+      "sha256_imagen": "b5f66cda48943e4f171e9005520a03c97c9081a981cd670b5f87cacb1bbb21c6",
+      "categoria": "fotografia",
+      "url_pagina": "https://clevelandart.org/art/2021.57",
+      "activacion_media": 0.21462,
+      "activacion_max_celda_7x7": 0.6414,
       "celda_7x7": [
         5,
         3
       ],
-      "caida_etapa_siguiente_al_apagar": 0.06035
-    },
-    {
-      "rango": 6,
-      "id_pieza": "d3_07",
-      "sha256_imagen": "b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0",
-      "activacion_media": 0.05398,
-      "activacion_max_celda_7x7": 0.2375,
-      "celda_7x7": [
-        5,
-        4
-      ],
-      "caida_etapa_siguiente_al_apagar": 0.03224
-    },
-    {
-      "rango": 7,
-      "id_pieza": "d3_15",
-      "sha256_imagen": "7a26ff28f246e4b73407dd224b7c9b2c274497345b9b2e27192be163eb0a75c8",
-      "activacion_media": 0.0494,
-      "activacion_max_celda_7x7": 0.36179,
-      "celda_7x7": [
-        5,
-        6
-      ],
-      "caida_etapa_siguiente_al_apagar": 0.03537
-    },
-    {
-      "rango": 8,
-      "id_pieza": "d3_08",
-      "sha256_imagen": "ef9512f92f6d579e5dc75af59a5a4b1b8b47d2eda89e00b954d44520e5369027",
-      "activacion_media": 0.03961,
-      "activacion_max_celda_7x7": 0.2121,
-      "celda_7x7": [
-        4,
-        4
-      ],
-      "caida_etapa_siguiente_al_apagar": 0.02315
+      "efecto_l2_al_apagar": 2.14178
     },
     {
       "rango": 9,
-      "id_pieza": "d3_06",
-      "sha256_imagen": "9e3543d5f66bc7370df89ffa64db2619ea8406361d53b2452b1d603a08ff48b1",
-      "activacion_media": 0.01761,
-      "activacion_max_celda_7x7": 0.3881,
+      "id_pieza": "cma_109207",
+      "sha256_imagen": "7fbcdf8767e392da45f4f9f44faf88e2b8829fb2e41fd2c594e65d11af088836",
+      "categoria": "grabados",
+      "url_pagina": "https://clevelandart.org/art/1927.477.11",
+      "activacion_media": 0.20926,
+      "activacion_max_celda_7x7": 0.66253,
       "celda_7x7": [
-        0,
-        6
+        3,
+        1
       ],
-      "caida_etapa_siguiente_al_apagar": 0.01024
+      "efecto_l2_al_apagar": 1.74975
     }
   ],
   "polo_neg": [
     {
       "rango": 1,
-      "id_pieza": "d3_03",
-      "sha256_imagen": "cd1508b71344efaf5e9da23e6715a486c983322ef2b1d59ec0b499d6b5cd6b2a",
-      "activacion_media": -0.15826,
-      "activacion_min_celda_7x7": -1.14754,
+      "id_pieza": "cma_124829",
+      "sha256_imagen": "5e461ca3265c7da679babb89abe9809e22e91871f167e5ef472110e81faf0c5d",
+      "categoria": "grabados",
+      "url_pagina": "https://clevelandart.org/art/1946.308",
+      "activacion_media": -0.22234,
+      "activacion_min_celda_7x7": -0.6966,
       "celda_7x7": [
-        6,
-        1
+        5,
+        6
       ]
     },
     {
       "rango": 2,
-      "id_pieza": "d3_16",
-      "sha256_imagen": "4320a2a836a7408de4a666db1cd28d4d1f8327e15f937ffacfdb67a34e55fccb",
-      "activacion_media": -0.15547,
-      "activacion_min_celda_7x7": -0.47165,
+      "id_pieza": "cma_110180",
+      "sha256_imagen": "5f915c951d174e40201c4686767bf19520c36d2db06c7a2b7bb6012eb2fea0dc",
+      "categoria": "pintura",
+      "url_pagina": "https://clevelandart.org/art/1928.8",
+      "activacion_media": -0.17129,
+      "activacion_min_celda_7x7": -0.54842,
+      "celda_7x7": [
+        1,
+        5
+      ]
+    },
+    {
+      "rango": 3,
+      "id_pieza": "cma_148758",
+      "sha256_imagen": "f11f8e85ea946d7d264adf8b73a614a08478b809b84ec75a627b4fa3a7181e0a",
+      "categoria": "pintura",
+      "url_pagina": "https://clevelandart.org/art/1976.2",
+      "activacion_media": -0.17036,
+      "activacion_min_celda_7x7": -0.61318,
       "celda_7x7": [
         1,
         1
       ]
     },
     {
-      "rango": 3,
-      "id_pieza": "d3_01",
-      "sha256_imagen": "a85c7a5f496e6830fe15eb238498f097e6caa282804c385be1fa35ec64ad5045",
-      "activacion_media": -0.06105,
-      "activacion_min_celda_7x7": -0.45837,
-      "celda_7x7": [
-        2,
-        5
-      ]
-    },
-    {
       "rango": 4,
-      "id_pieza": "d3_17",
-      "sha256_imagen": "13311d1cbf4a1b897354735482c541be07431facf1bab0d44f95bc52c6333c9f",
-      "activacion_media": -0.05714,
-      "activacion_min_celda_7x7": -0.42782,
+      "id_pieza": "cma_130360",
+      "sha256_imagen": "7dec302d5c0eb644f5ab655ae8a9151f7ef14623e75afd2ba44943f45068d227",
+      "categoria": "objetos",
+      "url_pagina": "https://clevelandart.org/art/1953.125",
+      "activacion_media": -0.16658,
+      "activacion_min_celda_7x7": -0.94852,
       "celda_7x7": [
-        4,
-        5
+        5,
+        3
       ]
     },
     {
       "rango": 5,
-      "id_pieza": "d3_02",
-      "sha256_imagen": "7a5578467a4116c7e9667cadd98029937629b2662d0564e87d87625a4b388f57",
-      "activacion_media": -0.04125,
-      "activacion_min_celda_7x7": -0.59841,
+      "id_pieza": "cma_129201",
+      "sha256_imagen": "23f629b6aab2083311c88688afdd7ae629275abe6b56eabdb5547183e5c74837",
+      "categoria": "grabados",
+      "url_pagina": "https://clevelandart.org/art/1952.10",
+      "activacion_media": -0.16485,
+      "activacion_min_celda_7x7": -0.92905,
       "celda_7x7": [
-        1,
-        0
+        6,
+        2
       ]
     },
     {
       "rango": 6,
-      "id_pieza": "d3_21",
-      "sha256_imagen": "6b058608ed95592fc99d206a43d13e1ce2330e8c323f31118b2e478fdc166fe8",
-      "activacion_media": -0.03972,
-      "activacion_min_celda_7x7": -0.55088,
+      "id_pieza": "cma_92937",
+      "sha256_imagen": "58967a48541ed4170980549966b8b8a7d238011592bf2aafebe7cb63732dfb49",
+      "categoria": "pintura",
+      "url_pagina": "https://clevelandart.org/art/1922.1133",
+      "activacion_media": -0.16129,
+      "activacion_min_celda_7x7": -0.75654,
       "celda_7x7": [
-        5,
-        4
+        0,
+        1
       ]
     },
     {
       "rango": 7,
-      "id_pieza": "d3_18",
-      "sha256_imagen": "f1063b43da990dd6aceff9c482e5f362631c47f56684fe6e956c88e58004e997",
-      "activacion_media": -0.03636,
-      "activacion_min_celda_7x7": -0.29862,
+      "id_pieza": "cma_145960",
+      "sha256_imagen": "e7135d3de50fca7b3851c5395ac0664eaf51f816ea700aff0201c0176ff914c7",
+      "categoria": "pintura",
+      "url_pagina": "https://clevelandart.org/art/1971.166",
+      "activacion_media": -0.14972,
+      "activacion_min_celda_7x7": -0.7479,
       "celda_7x7": [
-        1,
+        4,
         3
       ]
     },
     {
       "rango": 8,
-      "id_pieza": "d3_12",
-      "sha256_imagen": "014818d39c9dc3589c112bf6bcd7a657c3959cc5bd81481692f51a8745759507",
-      "activacion_media": -0.03418,
-      "activacion_min_celda_7x7": -0.46557,
+      "id_pieza": "cma_143381",
+      "sha256_imagen": "87fe09eff0b59bafe0977fd6e38e04d16f4777e7c62baf0ec302a9c801dab954",
+      "categoria": "objetos",
+      "url_pagina": "https://clevelandart.org/art/1967.29",
+      "activacion_media": -0.13672,
+      "activacion_min_celda_7x7": -0.4689,
       "celda_7x7": [
-        5,
-        4
+        4,
+        6
       ]
     },
     {
       "rango": 9,
-      "id_pieza": "d3_13",
-      "sha256_imagen": "fdd76328c77a2f3b535c2b57ca3ee3ed738b122bd87e1fb854203f5ebc2c49b8",
-      "activacion_media": -0.00153,
-      "activacion_min_celda_7x7": -0.51335,
+      "id_pieza": "cma_109391",
+      "sha256_imagen": "645a50efd040063c4774adfdd19cbd548b7bd5457bcd3a53b41771a20e1cd352",
+      "categoria": "objetos",
+      "url_pagina": "https://clevelandart.org/art/1927.6",
+      "activacion_media": -0.1331,
+      "activacion_min_celda_7x7": -0.58814,
       "celda_7x7": [
-        2,
-        2
+        0,
+        1
       ]
     }
   ]

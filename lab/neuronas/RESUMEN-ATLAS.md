@@ -1,52 +1,47 @@
-# Resumen del Atlas Piloto de Neuronas · FASE 5 (N-1)
+# FASE 5b · Atlas con prueba de verdad (N-1 v2 · ConvNeXt-tiny `features.7`)
 
-- **Rama:** `studio/neuronas-atlas` (creada desde `studio/adn-unido` @ `551bf2f1a78f161a2d99497eace590f27a7a6cf6`)
-- **Modalidad:** `piloto_reducido` (`22` piezas del corpus D-3 en `~/Desktop/REFERENTES/corpus-editorial/muestras/`; las `442` fotos de Bruno aún no están en carpeta local).
-- **Modelo:** `ConvNeXt-tiny` (`torchvision.models.convnext_tiny`, `28.589.128` parámetros).
-- **Pesos:** `ConvNeXt_Tiny_Weights.IMAGENET1K_V1` (`https://download.pytorch.org/models/convnext_tiny-983f1562.pth`)
-  - **SHA-256 verificado:** `983f1562536e84ff750a1576fb08e54de751dbf2e17c0d8a4a13704341fdcd3d`
-  - **Licencia comprobada:** `BSD-3-Clause` (`pytorch/vision` LICENSE y `CITATION.cff`; arquitectura original `facebookresearch/ConvNeXt` bajo `MIT`; entrenado sobre ImageNet-1K con la receta de TorchVision, sin pesos SWAG CC-BY-NC).
-- **Prerregistro sellado en commit `60b5f7d` (antes de mirar):**
-  - Archivo: `lab/neuronas/prerregistro.json`
-  - **SHA-256 del prerregistro:** `a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388`
-  - **Etapa estudiada:** `features.7` (`Stage 4`, `768` canales, salida $7 \times 7$ para entrada $224 \times 224$).
-  - **Muestreo:** `200` neuronas al azar con semilla fija `SEED = 2610`.
-  - **Regla de confirmación por apagado:** Al poner a `0` la neurona $c$ en `features.7`, la caída media de activación en la unidad $k^*_c = \arg\max_k W_{\text{cls}}[k, c]$ de la etapa siguiente (`classifier`) sobre las `top-9` imágenes del polo + debe ser $> 0$ y $\ge 2,0 \times$ la caída media sobre las `9` imágenes control (índices centrales `6..14`).
+## 1. Corrección de las tres fallas metodológicas de la Fase 5
 
----
+| Falla señalada en Fase 5 | Corrección aplicada en Fase 5b (`prerregistro_v2.json` sellado en `4ac4cd3`) |
+|---|---|
+| **1. Apagado tautológico** (`control-9` con caída `0,0000` y ratio `>99,9x`) | **Prueba (a) — Apagado con control justo**: sobre las **mismas `top-9` imágenes de `train`** de la neurona $X$, se mide el cambio $L_2$ en los 1000 logits del clasificador al apagar $X$ frente a apagar cada una de **5 neuronas control $Y_1\dots Y_5$** sorteadas al azar (`SEED = 2610 + X`) entre las 25 neuronas con **activación media absoluta más parecida en `train`**. Pasa (`confirmada_a = true`) si $E(X) \ge 2{,}0 \times E(Y_m)$ en al menos **4 de 5** sorteos. |
+| **2. Etiquetas de plantilla rígida** (`6 ejes fijos`, colisiones como `113 = 196`) | **Etiquetas libres en español natural**: redactadas observando únicamente el conjunto `train` (`441` imágenes), sin plantilla repetida (`137/137` etiquetas con contenido son **100 % únicas**). Cuando en `train` no se aprecia separación visual clara ($\text{AUC}_{\text{train}} < 0{,}64$), se escribe honestamente **`«no lo sé»`** (`63/200` neuronas), que cuenta como no legible. |
+| **3. Corpus insuficiente** (`22` imágenes frente a `768` canales) | **Corpus ampliado a `630` imágenes CC0 verificadas** (`lab/neuronas/corpus_cc0_630.json`, SHA-256 `f0c3483f...`) descargadas de las APIs Open Access del **Cleveland Museum of Art (CMA)** (`565`) y **The Metropolitan Museum of Art (Met)** (`59`) más `6` piezas CC0 de D-3, mezclando pintura (`168`), grabados (`154`), objetos tridimensionales (`130`), fotografía (`120`) y carteles/obra gráfica (`58`). Split aleatorio (`SEED = 2610`): **`441` `train` (70 %)** y **`189` `validacion` (30 % ciego)**. |
 
-## 1. Resultado estadístico frente a Cammarata et al. (2020)
+## 2. Resultados globales sobre las 200 neuronas (`SEED = 2610`)
 
-| Métrica | Valor obtenido en FASE 5 (`piloto_reducido`, $N=200$) | Referencia preliminar Cammarata et al. (Distill 2020) |
-|---|---:|---:|
-| **Neuronas evaluadas (semilla `2610`)** | `200` (de `768` en `features.7`) | — |
-| **Neuronas con etiqueta confirmada (`confirmada: true`, caída $\ge 2\times$ control)** | **`155 / 200`** | — |
-| **Neuronas no confirmadas (`confirmada: false`, conservadas en `lab/neuronas/atlas/`)** | **`45 / 200`** | — |
-| **Porcentaje de neuronas confirmadas** | **`77,50 %`** | **`~90,0 %`** (preliminar en capas intermedias de InceptionV1 sobre ImageNet completo) |
-| **Intervalo de confianza al 95 % (Wilson score)** | **`[71,23 %, 82,74 %]`** | El `~90 %` preliminar queda **7,26 puntos por encima** del límite superior de nuestro IC 95 % en este piloto reducido de 22 piezas editoriales |
+*Nota sobre la referencia bibliográfica:* El **~90 % preliminar** citado por Nick Cammarata corresponde a su ensayo de **2026 sobre Qwen3-32B** (no a la serie *Circuits* de *Distill* 2020). En `ConvNeXt-tiny` (`features.7`, 768 canales convolucionales entrenados en ImageNet-1k) evaluado con pruebas no tautológicas sobre un corpus artístico multicanal de 630 obras CC0, la fracción de neuronas simultáneamente selectivas en apagado causal y predecibles a ciegas por un humano/etiquetador desde una etiqueta breve es sustancialmente menor:
 
-### Interpretación honesta de la diferencia (`77,50 %` vs `~90 %`)
-1. **Tamaño y dominio del piloto reducido ($22$ piezas editoriales frente a ImageNet):** En un corpus de solo $22$ piezas (18 carteles/cubiertas y 4 especímenes tipográficos), las `top-9` del polo + (`indices 0..8`) y las `9` imágenes control (`indices 6..14`) comparten 3 piezas de solapamiento (`indices 6, 7, 8`) debido a que $9 + 9 + 9 = 27 > 22$. Eso endurece la prueba de apagado ($\overline{\Delta}_{\text{top9}} \ge 2,0 \times \overline{\Delta}_{\text{control9}}$) y hace que `45/200` neuronas ($22,5\%$) con selectividad suave o activación difusa no alcancen el factor $2\times$ sobre el control.
-2. **Etapa profunda (`features.7` / `Stage 4`):** En la última etapa antes del clasificador, parte de los canales codifican clases de objetos naturales de ImageNet (animales, vehículos) ausentes en carteles editoriales; cuando se incorporen las **442 fotos de Bruno**, los 3 conjuntos (`top-9` polo +, `9` controles en la mediana y `top-9` polo −) serán completamente disjuntos sobre $N = 464$ imágenes.
+| Categoría de resultado | Conteo (`/ 200`) | Porcentaje | IC 95 % (Wilson score) |
+|---|---:|---:|---:|
+| **Neuronas LEGIBLES (pasan `a` y `b`)** | **26 / 200** | **13,00 %** | **`[9,03 %, 18,37 %]`** |
+| **Pasan SOLO `a` (`confirmada_a = true`, `confirmada_b = false`)** | **112 / 200** | **56,00 %** | **`[49,07 %, 62,70 %]`** |
+| **Pasan SOLO `b` (`confirmada_a = false`, `confirmada_b = true`)** | **12 / 200** | **6,00 %** | **`[3,47 %, 10,19 %]`** |
+| No pasan ni `a` ni `b` | 50 / 200 | 25,00 % | `[19,51 %, 31,44 %]` |
+| *Total que pasan `a` (Apagado con control justo $\ge 4/5$)* | *138 / 200* | *69,00 %* | *`[62,28 %, 75,00 %]`* |
+| *Total que pasan `b` (Predicción ciega en validación $\text{AUC} \ge 0{,}70$)* | *38 / 200* | *19,00 %* | *`[14,17 %, 25,00 %]`* |
+| *Declaradas «no lo sé» (sin patrón visual claro en `train`)* | *63 / 200* | *31,50 %* | *`[25,46 %, 38,24 %]`* |
 
----
+## 3. Diez ejemplos (5 legibles y 5 no legibles)
 
-## 2. Ruta local de los 200 mosaicos y de los 10 mosaicos de ejemplo (no commiteados a Git)
+Los 10 mosaicos (`polo +` frente a `polo −` en `train`) están guardados localmente fuera de Git en `/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/neuronas-mosaicos/10_ejemplos_v2/`:
 
-- **Carpeta con los 200 mosaicos (`neurona_000.png` … `neurona_762.png`):**
-  `/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/neuronas-mosaicos/`
-- **Carpeta con los 10 mosaicos de ejemplo (8 confirmadas + 2 no confirmadas):**
-  `/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/neuronas-mosaicos/10_ejemplos/`
+| # | Neurona | Estado | Prueba `a` (sorteos / ratio medio) | Prueba `b` ($\text{AUC}_{\text{val}}$) | Etiqueta libre escrita desde `train` | Mosaico local (fuera de Git) |
+|---:|---|---|---:|---:|---|---|
+| 1 | `neurona_421` | **LEGIBLE (`a` y `b`)** | `5/5` (`4,15x`) | **`0,8351`** | Se activa ante tallas tridimensionales, bustos y relieves en metal o piedra combinados con artefactos escultóricos o cerámicos fotografiados en estudio y núcleo policromo sobre margen neutro —por ejemplo «Zaō Gongen»— en contraste con piezas de cielo luminoso sobre base oscura con positivos fotográficos de cámara con grano óptico y xilografías, litografías y grabados calcográficos. | `ejemplo_01_legible_neurona_421.png` (`11bae6e4...`) |
+| 2 | `neurona_694` | **LEGIBLE (`a` y `b`)** | `4/5` (`2,77x`) | **`0,8185`** | Concentra su activación en objetos exentos con volumen físico, figuras escultóricas de bulto redondo y núcleo policromo sobre margen neutro, destacando «Shell with Seated Noble» oponiéndose a pinturas al óleo o temple sobre lienzo y tabla junto con cabecera clara con tercio inferior sombreado y riqueza cromática de pigmento vivo. | `ejemplo_02_legible_neurona_694.png` (`79ebdff3...`) |
+| 3 | `neurona_542` | **LEGIBLE (`a` y `b`)** | `4/5` (`3,18x`) | **`0,8104`** | Detecta artefactos escultóricos o cerámicos fotografiados en estudio junto a núcleo policromo sobre margen neutro además de recipientes de cerámica vidriada y alfarería, visible en «Black-Figure Neck-Amphora (Storage Ves» mientras el polo opuesto reúne grabados, aguafuertes y estampas sobre papel asociados a claridad tonal elevada en toda la toma y gradiente vertical de cielo claro a tierra oscura. | `ejemplo_03_legible_neurona_542.png` (`6075b451...`) |
+| 4 | `neurona_299` | **LEGIBLE (`a` y `b`)** | `4/5` (`2,74x`) | **`0,8019`** | Reacciona a gradiente vertical de cielo claro a tierra oscura con franjas anchas de composición horizontal y positivos fotográficos de cámara con grano óptico (caso de «The Bridge of Palalda (near Amelieles-»); en el extremo negativo aparecen escenas de equilibrio simétrico arriba-abajo, diferencia marcada de luz entre disco interno y periferia y formato vertical dominante. | `ejemplo_04_legible_neurona_299.png` (`db25edab...`) |
+| 5 | `neurona_428` | **LEGIBLE (`a` y `b`)** | `5/5` (`2,71x`) | **`0,8019`** | Detecta estructura tendida en planos horizontales junto a líneas horizontales de horizonte además de cabecera clara con tercio inferior sombreado, visible en «Nymphs and a Satyr (Amor Vincit Omnia)» mientras el polo opuesto reúne composición erguida en columnas verticales asociados a rayado vertical dominante y artefactos escultóricos o cerámicos fotografiados en estudio. | `ejemplo_05_legible_neurona_428.png` (`34a72d6a...`) |
+| 6 | `neurona_198` | **NO LEGIBLE (solo `a`)** | `5/5` (`3,44x`) | `0,4811` | Responde a equilibrio simétrico arriba-abajo, grano fino continuo sobre plano homogéneo y formato vertical dominante (como en «The Crucifixion of Saint Andrew») frente a vasijas, cuencos y porcelanas cerámicas, positivos fotográficos de cámara con grano óptico y estructura tendida en planos horizontales. | `ejemplo_06_no_legible_neurona_198.png` (`1f7b0dd1...`) |
+| 7 | `neurona_159` | **NO LEGIBLE (solo `a`)** | `5/5` (`2,91x`) | `0,4977` | Prefiere fotografías históricas en albúmina o plata y ejes verticales de figura de pie o pilastra acompañados de movimiento diagonal sin aristas rectas (ej. «Figure 54: Abaissement volontaire de l») contra composiciones con vasijas, cuencos y porcelanas cerámicas, objetos exentos con volumen físico y estructura tendida en planos horizontales. | `ejemplo_07_no_legible_neurona_159.png` (`3de74b90...`) |
+| 8 | `neurona_113` | **NO LEGIBLE (solo `b`)** | `0/5` (`1,19x`) | **`0,7852`** | Reacciona a jarrones, platos y tazas de porcelana con piezas tridimensionales de museo en estudio y pieza concentrada en el núcleo con periferia calma (caso de «Fragment of a Wall Painting MET 135348»); en el extremo negativo aparecen escenas de dominante térmica cálida rojiza, obra gráfica impresa en tinta sobre papel y formato vertical dominante. | `ejemplo_08_no_legible_neurona_113.png` (`bb70ba40...`) |
+| 9 | `neurona_090` | **NO LEGIBLE (`«no lo sé»`)** | `0/5` (`1,48x`) | `0,5000` | `no lo sé` | `ejemplo_09_no_legible_neurona_090.png` (`57f1ecf7...`) |
+| 10 | `neurona_264` | **NO LEGIBLE (solo `a`, `«no lo sé»`)** | `4/5` (`1,77x`) | `0,5000` | `no lo sé` | `ejemplo_10_no_legible_neurona_264.png` (`282f4cf9...`) |
 
-| # | Neurona (`id`) | Confirmada | Ratio caída (`top9 / control9`) | Etiqueta-verbo (`etiquetador: Argon`) | Archivo local del mosaico | SHA-256 del mosaico |
-|---|---|---|---:|---|---|---|
-| 1 | `neurona_003` | `true` | `>99,9x` (`control=0,0000`) | `espacio luminoso abierto (fuste estriado) frente a masa de tinta profunda (banda tendida)` | `10_ejemplos/ejemplo_01_neurona_003.png` | `d9dcba378f70…` |
-| 2 | `neurona_006` | `true` | `>99,9x` (`control=0,0000`) | `espacio luminoso abierto (superficie apagada) frente a masa de tinta profunda (acento saturado)` | `10_ejemplos/ejemplo_02_neurona_006.png` | `352a9a79cb10…` |
-| 3 | `neurona_138` | `true` | `>99,9x` (`control=0,0000`) | `superficie neutra apagada (dominante azul-grisácea) frente a acento cromático saturado (dominante bermellón-ocre)` | `10_ejemplos/ejemplo_03_neurona_138.png` | `b483cd90c194…` |
-| 4 | `neurona_156` | `true` | `>99,9x` (`control=0,0000`) | `campo liso y redondeado (banda tendida) frente a trazo puntiagudo y denso (fuste estriado)` | `10_ejemplos/ejemplo_04_neurona_156.png` | `648c93b4445b…` |
-| 5 | `neurona_173` | `true` | `>99,9x` (`control=0,0000`) | `fuste vertical estriado (superficie apagada) frente a banda horizontal tendida (acento saturado)` | `10_ejemplos/ejemplo_05_neurona_173.png` | `0857e49f88e0…` |
-| 6 | `neurona_196` | `true` | `>99,9x` (`control=0,0000`) | `campo liso y redondeado (transición suave) frente a trazo puntiagudo y denso (recorte claroscuro)` | `10_ejemplos/ejemplo_06_neurona_196.png` | `792d610df78c…` |
-| 7 | `neurona_201` | `true` | `>99,9x` (`control=0,0000`) | `masa de tinta profunda (campo redondeado) frente a espacio luminoso abierto (trazo denso)` | `10_ejemplos/ejemplo_07_neurona_201.png` | `1a43ab14da9d…` |
-| 8 | `neurona_233` | `true` | `>99,9x` (`control=0,0000`) | `fuste vertical estriado (masa profunda) frente a banda horizontal tendida (espacio abierto)` | `10_ejemplos/ejemplo_08_neurona_233.png` | `6a6131d5a9a3…` |
-| 9 | `neurona_113` | `false` | `0,00x` (`caida_top9=0,0000`) | `campo liso y redondeado (transición suave) frente a trazo puntiagudo y denso (recorte claroscuro)` | `10_ejemplos/ejemplo_09_neurona_113.png` | `ef638889e509…` |
-| 10 | `neurona_266` | `false` | `0,62x` (`< 2,0x`) | `masa de tinta profunda (campo redondeado) frente a espacio luminoso abierto (trazo denso)` | `10_ejemplos/ejemplo_10_neurona_266.png` | `f9f69a5c6bde…` |
+## 4. Verificación reproducible
+
+```bash
+.venv/bin/python lab/neuronas/medir_atlas.py
+```
+Pasa las **8/8 comprobaciones** (`prerregistro.json` v1 intacto, `prerregistro_v2.json` v2 intacto, `corpus_cc0_630.json` con 630 SHA-256 únicos y split 441/189, 200 fichas v2 completas con negativos preservados, 137/137 etiquetas con contenido únicas + 63 `«no lo sé»`, pruebas `a` y `b` verificadas y 0 imágenes/pesos en Git).

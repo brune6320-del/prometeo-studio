@@ -1,153 +1,231 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "id_neurona": "neurona_714",
   "canal_indice": 714,
   "modelo": "convnext_tiny",
   "etapa": "features.7",
-  "modalidad_corpus": "piloto_reducido",
-  "etiqueta": "banda horizontal tendida (transición suave) frente a fuste vertical estriado (recorte claroscuro)",
+  "modalidad_corpus": "cc0_630_train441_val189",
+  "etiqueta": "Responde a retícula ortogonal de trazos a 0 y 90 grados, estructura geométrica de ángulos rectos y panoramas campestres y marinos (como en «The Moon-Viewing Promontory, from One») frente a curvas orgánicas y diagonales dinámicas, objetos exentos con volumen físico y jarrones, platos y tazas de porcelana.",
   "etiquetador": "Argon",
+  "legible": true,
   "confirmada": true,
+  "confirmada_a": true,
+  "confirmada_b": true,
   "fecha": "2026-10-26",
   "sha256_pesos": "983f1562536e84ff750a1576fb08e54de751dbf2e17c0d8a4a13704341fdcd3d",
   "licencia_pesos": "BSD-3-Clause (https://github.com/pytorch/vision/blob/main/LICENSE)",
-  "sha256_prerregistro": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
-  "sha256_mosaico_local": "d04d831af0d840559aa1df5b4b3dff0988f85c51a9c3716710af93d462084358",
-  "prueba_apagado": {
+  "sha256_prerregistro_v1": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
+  "sha256_prerregistro_v2": "729bb150cc75e50e9ec5d2e43145f5e4d8876aa7119cc9b639f336d8c9ca1555",
+  "sha256_corpus_cc0": "f0c3483fafa8c04be6492ff62190071c8f6278beb8dec78b05110a6cabb5875f",
+  "sha256_mosaico_local": "b6dd7342dc21983661d69af7da4816825723cfb9eddf4a55dfd80f535cbabd25",
+  "prueba_a_apagado_control_justo": {
     "etapa_siguiente": "classifier (LayerNorm2d(768) -> Linear(768, 1000))",
-    "unidad_excitada_k": 780,
-    "peso_conexion_w_kc": 0.10649,
-    "caida_media_top9": 0.063056,
-    "caida_media_control9": 0.011439,
-    "ratio_top9_vs_control9": 5.5122,
-    "umbral_ratio_minimo": 2.0,
-    "confirmada": true
+    "activacion_media_abs_train": 0.0847,
+    "efecto_l2_neurona_x_top9_train": 4.31549,
+    "ratio_medio_x_vs_controles": 4.9171,
+    "sorteos_ganados_de_5": 5,
+    "minimo_sorteos_requerido": 4,
+    "factor_minimo_efecto": 2.0,
+    "controles_y_sorteados": [
+      {
+        "canal_y": 347,
+        "activacion_media_abs_train": 0.08478,
+        "efecto_l2_en_top9_de_x": 1.0969,
+        "ratio_x_vs_y": 3.9343,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 522,
+        "activacion_media_abs_train": 0.08416,
+        "efecto_l2_en_top9_de_x": 0.4417,
+        "ratio_x_vs_y": 9.7703,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 31,
+        "activacion_media_abs_train": 0.0847,
+        "efecto_l2_en_top9_de_x": 0.94168,
+        "ratio_x_vs_y": 4.5828,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 362,
+        "activacion_media_abs_train": 0.08364,
+        "efecto_l2_en_top9_de_x": 0.80699,
+        "ratio_x_vs_y": 5.3476,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 236,
+        "activacion_media_abs_train": 0.08564,
+        "efecto_l2_en_top9_de_x": 1.10099,
+        "ratio_x_vs_y": 3.9196,
+        "supera_2x": true
+      }
+    ],
+    "confirmada_a": true
   },
-  "discriminadores_visuales_d_cohen": {
-    "agudeza_borde": -0.2756,
-    "contraste_tonal": -0.5571,
-    "luminosidad": -0.2451,
-    "saturacion": -0.2454,
-    "calidez": -0.1449,
-    "anisotropia_vert": -0.7786
+  "prueba_b_prediccion_validacion_ciega": {
+    "split_evaluado": "validacion (189 imágenes ciegas)",
+    "escala_puntuacion": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "conteo_puntuaciones_0_a_3": {
+      "0": 47,
+      "1": 47,
+      "2": 47,
+      "3": 48
+    },
+    "positivos_reales_validacion_top20pct": 38,
+    "roc_auc_validacion": 0.70277,
+    "umbral_auc_minimo": 0.7,
+    "etiqueta_es_no_lo_se": false,
+    "confirmada_b": true
+  },
+  "coherencia_descubrimiento_train": {
+    "roc_auc_train": 0.73688,
+    "umbral_claridad_train": 0.64
   },
   "polo_pos": [
     {
       "rango": 1,
-      "id_pieza": "d3_13",
-      "sha256_imagen": "fdd76328c77a2f3b535c2b57ca3ee3ed738b122bd87e1fb854203f5ebc2c49b8",
-      "activacion_media": 0.09618,
-      "activacion_max_celda_7x7": 0.68108,
+      "id_pieza": "cma_152499",
+      "sha256_imagen": "0cdda10ea479d8cf1056e52a2b58027b0474e24dfe8de6ab29c4fb177fb3e1f8",
+      "categoria": "grabados",
+      "url_pagina": "https://clevelandart.org/art/1985.320",
+      "activacion_media": 0.30373,
+      "activacion_max_celda_7x7": 1.02321,
       "celda_7x7": [
-        0,
-        0
+        3,
+        6
       ],
-      "caida_etapa_siguiente_al_apagar": 0.10354
+      "efecto_l2_al_apagar": 5.74097
     },
     {
       "rango": 2,
-      "id_pieza": "d3_05",
-      "sha256_imagen": "f62c68d6a390f72d533b087ecdca1137b2b87376f4cbb76d97edc37ef0a9f905",
-      "activacion_media": 0.09141,
-      "activacion_max_celda_7x7": 0.5193,
+      "id_pieza": "met_wm_57670896",
+      "sha256_imagen": "e31669b16b44b9c5888ba3acdb60c425f1d1f290f4129b34b1e9e6e82b88c165",
+      "categoria": "pintura",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Maude_Adams_(1872%E2%80%931953)_as_Joan_of_Arc_MET_DT203309.jpg",
+      "activacion_media": 0.28536,
+      "activacion_max_celda_7x7": 0.98355,
       "celda_7x7": [
-        2,
-        2
+        0,
+        5
       ],
-      "caida_etapa_siguiente_al_apagar": 0.12666
+      "efecto_l2_al_apagar": 3.71927
     },
     {
       "rango": 3,
-      "id_pieza": "d3_02",
-      "sha256_imagen": "7a5578467a4116c7e9667cadd98029937629b2662d0564e87d87625a4b388f57",
-      "activacion_media": 0.0738,
-      "activacion_max_celda_7x7": 0.70801,
+      "id_pieza": "cma_157339",
+      "sha256_imagen": "8929b9438bc3f0f6aa4612bf4b7d57abb720fd014de37184dd68725e2460dafa",
+      "categoria": "fotografia",
+      "url_pagina": "https://clevelandart.org/art/1994.201",
+      "activacion_media": 0.26858,
+      "activacion_max_celda_7x7": 0.70312,
+      "celda_7x7": [
+        5,
+        0
+      ],
+      "efecto_l2_al_apagar": 5.01208
+    },
+    {
+      "rango": 4,
+      "id_pieza": "cma_131338",
+      "sha256_imagen": "90543cddc9fcedd835d5e5d5137c20fdf124fa95bac7279b37a705683fc5f62d",
+      "categoria": "carteles_y_obra_grafica",
+      "url_pagina": "https://clevelandart.org/art/1954.129",
+      "activacion_media": 0.25651,
+      "activacion_max_celda_7x7": 0.75749,
+      "celda_7x7": [
+        0,
+        0
+      ],
+      "efecto_l2_al_apagar": 3.92445
+    },
+    {
+      "rango": 5,
+      "id_pieza": "cma_103244",
+      "sha256_imagen": "d06e3cc14430f93ea6bc4ab5a38b0c563385605a6d3535a37a5aa9f140b73759",
+      "categoria": "grabados",
+      "url_pagina": "https://clevelandart.org/art/1921.318",
+      "activacion_media": 0.25465,
+      "activacion_max_celda_7x7": 1.06258,
+      "celda_7x7": [
+        3,
+        1
+      ],
+      "efecto_l2_al_apagar": 4.45177
+    },
+    {
+      "rango": 6,
+      "id_pieza": "met_wm_87914690",
+      "sha256_imagen": "4794e948dd97fcf999195515de047cec795f7c693065b28f7d9b430b085fbdc8",
+      "categoria": "pintura",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Kitten_cav_2_-_Copy.png",
+      "activacion_media": 0.23924,
+      "activacion_max_celda_7x7": 1.34942,
       "celda_7x7": [
         1,
         0
       ],
-      "caida_etapa_siguiente_al_apagar": 0.08164
-    },
-    {
-      "rango": 4,
-      "id_pieza": "d3_16",
-      "sha256_imagen": "4320a2a836a7408de4a666db1cd28d4d1f8327e15f937ffacfdb67a34e55fccb",
-      "activacion_media": 0.05869,
-      "activacion_max_celda_7x7": 0.42019,
-      "celda_7x7": [
-        5,
-        2
-      ],
-      "caida_etapa_siguiente_al_apagar": 0.06714
-    },
-    {
-      "rango": 5,
-      "id_pieza": "d3_15",
-      "sha256_imagen": "7a26ff28f246e4b73407dd224b7c9b2c274497345b9b2e27192be163eb0a75c8",
-      "activacion_media": 0.0443,
-      "activacion_max_celda_7x7": 0.30858,
-      "celda_7x7": [
-        5,
-        6
-      ],
-      "caida_etapa_siguiente_al_apagar": 0.04925
-    },
-    {
-      "rango": 6,
-      "id_pieza": "d3_01",
-      "sha256_imagen": "a85c7a5f496e6830fe15eb238498f097e6caa282804c385be1fa35ec64ad5045",
-      "activacion_media": 0.03522,
-      "activacion_max_celda_7x7": 0.48898,
-      "celda_7x7": [
-        0,
-        6
-      ],
-      "caida_etapa_siguiente_al_apagar": 0.04477
+      "efecto_l2_al_apagar": 3.67409
     },
     {
       "rango": 7,
-      "id_pieza": "d3_04",
-      "sha256_imagen": "55207aa597a71ee6df82e2babf85156ef26fb8315a3071cf0b9e7439bd9c15c2",
-      "activacion_media": 0.02947,
-      "activacion_max_celda_7x7": 0.35601,
+      "id_pieza": "met_wm_148856952",
+      "sha256_imagen": "40f02e0da1b6bf7faaf9d9a8ce263acf14efb36e105f20ccf4a8c8614f7b44d7",
+      "categoria": "pintura",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Matsumura_Keibun_%E6%9D%BE%E6%9D%91%E6%99%AF%E6%96%87_-_Plum_Blossoms_-_2015.500.9.57a%E2%80%93c_-_Metropolitan_Museum_of_Art.jpg",
+      "activacion_media": 0.22694,
+      "activacion_max_celda_7x7": 0.81008,
       "celda_7x7": [
-        0,
-        2
+        6,
+        0
       ],
-      "caida_etapa_siguiente_al_apagar": 0.04619
+      "efecto_l2_al_apagar": 4.13772
     },
     {
       "rango": 8,
-      "id_pieza": "d3_14",
-      "sha256_imagen": "18cc2e1152f9d3ec74d4d2eddb5269d2e1743d1bc005d3f7f5a4afeb4536f19f",
-      "activacion_media": 0.02797,
-      "activacion_max_celda_7x7": 0.36626,
+      "id_pieza": "cma_130457",
+      "sha256_imagen": "853f04aa66992e9f077ef7661a5e48652451929af6262d7d708e6399ce7263f5",
+      "categoria": "pintura",
+      "url_pagina": "https://clevelandart.org/art/1953.212",
+      "activacion_media": 0.22432,
+      "activacion_max_celda_7x7": 0.62073,
       "celda_7x7": [
         4,
-        2
+        5
       ],
-      "caida_etapa_siguiente_al_apagar": 0.0382
+      "efecto_l2_al_apagar": 4.28643
     },
     {
       "rango": 9,
-      "id_pieza": "d3_18",
-      "sha256_imagen": "f1063b43da990dd6aceff9c482e5f362631c47f56684fe6e956c88e58004e997",
-      "activacion_media": 0.01088,
-      "activacion_max_celda_7x7": 0.21652,
+      "id_pieza": "cma_142298",
+      "sha256_imagen": "460283af71f31e7bafaedae8d9fcecfd34f1c1920d025fed114ea43447c21e3c",
+      "categoria": "pintura",
+      "url_pagina": "https://clevelandart.org/art/1966.13",
+      "activacion_media": 0.22387,
+      "activacion_max_celda_7x7": 0.7531,
       "celda_7x7": [
-        1,
-        4
+        6,
+        2
       ],
-      "caida_etapa_siguiente_al_apagar": 0.01011
+      "efecto_l2_al_apagar": 3.89266
     }
   ],
   "polo_neg": [
     {
       "rango": 1,
-      "id_pieza": "d3_17",
-      "sha256_imagen": "13311d1cbf4a1b897354735482c541be07431facf1bab0d44f95bc52c6333c9f",
-      "activacion_media": -0.08589,
-      "activacion_min_celda_7x7": -0.38343,
+      "id_pieza": "cma_124071",
+      "sha256_imagen": "167c765ed9a57f18f4d166021653d057153067d2db616ed8a34c3021cd31487a",
+      "categoria": "objetos",
+      "url_pagina": "https://clevelandart.org/art/1944.74",
+      "activacion_media": -0.2164,
+      "activacion_min_celda_7x7": -0.89095,
       "celda_7x7": [
         3,
         4
@@ -155,21 +233,25 @@
     },
     {
       "rango": 2,
-      "id_pieza": "d3_20",
-      "sha256_imagen": "bea839ffbb373aeaf4014e59d64931e72b1db7a3f7f45b79b998a60a9d4ee349",
-      "activacion_media": -0.08327,
-      "activacion_min_celda_7x7": -0.42821,
+      "id_pieza": "cma_153366",
+      "sha256_imagen": "a40e388d3264d7f49c886f6637877deb470851175f1d606fbf6bd096efc16169",
+      "categoria": "objetos",
+      "url_pagina": "https://clevelandart.org/art/1986.57",
+      "activacion_media": -0.16561,
+      "activacion_min_celda_7x7": -0.60742,
       "celda_7x7": [
         5,
-        1
+        6
       ]
     },
     {
       "rango": 3,
-      "id_pieza": "d3_09",
-      "sha256_imagen": "177ff6c0f14e5550a3c624247cd1189611d4eb65d000b14944c63d967958abbb",
-      "activacion_media": -0.07773,
-      "activacion_min_celda_7x7": -0.23906,
+      "id_pieza": "cma_439440",
+      "sha256_imagen": "8e404f2485fcddba95f24826fe177db07d0b3117111ac54bff0274b317232532",
+      "categoria": "fotografia",
+      "url_pagina": "https://clevelandart.org/art/2021.76",
+      "activacion_media": -0.15833,
+      "activacion_min_celda_7x7": -0.97474,
       "celda_7x7": [
         0,
         6
@@ -177,68 +259,80 @@
     },
     {
       "rango": 4,
-      "id_pieza": "d3_03",
-      "sha256_imagen": "cd1508b71344efaf5e9da23e6715a486c983322ef2b1d59ec0b499d6b5cd6b2a",
-      "activacion_media": -0.07697,
-      "activacion_min_celda_7x7": -0.36756,
+      "id_pieza": "cma_135007",
+      "sha256_imagen": "5efad867365e99c234514063510b64b69d84bbc78a29309ceea237ee5b1b1e54",
+      "categoria": "objetos",
+      "url_pagina": "https://clevelandart.org/art/1957.61",
+      "activacion_media": -0.13516,
+      "activacion_min_celda_7x7": -0.52857,
       "celda_7x7": [
-        1,
-        4
+        5,
+        1
       ]
     },
     {
       "rango": 5,
-      "id_pieza": "d3_11",
-      "sha256_imagen": "1c227d456917abc52b3237911b65a8c21ce703e7d4c2f8dfecf7d80c8e8e576f",
-      "activacion_media": -0.07378,
-      "activacion_min_celda_7x7": -0.61668,
+      "id_pieza": "met_wm_57394177",
+      "sha256_imagen": "573eb7b311bec8cb4a9b94267507d992f85ef4b609bdd9eb7ac01761d7ee5665",
+      "categoria": "pintura",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Fragment_of_a_Wall_Painting_MET_sf45-103-13.jpg",
+      "activacion_media": -0.12365,
+      "activacion_min_celda_7x7": -0.47128,
+      "celda_7x7": [
+        5,
+        3
+      ]
+    },
+    {
+      "rango": 6,
+      "id_pieza": "cma_104769",
+      "sha256_imagen": "79efc9bc3176c89c63ed6e7ecb97cbc25483b438155d8263485d8445e31f943c",
+      "categoria": "objetos",
+      "url_pagina": "https://clevelandart.org/art/1923.1096",
+      "activacion_media": -0.12277,
+      "activacion_min_celda_7x7": -0.46109,
+      "celda_7x7": [
+        5,
+        6
+      ]
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_307213",
+      "sha256_imagen": "87f77a8df713e76d0e1a4038e598bbeb86ab6a581386e13f31393fd865c65039",
+      "categoria": "fotografia",
+      "url_pagina": "https://clevelandart.org/art/2018.10",
+      "activacion_media": -0.12185,
+      "activacion_min_celda_7x7": -0.68553,
+      "celda_7x7": [
+        3,
+        1
+      ]
+    },
+    {
+      "rango": 8,
+      "id_pieza": "met_wm_148892168",
+      "sha256_imagen": "45b905e9660f9db245a1f8f51f0587c8e14cde491b4129c2f8d74ae9ce3cd9b5",
+      "categoria": "pintura",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Kano_Tsunenobu_-_Album_of_Fan-Shaped_Paintings_of_Figures,_Birds_and_Flowers_-_2019.420.21_-_Metropolitan_Museum_of_Art.jpg",
+      "activacion_media": -0.11686,
+      "activacion_min_celda_7x7": -0.562,
       "celda_7x7": [
         2,
         6
       ]
     },
     {
-      "rango": 6,
-      "id_pieza": "d3_12",
-      "sha256_imagen": "014818d39c9dc3589c112bf6bcd7a657c3959cc5bd81481692f51a8745759507",
-      "activacion_media": -0.06714,
-      "activacion_min_celda_7x7": -0.4679,
-      "celda_7x7": [
-        4,
-        4
-      ]
-    },
-    {
-      "rango": 7,
-      "id_pieza": "d3_10",
-      "sha256_imagen": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6",
-      "activacion_media": -0.05551,
-      "activacion_min_celda_7x7": -0.23976,
-      "celda_7x7": [
-        1,
-        5
-      ]
-    },
-    {
-      "rango": 8,
-      "id_pieza": "d3_06",
-      "sha256_imagen": "9e3543d5f66bc7370df89ffa64db2619ea8406361d53b2452b1d603a08ff48b1",
-      "activacion_media": -0.05216,
-      "activacion_min_celda_7x7": -0.48748,
-      "celda_7x7": [
-        4,
-        3
-      ]
-    },
-    {
       "rango": 9,
-      "id_pieza": "d3_08",
-      "sha256_imagen": "ef9512f92f6d579e5dc75af59a5a4b1b8b47d2eda89e00b954d44520e5369027",
-      "activacion_media": -0.03367,
-      "activacion_min_celda_7x7": -0.15611,
+      "id_pieza": "cma_399499",
+      "sha256_imagen": "8bc6e3b5e4c12eda6a4229b5d7c054c6ed0a67424c4f0c76fc7115d5f837a748",
+      "categoria": "objetos",
+      "url_pagina": "https://clevelandart.org/art/2021.3",
+      "activacion_media": -0.11136,
+      "activacion_min_celda_7x7": -0.40257,
       "celda_7x7": [
         1,
-        5
+        2
       ]
     }
   ]
