@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronDown, ChevronRight, Lock, LockOpen, Settings2, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
+import { estaAtenuada } from '../board/atenuadas';
 import { readColumnData } from '../board/columnas';
 import { TituloEnSitio } from './InlineEdit';
 
@@ -14,7 +15,6 @@ export interface BoardColumnProps {
   card: BoardCard;
   childrenCards: BoardCard[];
   selected: boolean;
-  dimmed: boolean;
   dragging: boolean;
   settling: boolean;
   dropTarget: boolean;
@@ -43,7 +43,6 @@ export const BoardColumn: React.FC<BoardColumnProps> = ({
   card,
   childrenCards,
   selected,
-  dimmed,
   dragging,
   settling,
   dropTarget,
@@ -74,7 +73,7 @@ export const BoardColumn: React.FC<BoardColumnProps> = ({
       tabIndex={-1}
       aria-selected={selected}
       aria-label={`Columna: ${card.title || 'sin título'}`}
-      className={`board-column ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${dropTarget ? 'drop-target' : ''} ${data.plegada ? 'is-folded' : ''} ${card.locked ? 'is-locked' : ''}`}
+      className={`board-column ${selected ? 'selected' : ''} ${estaAtenuada(card.id) ? 'dimmed' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${dropTarget ? 'drop-target' : ''} ${data.plegada ? 'is-folded' : ''} ${card.locked ? 'is-locked' : ''}`}
       style={{ left: card.x, top: card.y, width: card.width, ...(data.alto ? { height: data.alto } : {}) }}
       onPointerMove={onDragMove}
       onPointerUp={onDragEnd}

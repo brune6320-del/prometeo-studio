@@ -1,6 +1,7 @@
 import React from 'react';
 import { Lock, LockOpen, Pause, Play, Settings2, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
+import { estaAtenuada } from '../board/atenuadas';
 import { metricas } from '../motion/metricas';
 import { TituloEnSitio, TextoEnSitio } from './InlineEdit';
 
@@ -39,7 +40,6 @@ interface Modificadores {
 export interface BoardFreeMediaProps {
   card: BoardCard;
   selected: boolean;
-  dimmed: boolean;
   dragging: boolean;
   settling: boolean;
   onSelect: (card: BoardCard, modifiers: Modificadores) => void;
@@ -66,7 +66,6 @@ const ESQUINAS: EsquinaMedia[] = ['nw', 'ne', 'sw', 'se'];
 export const BoardFreeMedia = React.memo(function BoardFreeMedia({
   card,
   selected,
-  dimmed,
   dragging,
   settling,
   onSelect,
@@ -115,7 +114,7 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
       tabIndex={-1}
       aria-selected={selected}
       aria-label={`${esVideo ? 'Vídeo' : 'Imagen'}: ${card.title || 'sin título'}`}
-      className={`board-free-media ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${card.locked ? 'is-locked' : ''}`}
+      className={`board-free-media ${selected ? 'selected' : ''} ${estaAtenuada(card.id) ? 'dimmed' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${card.locked ? 'is-locked' : ''}`}
       data-locked={card.locked ? 'si' : 'no'}
       style={{ left: card.x, top: card.y, width: card.width, height: alto }}
       onPointerDown={(event) => {
@@ -137,12 +136,14 @@ export const BoardFreeMedia = React.memo(function BoardFreeMedia({
         onDragEnd(event);
         inicioRef.current = null;
       }}
-      onClick={() => {
+      onClick={(event) => {
         if (movidoRef.current) {
           movidoRef.current = false;
           return;
         }
         if (esVideo) alternarVideo();
+        // T-4 · la selección se aplica al soltar (antes se hacía en pointerdown).
+        onSelect(card, event);
       }}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;

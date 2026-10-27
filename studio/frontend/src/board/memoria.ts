@@ -7,7 +7,7 @@
  * tocar el formato de los tableros ni invalidar los registros existentes.
  */
 import type { BoardDocument } from './model';
-import type { BoardHistory } from './history';
+import type { BoardHistory, BoardHistoryEntry } from './history';
 import type { BoardProject, PdfReference } from './projectModel';
 import { marca, marcaFin } from './marcas';
 
@@ -204,38 +204,129 @@ export async function olvidarBorrado(id: string): Promise<void> {
 /** Historial de deshacer por tablero. Se guarda acotado para no reventar la cuota. */
 const MAX_HISTORIAL_BYTES = 3_500_000;
 
+interface Serializado {
+  json: string;
+  bytes: number;
+}
+
 /**
- * T-3 · recorta desde el final midiendo cada paso, en vez de serializar las 100
- * copias del tablero para descubrir que sobran. Con 500 tarjetas eso eran 55 ms
- * de JSON en el hilo principal; ahora se mide solo lo que cabe.
+ * T-4 · cada paso se serializa una sola vez.
+ *
+ * Antes, cada guardado del historial volvía a hacer `JSON.stringify` de hasta
+ * 100 copias del tablero (3,5 MB) para descubrir qué cabía. Con 500 tarjetas
+ * eso es un longtask garantizado en un equipo lento. Ahora la medida sale de
+ * la caché y solo se serializa el paso nuevo; la escritura se trocea con
+ * `scheduler.yield` para no retener el hilo más de ~8 ms seguidos.
+ */
+const pasosSerializados = new WeakMap<BoardHistoryEntry, Serializado>();
+const listasSerializadas = new WeakMap<readonly unknown[], Serializado>();
+
+function serializarLista(lista: readonly unknown[]): Serializado {
+  const cache = listasSerializadas.get(lista);
+  if (cache) return cache;
+  const json = JSON.stringify(lista);
+  const valor = { json, bytes: json.length };
+  listasSerializadas.set(lista, valor);
+  return valor;
+}
+
+function serializarPaso(entry: BoardHistoryEntry): Serializado {
+  const cache = pasosSerializados.get(entry);
+  if (cache) return cache;
+  const inicio = marca('historial:json:paso', 'nuevo paso');
+  const json = JSON.stringify(entry);
+  const valor = { json, bytes: json.length + 1 };
+  marcaFin('historial:json:paso:fin', inicio, `${(valor.bytes / 1024).toFixed(0)} KB`);
+  pasosSerializados.set(entry, valor);
+  return valor;
+}
+
+/** Cede el hilo entre trozos de serialización, también donde `scheduler.yield` no existe. */
+function ceder(): Promise<void> {
+  const programador = (globalThis as { scheduler?: { yield?: () => Promise<void> } }).scheduler;
+  if (programador?.yield) return programador.yield();
+  return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
+}
+
+/**
+ * T-4 · recorta desde el final midiendo cada paso, sin volver a serializar las
+ * 100 copias del tablero. El resultado es el mismo que el de T-3: los pasos más
+ * recientes que caben y, siempre, al menos uno.
  */
 export function compactarHistorial(history: BoardHistory, maxBytes = MAX_HISTORIAL_BYTES): BoardHistory {
-  const redoBytes = JSON.stringify(history.redo).length;
+  const redo = serializarLista(history.redo);
   const recortado: BoardHistory['undo'] = [];
-  let bytes = redoBytes;
+  let bytes = redo.bytes;
   for (let indice = history.undo.length - 1; indice >= 0; indice -= 1) {
     const entry = history.undo[indice];
-    const inicio = marca('historial:json:paso', `${history.undo.length - indice} de ${history.undo.length}`);
-    const tamano = JSON.stringify(entry).length + 1;
-    marcaFin('historial:json:paso:fin', inicio, `${(tamano / 1024).toFixed(0)} KB`);
+    const tamano = serializarPaso(entry).bytes;
     if (recortado.length > 0 && bytes + tamano > maxBytes) break;
-    recortado.unshift(entry);
+    recortado.push(entry);
     bytes += tamano;
   }
+  recortado.reverse();
   return { undo: recortado, redo: history.redo };
 }
 
-export async function guardarHistorial(boardId: string, history: BoardHistory): Promise<void> {
+type TareaHistorial = { history: BoardHistory; generacion: number };
+
+const colaHistorial = new Map<string, Promise<void>>();
+const historialPendiente = new Map<string, TareaHistorial>();
+const generacionHistorial = new Map<string, number>();
+let contadorGeneracion = 0;
+
+/**
+ * T-4 · serializa el historial por diferencias y escribe la última revisión.
+ * Las escrituras de un mismo tablero se encadenan para que una vieja no pise a
+ * una nueva; una revisión obsoleta se descarta antes de empezar.
+ */
+export function guardarHistorial(boardId: string, history: BoardHistory): Promise<void> {
+  contadorGeneracion += 1;
+  const generacion = contadorGeneracion;
+  historialPendiente.set(boardId, { history, generacion });
+  generacionHistorial.set(boardId, generacion);
+  const anterior = colaHistorial.get(boardId) ?? Promise.resolve();
+  const siguiente = anterior
+    .then(async () => {
+      const turno = historialPendiente.get(boardId);
+      if (!turno || turno.generacion !== generacion) return;
+      historialPendiente.delete(boardId);
+      await escribirHistorial(boardId, turno.history, generacion);
+    })
+    .catch((error: unknown) => {
+      console.warn('No se pudo guardar el historial del tablero.', error);
+    });
+  colaHistorial.set(boardId, siguiente);
+  return siguiente;
+}
+
+async function escribirHistorial(boardId: string, history: BoardHistory, generacion: number): Promise<void> {
   const inicio = marca('historial:guardado', `${boardId} · ${history.undo.length} pasos · ${history.redo.length} redo`);
-  try {
-    const database = await openDatabase();
-    const transaction = database.transaction(HISTORIAL_STORE, 'readwrite');
-    transaction.objectStore(HISTORIAL_STORE).put({ boardId, history: compactarHistorial(history), savedAt: new Date().toISOString() });
-    await transactionFinished(transaction);
-    marcaFin('historial:guardado:fin', inicio, boardId);
-  } catch (error) {
-    console.warn('No se pudo guardar el historial del tablero.', error);
+  const redo = serializarLista(history.redo);
+  const piezas: string[] = [];
+  let bytes = redo.bytes;
+  let desde = performance.now();
+  for (let indice = history.undo.length - 1; indice >= 0; indice -= 1) {
+    const paso = serializarPaso(history.undo[indice]);
+    if (piezas.length > 0 && bytes + paso.bytes > MAX_HISTORIAL_BYTES) break;
+    piezas.push(paso.json);
+    bytes += paso.bytes;
+    if (performance.now() - desde >= 8) {
+      await ceder();
+      // Llegó una revisión más nueva mientras cedíamos: esa escribirá.
+      if (generacionHistorial.get(boardId) !== generacion) return;
+      desde = performance.now();
+    }
   }
+  piezas.reverse();
+  // Se guarda como texto: IndexedDB copia una cadena, no recorre 100 tableros.
+  const payload = `{"undo":[${piezas.join(',')}],"redo":${redo.json}}`;
+  marca('historial:armado', `${boardId} · ${piezas.length} pasos · ${(bytes / 1024).toFixed(0)} KB`);
+  const database = await openDatabase();
+  const transaction = database.transaction(HISTORIAL_STORE, 'readwrite');
+  transaction.objectStore(HISTORIAL_STORE).put({ boardId, version: 2, payload, pasos: piezas.length, savedAt: new Date().toISOString() });
+  await transactionFinished(transaction);
+  marcaFin('historial:guardado:fin', inicio, boardId);
 }
 
 export async function leerHistoriales(): Promise<Record<string, BoardHistory>> {
@@ -250,9 +341,20 @@ export async function leerHistoriales(): Promise<Record<string, BoardHistory>> {
     await transactionFinished(transaction);
     const result: Record<string, BoardHistory> = {};
     for (const record of records) {
-      if (!isRecord(record) || typeof record.boardId !== 'string' || !isRecord(record.history)) continue;
-      const undo = Array.isArray(record.history.undo) ? record.history.undo : [];
-      const redo = Array.isArray(record.history.redo) ? record.history.redo : [];
+      if (!isRecord(record) || typeof record.boardId !== 'string') continue;
+      // T-4 guarda el historial como texto; los registros de T-3 y anteriores
+      // traen el objeto `history` y se siguen leyendo tal cual.
+      let guardado: unknown = record.history;
+      if (typeof record.payload === 'string') {
+        try {
+          guardado = JSON.parse(record.payload);
+        } catch {
+          continue;
+        }
+      }
+      if (!isRecord(guardado)) continue;
+      const undo = Array.isArray(guardado.undo) ? guardado.undo : [];
+      const redo = Array.isArray(guardado.redo) ? guardado.redo : [];
       result[record.boardId] = { undo: undo as BoardHistory['undo'], redo: redo as BoardHistory['redo'] };
     }
     return result;
@@ -276,4 +378,7 @@ export async function borrarHistorial(boardId: string): Promise<void> {
 /** Solo pruebas: olvida la conexión para que un contexto nuevo empiece limpio. */
 export function resetMemoriaForTests(): void {
   databasePromise = null;
+  colaHistorial.clear();
+  historialPendiente.clear();
+  generacionHistorial.clear();
 }

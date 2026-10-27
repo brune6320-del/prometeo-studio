@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState, useSyncExternalStore } from 'react';
 import { Link2, Lock, LockOpen, Settings2, X } from 'lucide-react';
 import type { BoardCard } from '../board/model';
+import { lodCompleta, suscribirLod } from '../board/lod';
+import { estaAtenuada } from '../board/atenuadas';
 import { BoardCardContent } from '../board/tools/CardView';
 import type { BoardToolActions } from '../board/tools/registry';
 import { TituloEnSitio } from './InlineEdit';
@@ -15,15 +17,12 @@ interface Modificadores {
 export interface BoardCardItemProps {
   card: BoardCard;
   selected: boolean;
-  dimmed: boolean;
   dragging: boolean;
   settling: boolean;
   connectionSource: boolean;
   connectionTarget?: boolean;
   connectMode: boolean;
   colors: Array<BoardCard['color']>;
-  /** Por debajo del 35 % solo queda el título: menos DOM para mover y borrar cientos. */
-  compact?: boolean;
   onSelect: (card: BoardCard, modifiers: Modificadores) => void;
   onConnect: (cardId: string) => void;
   onConnectStart: (card: BoardCard, event: React.PointerEvent<HTMLElement>) => void;
@@ -45,14 +44,12 @@ export interface BoardCardItemProps {
 export const BoardCardItem = React.memo(function BoardCardItem({
   card,
   selected,
-  dimmed,
   dragging,
   settling,
   connectionSource,
   connectionTarget = false,
   connectMode,
   colors,
-  compact = false,
   onSelect,
   onConnect,
   onConnectStart,
@@ -71,6 +68,14 @@ export const BoardCardItem = React.memo(function BoardCardItem({
   acciones,
 }: BoardCardItemProps) {
   metricas.rendersTarjeta += 1;
+  /**
+   * T-4 · el LOD se suscribe por tarjeta: encender cuatro cuerpos no vuelve a
+   * renderizar las 500. La tarjeta nace compacta hasta que entra en encuadre.
+   */
+  const compact = useSyncExternalStore(
+    useCallback((onChange) => suscribirLod(card.id, onChange), [card.id]),
+    useCallback(() => !lodCompleta(card.id), [card.id]),
+  );
   const [cercaDelBorde, setCercaDelBorde] = useState(false);
   const iniciarArrastre = (event: React.PointerEvent<HTMLElement>, force = false) => {
     if (card.locked) return;
@@ -122,7 +127,7 @@ export const BoardCardItem = React.memo(function BoardCardItem({
         tabIndex={-1}
         aria-selected={selected}
         aria-label={`Tarjeta: ${card.title || 'sin título'}`}
-        className={`board-card board-card-compact color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${card.locked ? 'is-locked' : ''}`}
+        className={`board-card board-card-compact color-${card.color} ${selected ? 'selected' : ''} ${estaAtenuada(card.id) ? 'dimmed' : ''} ${card.locked ? 'is-locked' : ''}`}
         style={estiloTarjeta}
         onPointerDown={iniciarArrastre}
         onPointerMove={onDragMove}
@@ -149,7 +154,7 @@ export const BoardCardItem = React.memo(function BoardCardItem({
       tabIndex={-1}
       aria-selected={selected}
       aria-label={`Tarjeta: ${card.title || 'sin título'}`}
-      className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${dimmed ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''} ${connectionTarget ? 'connection-target' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${card.locked ? 'is-locked' : ''} ${cercaDelBorde ? 'connect-near' : ''}`}
+      className={`board-card color-${card.color} ${selected ? 'selected' : ''} ${estaAtenuada(card.id) ? 'dimmed' : ''} ${connectionSource ? 'connection-source' : ''} ${connectionTarget ? 'connection-target' : ''} ${dragging ? 'dragging' : ''} ${settling ? 'settling' : ''} ${card.locked ? 'is-locked' : ''} ${cercaDelBorde ? 'connect-near' : ''}`}
       style={estiloTarjeta}
       onPointerDownCapture={(event) => {
         if ((event.metaKey || event.ctrlKey) && !card.locked) {

@@ -493,15 +493,30 @@
   position: absolute;
   z-index: 2;
   inset: 0;
-  contain: layout style paint;
+  /*
+   * T-4 · la caja del escenario mide el viewport, pero las tarjetas viven en
+   * coordenadas de mundo que lo desbordan. Con `will-change: transform` el
+   * navegador compone el escenario y, si además hay contención de layout, el
+   * layer se recorta a esa caja: solo se veían las primeras columnas y el
+   * desbordamiento gigante se repintaba al panear o seleccionar. `contain:
+   * style` conserva el aislamiento sin recortar; el recorte real lo hace el
+   * viewport.
+   */
+  contain: style;
   transform-origin: 0 0;
   pointer-events: none;
-  will-change: transform;
+  /*
+   * T-4 · sin `will-change`: el escenario es una capa enorme que el navegador
+   * re-rasteriza al cambiar el zoom (552 ms medidos). Sin capa, el pintado se
+   * limita al viewport. El transform sigue siendo 2D para no promoverla.
+   */
+  will-change: auto;
 }
 
-/* Una tarjeta en coordenadas negativas no puede quedar recortada por `contain: paint`. */
+/* Las tarjetas en coordenadas negativas ya no necesitan una excepción: el
+   escenario no recorta. Se conserva el atributo para las marcas del soak. */
 .board-stage.has-negative {
-  contain: layout style;
+  contain: style;
 }
 
 /*
@@ -556,6 +571,16 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/*
+ * T-4 · por debajo del 50 % la tarjeta es una ficha de color. A 36 % una nota
+ * mide 94×54 px y su título se pinta a 4 px: no se lee y rasterizar 500
+ * textos era el pico de 100–116 ms del arranque y del primer zoom. La ficha
+ * conserva color y posición; el título vuelve al entrar en LOD completo.
+ */
+.board-card-compact .board-card-title {
+  display: none;
 }
 
 .board-frame {
@@ -3085,10 +3110,10 @@
 
 /* ── LOD: el contenido de las tarjetas lo decide React por tandas (T-3) ─── */
 /*
- * T-3 · las reglas de LOD por tarjeta viven en `.board-card-compact`. Un
- * cambio global de `data-lod` a `full` obligaba a recalcular el estilo y el
- * layout de 500 tarjetas en un solo fotograma (238 ms medidos). El atributo
- * se queda solo para medios libres, marcos y columnas, que son pocos.
+ * T-3/T-4 · las reglas de LOD por tarjeta viven en `.board-card-compact`.
+ * Un cambio global de `data-lod` obligaba a recalcular el estilo y el layout
+ * de 500 tarjetas en un solo fotograma (238 ms medidos). T-4 quitó también el
+ * atributo: el LOD se decide por id en `board/lod.ts`.
  */
 
 /* El aviso no empuja el lienzo: se posa encima, como una notificación. */
@@ -3340,12 +3365,9 @@
 .board-free-media-handle.sw { bottom: -11px; left: -11px; cursor: nesw-resize; }
 .board-free-media-handle.se { right: -11px; bottom: -11px; cursor: nwse-resize; }
 
-.board-stage[data-lod='min'] .board-free-media-caption,
-.board-stage[data-lod='min'] .board-free-media-play,
-.board-stage[data-lod='min'] .board-free-media-delete,
-.board-stage[data-lod='min'] .board-free-media-handle {
-  display: none;
-}
+/* T-4 · el chrome de medios libres ya no depende de un atributo global del
+   escenario (cambiarlo recalculaba 500 tarjetas). Son pocos medios: se deja
+   visible y el LOD de las tarjetas lo decide el registro por id. */
 
 @media (prefers-reduced-motion: reduce) {
   .board-free-media {

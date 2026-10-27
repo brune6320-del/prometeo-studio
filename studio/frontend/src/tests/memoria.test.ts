@@ -47,4 +47,11 @@ describe('historial de 30 días (T-3)', () => {
     expect(compacto.undo).toHaveLength(1);
     expect(compacto.undo[0].coalesceKey).toBe('paso-2');
   });
+
+  it('medir desde la caché da el mismo recorte que la primera pasada', () => {
+    const history = historialDe(100, 2000);
+    const primera = compactarHistorial(history, 20_000);
+    const segunda = compactarHistorial(history, 20_000);
+    expect(segunda.undo.map((entry) => entry.coalesceKey)).toEqual(primera.undo.map((entry) => entry.coalesceKey));
+  });
 });

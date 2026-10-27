@@ -120,6 +120,8 @@ import { gustosVacios, importarGustosParciales, like, nope, type Gustos } from '
 import { crearMarcoManifiesto, pedirManifiesto, seleccionarSemana } from '../board/vanguardia/manifiesto';
 import { enqueueBoardSave, flushBoardWrites, removeBoardFromStore, rememberActiveBoard } from '../board/saveQueue';
 import { marca, marcaFin } from '../board/marcas';
+import { fijarLodCompletas, limpiarLod, lodCompletas as lodCompletasActuales } from '../board/lod';
+import { estaAtenuada, fijarAtenuadas, limpiarAtenuadas } from '../board/atenuadas';
 import { publishFrameToDirectory } from '../board/publicar';
 import {
   createPdfReference,
@@ -341,13 +343,20 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
   /** T-3: último LOD aplicado, para registrar cada cambio (compacto ↔ completo). */
   const lodRef = useRef<'min' | 'full' | null>(null);
   /**
-   * T-3 · el LOD no se cambia de golpe: con 500 tarjetas, montar todo el
-   * contenido en un commit era un congelón de 145–538 ms al cruzar el 35 %.
-   * `lodCompletas` guarda los ids con contenido completo: solo los que están
-   * en el encuadre (más margen), y entran por tandas.
+   * T-4 · el LOD vive fuera de React (`board/lod.ts`): cambiar el contenido de
+   * cuatro tarjetas ya no vuelve a renderizar el tablero de 500. `lodCompletasRef`
+   * solo guarda la última foto para las marcas del soak.
    */
-  const [lodCompletas, setLodCompletas] = useState<Set<string>>(() => new Set());
   const lodCompletasRef = useRef<Set<string>>(new Set());
+  /** T-4 · una tarjeta entra en cuanto la cámara lleva 120 ms quieta, nunca durante el gesto. */
+  const ultimaCamara = useRef(0);
+  /**
+   * T-4 · el primer montaje también va por tandas: 500 tarjetas en un solo
+   * commit eran 100–125 ms de layout al abrir el tablero. Empiezan 120 y el
+   * resto entra de 160 en 160 por fotograma.
+   */
+  const montajeRef = useRef<{ id: string | null; visibles: number }>({ id: null, visibles: 0 });
+  const [montaje, setMontaje] = useState<{ id: string | null; visibles: number }>({ id: null, visibles: 0 });
   /** T-3 · el LOD espera a que el zoom se asiente: una ráfaga +/− no monta nada. */
   const [zoomLod, setZoomLod] = useState(1);
   useEffect(() => {
@@ -360,7 +369,7 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
   /** Timer que retira `.gesto-activo` cuando dejan de llegar eventos de gesto. */
   const gestoVisualTimer = useRef<number | null>(null);
   const panDrag = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; samples: MuestraInercia[]; captureEl: HTMLElement | null } | null>(null);
-  const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; sizes: Map<string, CardSize>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null; lastX: number; lastY: number; lastT: number; altKey: boolean; duplicated: boolean } | null>(null);
+  const cardDrag = useRef<{ pointerId: number; boardId: string; ids: string[]; grabId: string; pendingSelection?: string[]; x: number; y: number; positions: Map<string, { x: number; y: number }>; sizes: Map<string, CardSize>; startBoard: BoardDocument; gesture: string; moved: boolean; captureEl: HTMLElement | null; lastX: number; lastY: number; lastT: number; altKey: boolean; duplicated: boolean } | null>(null);
   /** Rectángulo de selección (arrastrar el fondo), en coordenadas de pantalla. */
   const marqueeDrag = useRef<{ pointerId: number; startX: number; startY: number; captureEl: HTMLElement | null; modo: 'reemplazar' | 'sumar' | 'restar' } | null>(null);
   /** H3 · dedos activos y gesto táctil: un dedo dibuja, dos panean y pellizcan. */
@@ -425,19 +434,40 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
   const algunDialogoAbierto = shortcutsOpen || nestedDialog || templateDialog || linkDialog || projectDialog || pdfReferenceDialog || archiveOpen || moveDialog || Boolean(archiveFullscreenId);
   useFocusTrap(algunDialogoAbierto, dialogRef);
 
-  const projectBoards = activeProjectId
-    ? boards.filter((board) => projectIdByBoardId.get(board.id) === activeProjectId)
-    : boards;
-  const projectOptions = projects.filter((project) => !project.archivado);
-  const archivedProjects = projects.filter((project) => project.archivado);
-  const activeProject = projects.find((project) => project.id === activeProjectId) ?? null;
-  const activeProjectReferences = projectReferences.filter((reference) => reference.projectId === activeProjectId);
+  const projectBoards = useMemo(
+    () => (activeProjectId ? boards.filter((board) => projectIdByBoardId.get(board.id) === activeProjectId) : boards),
+    [activeProjectId, boards, projectIdByBoardId],
+  );
+  const projectOptions = useMemo(() => projects.filter((project) => !project.archivado), [projects]);
+  const archivedProjects = useMemo(() => projects.filter((project) => project.archivado), [projects]);
+  const activeProject = useMemo(
+    () => projects.find((project) => project.id === activeProjectId) ?? null,
+    [projects, activeProjectId],
+  );
+  const activeProjectReferences = useMemo(
+    () => projectReferences.filter((reference) => reference.projectId === activeProjectId),
+    [projectReferences, activeProjectId],
+  );
   const activeBoard = projectBoards.find((board) => board.id === activeBoardId) ?? projectBoards[0] ?? null;
   const ajustes: BoardSettings = activeBoard?.ajustes ?? DEFAULT_BOARD_SETTINGS;
   const snapEnabled = ajustes.iman;
-  const selectedCards = activeBoard?.cards.filter((card) => selectedCardIds.includes(card.id)) ?? [];
+  /**
+   * T-4 · las selecciones grandes se consultan por conjunto. Con 500 tarjetas
+   * seleccionadas, `includes` dentro del mapa de tarjetas era 500×500 por
+   * render; el `Set` lo deja en una consulta por tarjeta.
+   */
+  const selectedIdSet = useMemo(() => new Set(selectedCardIds), [selectedCardIds]);
+  const draggingIdSet = useMemo(() => new Set(draggingIds), [draggingIds]);
+  const settlingIdSet = useMemo(() => new Set(settlingIds), [settlingIds]);
+  const selectedCards = useMemo(
+    () => activeBoard?.cards.filter((card) => selectedIdSet.has(card.id)) ?? [],
+    [activeBoard, selectedIdSet],
+  );
   /** T-3: el `contain: paint` del escenario solo se retira si hay coordenadas negativas. */
-  const hasNegative = (activeBoard?.cards ?? []).some((card) => card.x < 0 || card.y < 0);
+  const hasNegative = useMemo(
+    () => (activeBoard?.cards ?? []).some((card) => card.x < 0 || card.y < 0),
+    [activeBoard],
+  );
   const containRef = useRef<boolean | null>(null);
   useEffect(() => {
     if (containRef.current === hasNegative) return;
@@ -635,11 +665,21 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     const { pan: posicion, zoom: escala } = cameraRef.current;
     const stage = stageRef.current;
     if (stage) {
-      stage.style.transform = `translate3d(${posicion.x}px, ${posicion.y}px, 0) scale(${escala})`;
-      // T-3: el atributo es para medios/marcos; el contenido de las tarjetas
-      // cambia por tandas en React, nunca con un recálculo global.
-      const lod: 'min' | 'full' = escala < 0.35 ? 'min' : 'full';
-      if (stage.dataset.lod !== lod) {
+      stage.style.transform = `translate(${posicion.x}px, ${posicion.y}px) scale(${escala})`;
+      // T-4: el LOD no monta cuerpos mientras la cámara se mueve; este sello
+      // permite esperar a que el transform se asiente antes de la tanda.
+      ultimaCamara.current = performance.now();
+      // T-4 · el contenido completo empieza al 50 %: por debajo, una tarjeta
+      // mide menos de 130 px y el texto no se lee; montarlo era pintar cientos
+      // de cuerpos para nada y el origen de los picos. Los tableros de ≤ 24
+      // tarjetas se saltan el umbral (ver `pequeno`).
+      //
+      // No hay ninguna regla CSS que dependa de `data-lod` (T-4 las quitó): el
+      // atributo se conserva solo para las marcas y las pruebas de gesto. Al no
+      // tener selectores asociados, cambiarlo no invalida el estilo de 500
+      // tarjetas. El contenido lo decide el registro por id.
+      const lod: 'min' | 'full' = escala < 0.5 ? 'min' : 'full';
+      if (lodRef.current !== lod) {
         stage.dataset.lod = lod;
         marca('lod:cambio', `${lodRef.current ?? 'inicio'} → ${lod} · ${Math.round(escala * 100)} % · ${lodCompletasRef.current.size}/${activeBoardRef.current?.cards.length ?? 0} completas`);
       }
@@ -877,17 +917,84 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
   }, [activeBoard, centerCamera, loaded, viewportSize]);
 
   /**
-   * T-3 · el contenido completo entra por tandas y solo para lo que está en el
-   * encuadre (más un margen). 500 tarjetas completas de golpe eran 238 ms de
-   * estilo/layout; 4 por fotograma mantienen cada frame dentro de presupuesto.
+   * T-4 · el primer montaje va por tandas. El primer render pinta 120 tarjetas
+   * (o todas si el tablero es pequeño) y el resto entra de 160 en 160 por
+   * fotograma; así abrir un tablero de 500 no es un longtask de 100–125 ms.
+   * Las tarjetas que se añaden después aparecen en la siguiente tanda.
+   */
+  useEffect(() => {
+    const id = activeBoard?.id ?? null;
+    const total = activeBoard?.cards.length ?? 0;
+    if (!id || !total) return;
+    let cancelado = false;
+    let raf = 0;
+    if (montajeRef.current.id !== id) {
+      montajeRef.current = { id, visibles: Math.min(40, total) };
+      setMontaje({ ...montajeRef.current });
+    }
+    const crecer = () => {
+      if (cancelado) return;
+      if (montajeRef.current.visibles >= total) return;
+      montajeRef.current = { id, visibles: Math.min(total, montajeRef.current.visibles + 80) };
+      setMontaje({ ...montajeRef.current });
+      if (montajeRef.current.visibles < total) raf = requestAnimationFrame(crecer);
+    };
+    if (montajeRef.current.visibles < total) raf = requestAnimationFrame(crecer);
+    return () => {
+      cancelado = true;
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [activeBoard?.id, activeBoard?.cards.length]);
+
+  /** Cuántas tarjetas pinta ya el primer montaje (sin cortar las que se añaden después). */
+  const totalTarjetas = activeBoard?.cards.length ?? 0;
+  const visiblesMontaje = montaje.id === (activeBoard?.id ?? null)
+    ? Math.min(montaje.visibles > 0 ? montaje.visibles : Math.min(40, totalTarjetas), totalTarjetas)
+    : Math.min(40, totalTarjetas);
+
+  /**
+   * T-4 · el contenido completo entra por tandas y solo para lo que está en el
+   * encuadre (más un margen). El conjunto vive en `board/lod.ts`: cada tanda
+   * despierta únicamente a las tarjetas que entran o salen, nunca al tablero
+   * entero. La tanda espera a que la cámara lleve 120 ms quieta: montar cuerpos
+   * mientras el escenario se está transformando era el pico de 100–300 ms.
    */
   useEffect(() => {
     const tablero = activeBoard;
+    if (!tablero) return;
+    /**
+     * T-4 · un tablero pequeño (≤ 24 tarjetas) monta todo su contenido de una
+     * vez: es barato y las pruebas y el uso esperan verlo al abrir. Los
+     * tableros grandes sí esperan al zoom asentado y entran por tandas.
+     */
+    const pequeno = tablero.cards.length <= 24;
+    if (!pequeno) {
+      // Solo se toca el LOD cuando el zoom está asentado. Antes, una ráfaga de
+      // zoom dejaba el efecto calculando el encuadre con el zoom viejo y
+      // montaba cientos de cuerpos que ya no se veían (y a un tamaño enorme).
+      if (Math.abs(zoom - zoomLod) > 0.0001) return;
+      // El estado de React puede ir por detrás de la cámara real (centerCamera,
+      // sincronización de 150 ms). Calcular con el zoom/pan viejo montaba
+      // cuerpos que ya no estaban en pantalla; el arranque al 100 % era el peor.
+      const camara = cameraRef.current;
+      if (Math.abs(zoom - camara.zoom) > 0.0001) return;
+      if (Math.abs(pan.x - camara.pan.x) > 0.5 || Math.abs(pan.y - camara.pan.y) > 0.5) return;
+      // Sin cámara encuadrada para este tablero no se sabe qué está en pantalla.
+      if (previousBoardId.current !== tablero.id) return;
+    }
+    // Mientras se busca o se abre el índice no se montan cuerpos nuevos: la
+    // tarjeta atenuada no los necesita y el pintado compite con el panel.
+    if (search.trim() || indexOpen) return;
     const { width, height } = viewportSize;
-    const escala = Math.max(zoomLod, 0.0001);
+    const escala = Math.max(zoom, 0.0001);
     const deseados: string[] = [];
-    if (tablero && width && height && zoom >= 0.35 && zoomLod >= 0.35) {
-      const margen = 512;
+    if (pequeno) {
+      deseados.push(...tablero.cards.map((card) => card.id));
+    } else if (width && height && zoom >= 0.5) {
+      // El margen se mide en píxeles de pantalla, no en unidades del mundo: a
+      // 800 % un margen de 512 unidades eran miles de píxeles y montaba
+      // tarjetas que no se veían.
+      const margen = Math.min(512, 360 / escala);
       const izquierda = -pan.x / escala - margen;
       const arriba = -pan.y / escala - margen;
       const derecha = (width - pan.x) / escala + margen;
@@ -902,27 +1009,52 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
         candidatos.push({ id: card.id, distancia: dx * dx + dy * dy });
       }
       candidatos.sort((a, b) => a.distancia - b.distancia);
-      deseados.push(...candidatos.map((candidato) => candidato.id));
+      // T-4 · techo de cuerpos completos: los más cercanos al centro. Con 121
+      // candidatos al 52 %, montar y desmontar todos era el pico de 133 ms;
+      // 60 cubren de sobra lo que se lee y el resto entra al acercarse.
+      deseados.push(...candidatos.slice(0, 60).map((candidato) => candidato.id));
     }
     const objetivo = new Set(deseados);
+    if (pequeno) {
+      fijarLodCompletas(objetivo);
+      lodCompletasRef.current = objetivo;
+      marca('lod:tanda', `+${deseados.length} · tablero ${deseados.length}`);
+      return;
+    }
     let raf = 0;
     let cancelado = false;
-    const paso = () => {
+    let tamano = 3;
+    let ultimoPaso = 0;
+    const paso = (ahora: number) => {
       if (cancelado) return;
-      const actual = lodCompletasRef.current;
+      const gesto = viewportRef.current?.classList.contains('gesto-activo') ?? false;
+      if (gesto || ahora - ultimaCamara.current < 120) {
+        raf = requestAnimationFrame(paso);
+        return;
+      }
+      const actual = new Set(lodCompletasActuales());
       const faltan = deseados.filter((id) => !actual.has(id));
       const sobran = [...actual].filter((id) => !objetivo.has(id));
       if (!faltan.length && !sobran.length) return;
+      // Si el fotograma anterior se pasó, la siguiente tanda es más pequeña;
+      // si sobró aire, crece. Así un equipo lento no acumula trabajo.
+      const delta = ultimoPaso ? ahora - ultimoPaso : 16;
+      ultimoPaso = ahora;
+      if (delta > 40) tamano = 1;
+      else if (delta > 28) tamano = Math.max(1, tamano - 1);
+      else if (delta < 22) tamano = Math.min(2, tamano + 1);
       const siguiente = new Set(actual);
       if (faltan.length) {
-        for (const id of faltan.slice(0, 4)) siguiente.add(id);
-        marca('lod:tanda', `+${Math.min(4, faltan.length)} · ${siguiente.size}/${deseados.length} en encuadre`);
+        const lote = faltan.slice(0, tamano);
+        for (const id of lote) siguiente.add(id);
+        marca('lod:tanda', `+${lote.length} · ${siguiente.size}/${deseados.length} en encuadre`);
       } else {
-        for (const id of sobran.slice(0, 16)) siguiente.delete(id);
-        marca('lod:tanda', `−${Math.min(16, sobran.length)} · ${siguiente.size}/${deseados.length} en encuadre`);
+        const lote = sobran.slice(0, 4);
+        for (const id of lote) siguiente.delete(id);
+        marca('lod:tanda', `−${lote.length} · ${siguiente.size}/${deseados.length} en encuadre`);
       }
+      fijarLodCompletas(siguiente);
       lodCompletasRef.current = siguiente;
-      setLodCompletas(siguiente);
       raf = requestAnimationFrame(paso);
     };
     raf = requestAnimationFrame(paso);
@@ -930,7 +1062,9 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
       cancelado = true;
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [activeBoard, pan, viewportSize, zoom, zoomLod]);
+  }, [activeBoard, pan, viewportSize, zoom, zoomLod, search, indexOpen]);
+
+  useEffect(() => () => limpiarLod(), []);
 
   useEffect(() => {
     if (!loaded || !activeBoardId) return;
@@ -1427,7 +1561,10 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     const ancho = Math.abs(x - drag.startX);
     const alto = Math.abs(y - drag.startY);
     setMarquee(null);
-    if (ancho < 5 && alto < 5) return;
+    if (ancho < 5 && alto < 5) {
+      terminarGestoVisual();
+      return;
+    }
     const a = screenToWorld({ x: Math.min(drag.startX, x), y: Math.min(drag.startY, y) }, cameraRef.current);
     const b = screenToWorld({ x: Math.max(drag.startX, x), y: Math.max(drag.startY, y) }, cameraRef.current);
     const dentro = (activeBoard?.cards ?? []).filter((card) => {
@@ -1448,6 +1585,9 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
       : modo === 'sumar'
         ? `Rectángulo sumado: ${dentro.length} ${dentro.length === 1 ? 'tarjeta más' : 'tarjetas más'}.`
         : `Rectángulo restado: ${dentro.length} ${dentro.length === 1 ? 'tarjeta' : 'tarjetas'}.`);
+    // T-4: el rectángulo también es un gesto; si deja la clase puesta, el LOD
+    // esperaría para siempre a que «termine» algo que ya terminó.
+    terminarGestoVisual();
   };
 
   const beginPan = (event: React.PointerEvent<HTMLDivElement>, force = false) => {
@@ -1455,8 +1595,10 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     detenerInercia();
     marcarGestoVisual();
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
-    setSettlingIds([]);
-    setGuias({});
+    // T-4 · no se llama a setState si el valor no cambia: React puede renderizar
+    // el componente para descubrir el bail-out y en dev son ~140 ms por render.
+    if (settlingIds.length) setSettlingIds([]);
+    if (guias.x !== undefined || guias.y !== undefined) setGuias({});
     limpiarInclinacion();
     const posicion = cameraRef.current.pan;
     panDrag.current = {
@@ -1726,11 +1868,14 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     if (spaceHeld.current || event.button !== 0 || event.detail > 1 || frameToolId || connectMode || card.locked
       || (!force && (event.target as HTMLElement).closest('input,button,a,textarea,select,[contenteditable="true"],.board-inline-input'))
       || !activeBoard) return;
-    marcarGestoVisual();
+    // T-4 · no se toca `.gesto-activo` en un clic: esa clase invalida el estilo
+    // de las 500 tarjetas (~140 ms en dev). Se enciende al primer movimiento.
     suppressCardClick.current = false;
     if (settleTimer.current) { window.clearTimeout(settleTimer.current); settleTimer.current = null; }
-    setSettlingIds([]);
-    setGuias({});
+    // T-4 · no se llama a setState si el valor no cambia: React puede renderizar
+    // el componente para descubrir el bail-out y en dev son ~140 ms por render.
+    if (settlingIds.length) setSettlingIds([]);
+    if (guias.x !== undefined || guias.y !== undefined) setGuias({});
     limpiarInclinacion();
     let nextSelection = selectedCardIds;
     if (profundo) {
@@ -1738,11 +1883,15 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
       // El clic sin arrastre sigue alternando la selección.
     } else if (event.shiftKey) {
       nextSelection = alternarEnSeleccion(selectedCardIds, card.id);
-      suppressCardClick.current = true;
+      // T-4 · la selección se aplica en el clic; no se suprime ese clic o el
+      // ⇧+clic dejaría de alternar.
     } else if (!selectedCardIds.includes(card.id)) {
       nextSelection = [card.id];
     }
-    if (nextSelection !== selectedCardIds) setSelectedCardIds(nextSelection);
+    // T-4 · la selección se aplica al primer movimiento o al clic, no en el
+    // pointerdown: un clic normal hacía un render de 500 tarjetas (~140 ms en
+    // dev) antes de que el clic hiciera otro. El arrastre la aplica al moverse.
+    const pendingSelection = nextSelection !== selectedCardIds ? nextSelection : undefined;
     if (event.shiftKey && !nextSelection.includes(card.id)) return;
 
     const idsBrutos = profundo || event.shiftKey
@@ -1757,20 +1906,20 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     const positions = new Map(
       activeBoard.cards.filter((item) => ids.includes(item.id)).map((item) => [item.id, { x: item.x, y: item.y }]),
     );
-    // Solo se mide la tarjeta que se agarra. Medir las 500 en el pointerdown
-    // convertía un clic en una tarea de 200 ms; las demás usan su ancho guardado
-    // y un alto razonable para el imán.
+    // T-4 · no se mide con `getBoundingClientRect` en el pointerdown: eso fuerza
+    // layout de las 500 tarjetas (~140 ms en dev) aunque el gesto acabe en clic.
+    // Se mide en el primer movimiento, cuando la altura ya importa para el imán.
     const sizes = new Map<string, CardSize>();
-    const elementoAgarrado = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${card.id}"]`);
-    const cajaAgarrada = elementoAgarrado?.getBoundingClientRect();
     sizes.set(card.id, {
       width: card.width,
-      height: card.type === 'marco' ? readFrameData(card).alto : cajaAgarrada ? cajaAgarrada.height / cameraRef.current.zoom : 200,
+      height: card.type === 'marco' ? readFrameData(card).alto : card.height ?? 200,
     });
     cardDrag.current = {
       pointerId: event.pointerId,
       boardId: activeBoard.id,
       ids,
+      grabId: card.id,
+      pendingSelection,
       x: event.clientX,
       y: event.clientY,
       positions,
@@ -1785,8 +1934,8 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
       altKey: event.altKey,
       duplicated: false,
     };
-    setDraggingIds(ids);
-    setDropFrameId(null);
+    // El estado de arrastre se enciende en el primer movimiento: un clic sin
+    // arrastre no re-renderiza las 500 tarjetas.
     dropFrameIdRef.current = null;
   };
 
@@ -1797,6 +1946,16 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     if (!drag.moved && distancia < 4) return;
     if (!drag.moved) {
       drag.moved = true;
+      marcarGestoVisual();
+      if (drag.pendingSelection) {
+        setSelectedCardIds(drag.pendingSelection);
+        drag.pendingSelection = undefined;
+      }
+      setDraggingIds(drag.ids);
+      const agarrada = viewportRef.current?.querySelector<HTMLElement>(`[data-card-id="${drag.grabId}"]`);
+      const caja = agarrada?.getBoundingClientRect();
+      const previa = drag.sizes.get(drag.grabId);
+      if (caja && previa) drag.sizes.set(drag.grabId, { width: previa.width, height: caja.height / cameraRef.current.zoom });
       try { drag.captureEl?.setPointerCapture(event.pointerId); } catch { /* el puntero ya se soltó */ }
     }
     // Alt/Opción + arrastrar: la copia nace en el primer movimiento, no al hacer clic.
@@ -1920,11 +2079,14 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     const tablero = boards.find((board) => board.id === drag.boardId) ?? activeBoard;
     const destino = dropFrameIdRef.current;
     let final = tablero;
+    // T-4 · un clic sin movimiento no adopta ni mueve nada: clonar el tablero y
+    // recorrer 500 tarjetas en el pointerup era ~140 ms en dev para nada.
+    const sinCambios = !drag.moved && !destino;
     const arrastraContenedor = Boolean(tablero && drag.ids.some((id) => {
       const tipo = tablero.cards.find((item) => item.id === id)?.type;
       return tipo === 'marco' || tipo === 'columna';
     }));
-    if (tablero && !arrastraContenedor) {
+    if (!sinCambios && tablero && !arrastraContenedor) {
       const adoptados = new Set(drag.ids);
       final = {
         ...tablero,
@@ -1962,10 +2124,10 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     }
     if (drag.moved || destino) suppressCardClick.current = true;
     liberarPuntero(drag.captureEl, drag.pointerId);
-    setDraggingIds([]);
-    setDropFrameId(null);
+    if (draggingIds.length) setDraggingIds([]);
+    if (dropFrameId !== null) setDropFrameId(null);
     dropFrameIdRef.current = null;
-    setGuias({});
+    if (guias.x !== undefined || guias.y !== undefined) setGuias({});
     if (drag.moved) asentar(drag.ids);
     else limpiarInclinacion();
     cardDrag.current = null;
@@ -2478,7 +2640,9 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     } else if (event.shiftKey) {
       setSelectedCardIds((current) => alternarEnSeleccion(current, cardId));
     } else {
-      setSelectedCardIds([cardId]);
+      // T-4 · devolver el mismo array cuando no cambia evita un render de 500
+      // tarjetas por el clic que ya seleccionó en pointerdown.
+      setSelectedCardIds((current) => (current.length === 1 && current[0] === cardId ? current : [cardId]));
     }
   };
 
@@ -4289,6 +4453,27 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
     return coincidencias;
   }, [activeBoard?.cards, search]);
 
+  /**
+   * T-4 · la búsqueda no re-renderiza las tarjetas: guarda quién no coincide y
+   * cambia la clase en el DOM. Antes, cada tecla cambiaba `dimmed` en las 500 y
+   * con cuerpos completos eso eran 100–165 ms de React.
+   */
+  useEffect(() => {
+    const noCoinciden = new Set<string>();
+    for (const card of activeBoard?.cards ?? []) {
+      if (!matchingCards.has(card.id)) noCoinciden.add(card.id);
+    }
+    fijarAtenuadas(noCoinciden);
+    const root = stageRef.current;
+    if (!root) return;
+    for (const element of root.querySelectorAll<HTMLElement>('[data-card-id]')) {
+      const id = element.dataset.cardId;
+      if (id) element.classList.toggle('dimmed', noCoinciden.has(id));
+    }
+  }, [activeBoard, matchingCards, visiblesMontaje]);
+
+  useEffect(() => () => limpiarAtenuadas(), []);
+
   const resultadosBusqueda = useMemo(() => {
     const inicio = marca('busqueda:resultados', searchScope);
     const query = search.trim();
@@ -4757,10 +4942,10 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
               {indiceVisibles.map((card) => (
                 <div
                   key={card.id}
-                  className={`board-index-row ${selectedCardIds.includes(card.id) ? 'selected' : ''}`}
+                  className={`board-index-row ${selectedIdSet.has(card.id) ? 'selected' : ''}`}
                   style={{ height: INDICE_ROW_HEIGHT }}
                   role="option"
-                  aria-selected={selectedCardIds.includes(card.id)}
+                  aria-selected={selectedIdSet.has(card.id)}
                   tabIndex={0}
                   onClick={(event) => seleccionarDesdeIndice(card, event)}
                   onKeyDown={(event) => {
@@ -4900,8 +5085,7 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
           {ajustes.guias !== 'apagadas' && guias.y !== undefined && (
             <div className={`board-guide board-guide-y guias-${ajustes.guias}`} data-testid="board-guide-y" style={{ top: guias.y }} aria-hidden="true" />
           )}
-          {activeBoard.cards.map((card) => {
-            const matches = matchingCards.has(card.id);
+          {activeBoard.cards.slice(0, visiblesMontaje).map((card) => {
             if (card.type === 'columna') {
               const hijos = readColumnData(card).hijos
                 .map((id) => cardsById.get(id))
@@ -4911,10 +5095,9 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
                   key={card.id}
                   card={card}
                   childrenCards={hijos}
-                  selected={selectedCardIds.includes(card.id)}
-                  dimmed={!matches}
-                  dragging={draggingIds.includes(card.id)}
-                  settling={settlingIds.includes(card.id)}
+                  selected={selectedIdSet.has(card.id)}
+                  dragging={draggingIdSet.has(card.id)}
+                  settling={settlingIdSet.has(card.id)}
                   dropTarget={dropFrameId === card.id}
                   onSelect={onCardSelect}
                   onDragStart={onCardDragStart}
@@ -4943,9 +5126,9 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
                   data-card-id={card.id}
                   data-marco={esEntropia ? 'entropia' : 'libre'}
                   tabIndex={-1}
-                  aria-selected={selectedCardIds.includes(card.id)}
+                  aria-selected={selectedIdSet.has(card.id)}
                   aria-label={`Marco: ${card.title || 'sin título'}`}
-                  className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedCardIds.includes(card.id) ? 'selected' : ''} ${!matches ? 'dimmed' : ''} ${draggingIds.includes(card.id) ? 'dragging' : ''} ${settlingIds.includes(card.id) ? 'settling' : ''} ${dropFrameId === card.id ? 'drop-target' : ''} ${card.locked ? 'is-locked' : ''}`}
+                  className={`board-frame ${esEntropia ? 'is-entropia' : ''} ${collage?.guardado ? 'is-guardado' : ''} ${frame.vista === 'archivo' ? 'is-archive' : frame.vista === 'muro' ? 'is-muro' : frame.vista === 'mesa' ? 'is-mesa' : ''} ${selectedIdSet.has(card.id) ? 'selected' : ''} ${estaAtenuada(card.id) ? 'dimmed' : ''} ${draggingIdSet.has(card.id) ? 'dragging' : ''} ${settlingIdSet.has(card.id) ? 'settling' : ''} ${dropFrameId === card.id ? 'drop-target' : ''} ${card.locked ? 'is-locked' : ''}`}
                   style={{ left: card.x, top: card.y, width: card.width, height: frame.alto }}
                   onPointerMove={moveCardDrag}
                   onPointerUp={endCardDrag}
@@ -4994,7 +5177,7 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
                         aria-label={`Publicar ${card.title || 'marco'}`}
                       >{publishingFrameId === card.id ? '…' : 'Publicar'}</button>
                     )}
-                    {selectedCardIds.includes(card.id) && (
+                    {selectedIdSet.has(card.id) && (
                       <button
                         type="button"
                         className="board-frame-settings"
@@ -5061,10 +5244,9 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
                 <BoardFreeMedia
                   key={card.id}
                   card={card}
-                  selected={selectedCardIds.includes(card.id)}
-                  dimmed={!matches}
-                  dragging={draggingIds.includes(card.id)}
-                  settling={settlingIds.includes(card.id)}
+                  selected={selectedIdSet.has(card.id)}
+                  dragging={draggingIdSet.has(card.id)}
+                  settling={settlingIdSet.has(card.id)}
                   onSelect={onCardSelect}
                   onDragStart={onCardDragStart}
                   onDragMove={onCardDragMove}
@@ -5084,15 +5266,13 @@ const BoardWorkspaceInner: React.FC<BoardWorkspaceProps> = ({
               <BoardCardItem
                 key={card.id}
                 card={card}
-                selected={selectedCardIds.includes(card.id)}
-                dimmed={!matches}
-                dragging={draggingIds.includes(card.id)}
-                settling={settlingIds.includes(card.id)}
+                selected={selectedIdSet.has(card.id)}
+                dragging={draggingIdSet.has(card.id)}
+                settling={settlingIdSet.has(card.id)}
                  connectionSource={connectFromId === card.id}
                  connectionTarget={connectDraft?.target === card.id}
                  connectMode={connectMode}
                  colors={COLORS}
-                 compact={!lodCompletas.has(card.id)}
                  onSelect={onCardSelect}
                  onConnect={onCardConnect}
                  onConnectStart={onCardConnectStart}
