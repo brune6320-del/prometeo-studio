@@ -1,0 +1,10 @@
+test_backward_determinista_cpu (test_modelo.PoolDeterministaTest) ... ok
+test_backward_determinista_cuda (test_modelo.PoolDeterministaTest) ... skipped 'CUDA no disponible'
+test_pool_valor_y_gradiente_cpu (test_modelo.PoolDeterministaTest) ... ok
+test_rechaza_tamano_no_equivalente (test_modelo.PoolDeterministaTest) ... ok
+test_red_y_pesos_anteriores_compatibles (test_modelo.PoolDeterministaTest) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.754s
+
+OK (skipped=1)

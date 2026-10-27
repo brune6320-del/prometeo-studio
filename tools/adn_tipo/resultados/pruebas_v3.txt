@@ -1,0 +1,13 @@
+test_cpu_no_admite_entrenamiento_completo (test_v3.V3Test) ... ok
+test_documento_completo_no_cruza_particion (test_v3.V3Test) ... ok
+test_grupo_fuente_caracter_y_orden_independiente (test_v3.V3Test) ... ok
+test_humo_guarda_generacion_y_no_abre_holdout (test_v3.V3Test) ... epoca 1: score validacion=0.080405
+ok
+test_no_acepta_copia_cruzada (test_v3.V3Test) ... ok
+test_no_reubica_grupos_si_falta_clase (test_v3.V3Test) ... ok
+test_parada_empate_y_no_finito (test_v3.V3Test) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.706s
+
+OK
