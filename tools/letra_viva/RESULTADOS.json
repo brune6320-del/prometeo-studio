@@ -1,0 +1,87 @@
+{
+  "fecha": "2026-10-26",
+  "estado": "TESTED_CONSTRUCTOR_NO_VERIFIED",
+  "sha256_origen": "ff05702c3fe241d53bcab7fdcd37a925bb619e54313b6074bdedc68e32e9b1a9",
+  "sha256_adn": "9e60234c376ca724639e974ab41a4a84de1ef33103d33fe70d674610267aea39",
+  "prerregistro_sha256": "59d9bbace5e3aee1e65ec87a1b521ae6c7946834b5abc71c669a35feeec8a4af",
+  "dominio": "DESARROLLO_MISMO_ORIGEN",
+  "origenes": 1,
+  "paginas": 1,
+  "spans_evaluados": 1,
+  "span_id": 18,
+  "dpi": 144,
+  "simple": {
+    "ssim": 0.7985751620891067,
+    "mae_rgb": 15.470601237842617,
+    "lpips": null,
+    "lpips_estado": "NO VERIFICADO: pesos no autorizados ni descargados",
+    "pixeles_fuera_modificados": 0,
+    "pixeles_modificados": 1339,
+    "segundos": 2.658918375,
+    "gpu_unidades": 0,
+    "coste_usd": null
+  },
+  "estilo": {
+    "ssim": 0.7774540172056824,
+    "mae_rgb": 16.754862953138815,
+    "lpips": null,
+    "lpips_estado": "NO VERIFICADO: pesos no autorizados ni descargados",
+    "pixeles_fuera_modificados": 0,
+    "pixeles_modificados": 1388,
+    "segundos": 2.328881583,
+    "gpu_unidades": 0,
+    "coste_usd": null
+  },
+  "delta_ssim": -0.021121144883424314,
+  "promover": false,
+  "glifos_observados": 62,
+  "muestras": 436,
+  "glifo_baseline": "X desde x escalada con A",
+  "texto_nuevo": {
+    "pixeles_fuera_modificados": 0,
+    "pixeles_modificados": 1439,
+    "fidelidad_no_evaluable": true
+  },
+  "restauracion": {
+    "pixel_identico": true,
+    "sha256": "353914c54fbcb6099b89a057993fd1bcc68d6b4fa389fb321d18fe56a2f8c0a3"
+  },
+  "protecciones": [
+    {
+      "caso": "sin_autoria",
+      "rechazado": true,
+      "motivo": "Declaración de documento propio/ejemplo autorizado requerida",
+      "sin_salida": true
+    },
+    {
+      "caso": "zona_excluida",
+      "rechazado": true,
+      "motivo": "Región intersecta firma/sello/zona excluida",
+      "sin_salida": true
+    },
+    {
+      "caso": "region_pequena",
+      "rechazado": true,
+      "motivo": "Falta región autorizada que contenga el texto",
+      "sin_salida": true
+    },
+    {
+      "caso": "glifo_ausente",
+      "rechazado": true,
+      "motivo": "Glifo faltante: construir baseline explícita o abstenerse",
+      "sin_salida": true
+    }
+  ],
+  "ab": {
+    "sesion": "8505621e23d2102e0c86b7e4e6beb15df9cc82c212d8d595306551dba33343f6",
+    "n": 1,
+    "respuestas": 0,
+    "resultado": "PENDIENTE_BRUNO",
+    "clave_sha256": "c106954e10f19429efa5ea50b41c7273db4c7d4bea24a58dd70d188730e57375"
+  },
+  "aprendizaje_pesos": false,
+  "transferencia_demostrada": false,
+  "placebo_neuronal": null,
+  "olvido": null,
+  "entrenamiento_colab": false
+}

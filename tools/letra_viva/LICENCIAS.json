@@ -1,0 +1,53 @@
+{
+  "fecha": "2026-10-26",
+  "modelos": [
+    {
+      "modelo": "MX-Font",
+      "revision": "93f3c88517f7c904f16da6333adb2588dcdf3cce",
+      "evidencia": [
+        {
+          "url": "https://raw.githubusercontent.com/clovaai/mxfont/93f3c88517f7c904f16da6333adb2588dcdf3cce/readme.md",
+          "sha256_texto_recuperado": "f7d4c8ac9e33a22875943ecd4eba9cf485777ad6bf10033280e1e3a3553e410e"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/clovaai/mxfont/93f3c88517f7c904f16da6333adb2588dcdf3cce/LICENSE",
+          "sha256_texto_recuperado": "61d296a4046a78db8276424eb866089e6486cf288da1a92d2f7397308a93b9a3"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/clovaai/mxfont/93f3c88517f7c904f16da6333adb2588dcdf3cce/NOTICE",
+          "sha256_texto_recuperado": "f4886a3a2754d2b9a777dce1fc3cbe68b6cbe3ee5be1995d91b4c56cf6727457"
+        }
+      ],
+      "decision": "MIT general; excepción FUNIT CC-BY-NC-SA-4.0 en NOTICE. No adoptado.",
+      "pesos_descargados": false,
+      "sha256_pesos": null,
+      "licencia_pesos": "NO RESUELTA",
+      "instalado": false
+    },
+    {
+      "modelo": "FontDiffuser",
+      "revision": "7b28ce9c3b357f4fb23296622f458cf169803539",
+      "evidencia": [
+        {
+          "url": "https://raw.githubusercontent.com/yeungchenwa/FontDiffuser/7b28ce9c3b357f4fb23296622f458cf169803539/README.md",
+          "sha256_texto_recuperado": "ec1e22548415d122e5d5c2f11ac931ac5085de6d512c0fd9a63693ddf0f58b7c"
+        }
+      ],
+      "decision": "Uso limitado a investigación no comercial; no adoptado.",
+      "pesos_descargados": false,
+      "sha256_pesos": null,
+      "licencia_pesos": "NO RESUELTA",
+      "instalado": false
+    }
+  ],
+  "fonttools": {
+    "version": "4.60.1",
+    "licencia": "MIT",
+    "fuente": "https://pypi.org/project/fonttools/4.60.1/"
+  },
+  "pymupdf": {
+    "version": "1.26.5",
+    "licencia": "AGPL/comercial",
+    "estado": "Preexistente; reutilizado, no instalado en C3; distribución no evaluada"
+  }
+}
