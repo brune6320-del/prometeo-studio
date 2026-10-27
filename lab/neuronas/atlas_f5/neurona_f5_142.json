@@ -1,0 +1,323 @@
+{
+  "schema_version": "3.0.0",
+  "id_neurona": "neurona_f5_142",
+  "canal_indice": 142,
+  "modelo": "convnext_tiny",
+  "etapa": "features.5",
+  "modalidad_corpus": "cc0_630_train441_val189",
+  "etiqueta": "no lo sé",
+  "etiquetador": "Argon",
+  "legible": false,
+  "confirmada": false,
+  "confirmada_a": false,
+  "confirmada_b": false,
+  "fecha": "2026-10-27",
+  "sha256_pesos": "983f1562536e84ff750a1576fb08e54de751dbf2e17c0d8a4a13704341fdcd3d",
+  "licencia_pesos": "BSD-3-Clause (https://github.com/pytorch/vision/blob/main/LICENSE)",
+  "sha256_prerregistro_v1": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
+  "sha256_prerregistro_v2": "729bb150cc75e50e9ec5d2e43145f5e4d8876aa7119cc9b639f336d8c9ca1555",
+  "sha256_prerregistro_v3": "230303d5388312ef30652ae09c97a1aef3ecd1ec647db0db58f07599371b78a8",
+  "sha256_corpus_cc0": "f0c3483fafa8c04be6492ff62190071c8f6278beb8dec78b05110a6cabb5875f",
+  "sha256_mosaico_local": "c4ef8969020491e2f276ce6a841f4e71fd3f49ae2b4771c4b2df319c7e6f9064",
+  "prueba_a_apagado_control_justo": {
+    "etapa_siguiente": "features.6 -> features.7 -> avgpool -> classifier (1000 logits)",
+    "activacion_media_abs_train": 0.04696,
+    "efecto_l2_neurona_x_top9_train": 2.03402,
+    "ratio_medio_x_vs_controles": 2.0735,
+    "sorteos_ganados_de_5": 3,
+    "minimo_sorteos_requerido": 4,
+    "factor_minimo_efecto": 2.0,
+    "controles_y_sorteados": [
+      {
+        "canal_y": 350,
+        "activacion_media_abs_train": 0.04436,
+        "efecto_l2_en_top9_de_x": 0.77591,
+        "ratio_x_vs_y": 2.6215,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 210,
+        "activacion_media_abs_train": 0.0449,
+        "efecto_l2_en_top9_de_x": 0.95089,
+        "ratio_x_vs_y": 2.1391,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 321,
+        "activacion_media_abs_train": 0.04471,
+        "efecto_l2_en_top9_de_x": 1.03483,
+        "ratio_x_vs_y": 1.9655,
+        "supera_2x": false
+      },
+      {
+        "canal_y": 206,
+        "activacion_media_abs_train": 0.04722,
+        "efecto_l2_en_top9_de_x": 0.66083,
+        "ratio_x_vs_y": 3.078,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 144,
+        "activacion_media_abs_train": 0.04447,
+        "efecto_l2_en_top9_de_x": 1.48233,
+        "ratio_x_vs_y": 1.3722,
+        "supera_2x": false
+      }
+    ],
+    "confirmada_a": false
+  },
+  "prueba_b_prediccion_validacion_ciega": {
+    "split_evaluado": "validacion (189 imágenes ciegas)",
+    "vocabulario_usado": "38 rasgos visuales y compositivos puros (0 metadatos de museo)",
+    "escala_puntuacion": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "conteo_puntuaciones_0_a_3": {
+      "0": 189,
+      "1": 0,
+      "2": 0,
+      "3": 0
+    },
+    "positivos_reales_validacion_top20pct": 38,
+    "roc_auc_validacion": 0.5,
+    "umbral_auc_minimo": 0.7,
+    "etiqueta_es_no_lo_se": true,
+    "confirmada_b": false
+  },
+  "coherencia_descubrimiento_train": {
+    "roc_auc_train": 0.62117,
+    "umbral_claridad_train": 0.64
+  },
+  "polo_pos": [
+    {
+      "rango": 1,
+      "id_pieza": "cma_161864",
+      "sha256_imagen": "29f7b987340b2e00dbcf21c30d06a81ae31af456379bc051ddc86583a3e5bfae",
+      "url_pagina": "https://clevelandart.org/art/2001.151",
+      "activacion_media": 0.15912,
+      "activacion_max_celda_14x14": 0.99308,
+      "celda_14x14": [
+        2,
+        6
+      ],
+      "efecto_l2_al_apagar": 2.06447
+    },
+    {
+      "rango": 2,
+      "id_pieza": "cma_149955",
+      "sha256_imagen": "bd98eb911e6b28b0dd3decd2c5740424c22a34b470d460ee10dd398dd99803ca",
+      "url_pagina": "https://clevelandart.org/art/1980.186",
+      "activacion_media": 0.15532,
+      "activacion_max_celda_14x14": 1.02073,
+      "celda_14x14": [
+        12,
+        10
+      ],
+      "efecto_l2_al_apagar": 1.14757
+    },
+    {
+      "rango": 3,
+      "id_pieza": "cma_110123",
+      "sha256_imagen": "0ae3cdd156212858827f98afab2705a1bdd56adf3af05e2d3e325af4862ef8a3",
+      "url_pagina": "https://clevelandart.org/art/1928.750",
+      "activacion_media": 0.14889,
+      "activacion_max_celda_14x14": 0.72867,
+      "celda_14x14": [
+        4,
+        1
+      ],
+      "efecto_l2_al_apagar": 1.9594
+    },
+    {
+      "rango": 4,
+      "id_pieza": "cma_313231",
+      "sha256_imagen": "53a0e6b300a2d5023989c6d8ded26a94d4db8fba3aba287e3830ab26ebe8cd24",
+      "url_pagina": "https://clevelandart.org/art/2018.220",
+      "activacion_media": 0.14366,
+      "activacion_max_celda_14x14": 0.83221,
+      "celda_14x14": [
+        6,
+        4
+      ],
+      "efecto_l2_al_apagar": 2.84036
+    },
+    {
+      "rango": 5,
+      "id_pieza": "cma_109195",
+      "sha256_imagen": "71b8d2f6fd903a6084b0a1b9710c8494f06525ce10362d4504d4949926159930",
+      "url_pagina": "https://clevelandart.org/art/1927.344.5",
+      "activacion_media": 0.13936,
+      "activacion_max_celda_14x14": 1.01897,
+      "celda_14x14": [
+        1,
+        1
+      ],
+      "efecto_l2_al_apagar": 2.28781
+    },
+    {
+      "rango": 6,
+      "id_pieza": "cma_160440",
+      "sha256_imagen": "317049a8dc972d0756f3d9b9a9d6804737580b6080af33f865a4fd8e82befa6c",
+      "url_pagina": "https://clevelandart.org/art/1998.273",
+      "activacion_media": 0.12696,
+      "activacion_max_celda_14x14": 0.71214,
+      "celda_14x14": [
+        8,
+        1
+      ],
+      "efecto_l2_al_apagar": 2.93663
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_136172",
+      "sha256_imagen": "78319cbb02766b57913351843a9c6b061df2746908a118df98e1985e81abb542",
+      "url_pagina": "https://clevelandart.org/art/1959.99",
+      "activacion_media": 0.12669,
+      "activacion_max_celda_14x14": 0.90785,
+      "celda_14x14": [
+        11,
+        9
+      ],
+      "efecto_l2_al_apagar": 2.13987
+    },
+    {
+      "rango": 8,
+      "id_pieza": "cma_154507",
+      "sha256_imagen": "9b9015bc47b3c60cba7695b026ccff768f533752170c560c0bae93ea86f2adc7",
+      "url_pagina": "https://clevelandart.org/art/1989.15",
+      "activacion_media": 0.12308,
+      "activacion_max_celda_14x14": 0.88798,
+      "celda_14x14": [
+        12,
+        9
+      ],
+      "efecto_l2_al_apagar": 0.98477
+    },
+    {
+      "rango": 9,
+      "id_pieza": "cma_159836",
+      "sha256_imagen": "60ec9bf26098de749afc99ce4f7c304affae2c1d8740a3b269726e75dcb74b9f",
+      "url_pagina": "https://clevelandart.org/art/1997.148",
+      "activacion_media": 0.1144,
+      "activacion_max_celda_14x14": 0.7153,
+      "celda_14x14": [
+        7,
+        7
+      ],
+      "efecto_l2_al_apagar": 1.94527
+    }
+  ],
+  "polo_neg": [
+    {
+      "rango": 1,
+      "id_pieza": "cma_439440",
+      "sha256_imagen": "8e404f2485fcddba95f24826fe177db07d0b3117111ac54bff0274b317232532",
+      "url_pagina": "https://clevelandart.org/art/2021.76",
+      "activacion_media": -0.21348,
+      "activacion_min_celda_14x14": -0.73729,
+      "celda_14x14": [
+        0,
+        8
+      ]
+    },
+    {
+      "rango": 2,
+      "id_pieza": "met_wm_60868108",
+      "sha256_imagen": "435302a9a72b80537b0d01aaff3b64a4de0e772424ac38a8d92fd3e37d79f50a",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:%27Jos%C3%A9_Guadalupe_Posada-_36_Grabados%27_(Mexico,_1943)_MET_DP872853.jpg",
+      "activacion_media": -0.17084,
+      "activacion_min_celda_14x14": -0.52527,
+      "celda_14x14": [
+        6,
+        8
+      ]
+    },
+    {
+      "rango": 3,
+      "id_pieza": "met_wm_148857164",
+      "sha256_imagen": "c97a2846cb7c214bafa706af5f1ad4234ee2fc59f34c6ad4185135b131f34120",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Kubo_Shunman_-_Hototogisu_-_2019.420.28_-_Metropolitan_Museum_of_Art.jpg",
+      "activacion_media": -0.16889,
+      "activacion_min_celda_14x14": -0.72583,
+      "celda_14x14": [
+        12,
+        7
+      ]
+    },
+    {
+      "rango": 4,
+      "id_pieza": "met_wm_148821586",
+      "sha256_imagen": "988e158c9ec884c1be9f064c8ffb6f0c488a6fa9f72784b85784a8483df0b87c",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Kawanabe_Ky%C5%8Dsai_%E6%B2%B3%E9%8D%8B%E6%9A%81%E6%96%8E_-_Painting_and_Calligraphy_Gathering_at_the_Nakamurar%C5%8D_in_Ry%C5%8Dgoku_%E4%B8%A1%E5%9B%BD%E4%B8%AD%E6%9D%91%E6%A5%BC%E6%9B%B8%E7%94%BB%E4%BC%9A%E4%B9%8B%E5%9B%B3_(Ry%C5%8Dgoku_Nakamurar%C5%8D_shogakai_no_zu)_-_2023.583.34a,_b_-_Metropolitan_Museum_of_Art.jpg",
+      "activacion_media": -0.16519,
+      "activacion_min_celda_14x14": -0.71175,
+      "celda_14x14": [
+        9,
+        10
+      ]
+    },
+    {
+      "rango": 5,
+      "id_pieza": "cma_615401",
+      "sha256_imagen": "e54fe452526fc8ed048f4c47c498c31dfe6712c065c7c46c60a5d17b5acb3096",
+      "url_pagina": "https://clevelandart.org/art/2023.130",
+      "activacion_media": -0.16453,
+      "activacion_min_celda_14x14": -0.86571,
+      "celda_14x14": [
+        11,
+        2
+      ]
+    },
+    {
+      "rango": 6,
+      "id_pieza": "met_wm_60868094",
+      "sha256_imagen": "4167efdfb952163b604ba0ad831474f3dc0cb4963c73561b4891d8fc6895467f",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:%27Jos%C3%A9_Guadalupe_Posada-_36_Grabados%27_(Mexico,_1943)_MET_DP872821.jpg",
+      "activacion_media": -0.16381,
+      "activacion_min_celda_14x14": -0.48753,
+      "celda_14x14": [
+        11,
+        11
+      ]
+    },
+    {
+      "rango": 7,
+      "id_pieza": "met_wm_148857329",
+      "sha256_imagen": "0d911e7dd8e33734f4c5c328c1a71446afec987eab72e6c40c6dd328b1c4cd55",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Kakutei_%E9%B6%B4%E4%BA%AD_(Kaigan_J%C5%8Dk%C5%8D_%E6%B5%B7%E7%9C%BC%E6%B5%84%E5%85%89)_-_Amaranthus_and_Mynah_Bird_-_2020.396.32_-_Metropolitan_Museum_of_Art.jpg",
+      "activacion_media": -0.14978,
+      "activacion_min_celda_14x14": -0.54276,
+      "celda_14x14": [
+        6,
+        10
+      ]
+    },
+    {
+      "rango": 8,
+      "id_pieza": "d3_wikimedia_ed_02",
+      "sha256_imagen": "8eb9738e103f48535633eb852f61e6436943211bd0e42c32894e35584f86b291",
+      "url_pagina": "local://corpus-editorial/CORPUS.md",
+      "activacion_media": -0.14608,
+      "activacion_min_celda_14x14": -0.67382,
+      "celda_14x14": [
+        0,
+        0
+      ]
+    },
+    {
+      "rango": 9,
+      "id_pieza": "cma_384221",
+      "sha256_imagen": "60bf6623b81a7aeedab34909e0554f63947ef251b927ea55825326bab35a9f70",
+      "url_pagina": "https://clevelandart.org/art/2020.210",
+      "activacion_media": -0.13452,
+      "activacion_min_celda_14x14": -0.76862,
+      "celda_14x14": [
+        13,
+        13
+      ]
+    }
+  ]
+}

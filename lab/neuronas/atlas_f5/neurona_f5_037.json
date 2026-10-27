@@ -1,0 +1,323 @@
+{
+  "schema_version": "3.0.0",
+  "id_neurona": "neurona_f5_037",
+  "canal_indice": 37,
+  "modelo": "convnext_tiny",
+  "etapa": "features.5",
+  "modalidad_corpus": "cc0_630_train441_val189",
+  "etiqueta": "Se activa ante ejes verticales de figura de pie o pilastra combinados con arquitectura compositiva de grandes planos y papel blanco luminoso en contraste con piezas de contraste simultáneo de múltiples colores con bandas apaisadas de paisaje o friso y paleta dorada y ámbar.",
+  "etiquetador": "Argon",
+  "legible": false,
+  "confirmada": false,
+  "confirmada_a": true,
+  "confirmada_b": false,
+  "fecha": "2026-10-27",
+  "sha256_pesos": "983f1562536e84ff750a1576fb08e54de751dbf2e17c0d8a4a13704341fdcd3d",
+  "licencia_pesos": "BSD-3-Clause (https://github.com/pytorch/vision/blob/main/LICENSE)",
+  "sha256_prerregistro_v1": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
+  "sha256_prerregistro_v2": "729bb150cc75e50e9ec5d2e43145f5e4d8876aa7119cc9b639f336d8c9ca1555",
+  "sha256_prerregistro_v3": "230303d5388312ef30652ae09c97a1aef3ecd1ec647db0db58f07599371b78a8",
+  "sha256_corpus_cc0": "f0c3483fafa8c04be6492ff62190071c8f6278beb8dec78b05110a6cabb5875f",
+  "sha256_mosaico_local": "5a9a0497588294a5b7e9597516531b178388c2385ae4a8677cf869d9fba53263",
+  "prueba_a_apagado_control_justo": {
+    "etapa_siguiente": "features.6 -> features.7 -> avgpool -> classifier (1000 logits)",
+    "activacion_media_abs_train": 0.07106,
+    "efecto_l2_neurona_x_top9_train": 2.61683,
+    "ratio_medio_x_vs_controles": 2.2159,
+    "sorteos_ganados_de_5": 4,
+    "minimo_sorteos_requerido": 4,
+    "factor_minimo_efecto": 2.0,
+    "controles_y_sorteados": [
+      {
+        "canal_y": 7,
+        "activacion_media_abs_train": 0.07127,
+        "efecto_l2_en_top9_de_x": 1.39016,
+        "ratio_x_vs_y": 1.8824,
+        "supera_2x": false
+      },
+      {
+        "canal_y": 8,
+        "activacion_media_abs_train": 0.06947,
+        "efecto_l2_en_top9_de_x": 1.11941,
+        "ratio_x_vs_y": 2.3377,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 259,
+        "activacion_media_abs_train": 0.06953,
+        "efecto_l2_en_top9_de_x": 1.16312,
+        "ratio_x_vs_y": 2.2498,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 28,
+        "activacion_media_abs_train": 0.07257,
+        "efecto_l2_en_top9_de_x": 1.09227,
+        "ratio_x_vs_y": 2.3958,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 17,
+        "activacion_media_abs_train": 0.06957,
+        "efecto_l2_en_top9_de_x": 1.13982,
+        "ratio_x_vs_y": 2.2958,
+        "supera_2x": true
+      }
+    ],
+    "confirmada_a": true
+  },
+  "prueba_b_prediccion_validacion_ciega": {
+    "split_evaluado": "validacion (189 imágenes ciegas)",
+    "vocabulario_usado": "38 rasgos visuales y compositivos puros (0 metadatos de museo)",
+    "escala_puntuacion": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "conteo_puntuaciones_0_a_3": {
+      "0": 47,
+      "1": 47,
+      "2": 47,
+      "3": 48
+    },
+    "positivos_reales_validacion_top20pct": 38,
+    "roc_auc_validacion": 0.66199,
+    "umbral_auc_minimo": 0.7,
+    "etiqueta_es_no_lo_se": false,
+    "confirmada_b": false
+  },
+  "coherencia_descubrimiento_train": {
+    "roc_auc_train": 0.65178,
+    "umbral_claridad_train": 0.64
+  },
+  "polo_pos": [
+    {
+      "rango": 1,
+      "id_pieza": "cma_109207",
+      "sha256_imagen": "7fbcdf8767e392da45f4f9f44faf88e2b8829fb2e41fd2c594e65d11af088836",
+      "url_pagina": "https://clevelandart.org/art/1927.477.11",
+      "activacion_media": 0.35179,
+      "activacion_max_celda_14x14": 1.09801,
+      "celda_14x14": [
+        1,
+        10
+      ],
+      "efecto_l2_al_apagar": 2.99823
+    },
+    {
+      "rango": 2,
+      "id_pieza": "cma_114642",
+      "sha256_imagen": "98c8b98d94d3e30a2db73a105a22c1e53d4a934f2fbda1337cc0a5ac93c99513",
+      "url_pagina": "https://clevelandart.org/art/1934.247",
+      "activacion_media": 0.28393,
+      "activacion_max_celda_14x14": 1.73833,
+      "celda_14x14": [
+        5,
+        0
+      ],
+      "efecto_l2_al_apagar": 3.17221
+    },
+    {
+      "rango": 3,
+      "id_pieza": "cma_159836",
+      "sha256_imagen": "60ec9bf26098de749afc99ce4f7c304affae2c1d8740a3b269726e75dcb74b9f",
+      "url_pagina": "https://clevelandart.org/art/1997.148",
+      "activacion_media": 0.27075,
+      "activacion_max_celda_14x14": 1.56453,
+      "celda_14x14": [
+        5,
+        4
+      ],
+      "efecto_l2_al_apagar": 3.82667
+    },
+    {
+      "rango": 4,
+      "id_pieza": "cma_439492",
+      "sha256_imagen": "b5f66cda48943e4f171e9005520a03c97c9081a981cd670b5f87cacb1bbb21c6",
+      "url_pagina": "https://clevelandart.org/art/2021.57",
+      "activacion_media": 0.25283,
+      "activacion_max_celda_14x14": 1.47681,
+      "celda_14x14": [
+        8,
+        9
+      ],
+      "efecto_l2_al_apagar": 1.6107
+    },
+    {
+      "rango": 5,
+      "id_pieza": "cma_132098",
+      "sha256_imagen": "353e56b9bbfc077f44e98f057ff35d20359c40e8c7e828cf0515eede3dae7718",
+      "url_pagina": "https://clevelandart.org/art/1954.66",
+      "activacion_media": 0.22491,
+      "activacion_max_celda_14x14": 1.18155,
+      "celda_14x14": [
+        3,
+        12
+      ],
+      "efecto_l2_al_apagar": 2.24711
+    },
+    {
+      "rango": 6,
+      "id_pieza": "cma_439486",
+      "sha256_imagen": "2f743b09884f195c3f2447c6251aa912be238118a86be4c56c0a70f210bba606",
+      "url_pagina": "https://clevelandart.org/art/2021.60",
+      "activacion_media": 0.21954,
+      "activacion_max_celda_14x14": 1.31524,
+      "celda_14x14": [
+        3,
+        4
+      ],
+      "efecto_l2_al_apagar": 2.20065
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_130139",
+      "sha256_imagen": "1b3155ecc8331d5713b0b28d93dde6afb8a37a9db1e85ed4632c9d36324f20c4",
+      "url_pagina": "https://clevelandart.org/art/1952.518",
+      "activacion_media": 0.21758,
+      "activacion_max_celda_14x14": 1.29448,
+      "celda_14x14": [
+        3,
+        3
+      ],
+      "efecto_l2_al_apagar": 2.12974
+    },
+    {
+      "rango": 8,
+      "id_pieza": "cma_108400",
+      "sha256_imagen": "3954edc8d888dd3a1aaeb7a59c45d9a1fc6d2aa17d92ced24be7a0fd9b25d5f8",
+      "url_pagina": "https://clevelandart.org/art/1926.140.5",
+      "activacion_media": 0.20819,
+      "activacion_max_celda_14x14": 1.41774,
+      "celda_14x14": [
+        12,
+        0
+      ],
+      "efecto_l2_al_apagar": 3.27799
+    },
+    {
+      "rango": 9,
+      "id_pieza": "cma_668222",
+      "sha256_imagen": "ee9dbcda8709990095c1bc086e273ea611d095211e278d2c10eb48fddd5539f5",
+      "url_pagina": "https://clevelandart.org/art/2023.159",
+      "activacion_media": 0.20778,
+      "activacion_max_celda_14x14": 1.52576,
+      "celda_14x14": [
+        12,
+        10
+      ],
+      "efecto_l2_al_apagar": 2.08813
+    }
+  ],
+  "polo_neg": [
+    {
+      "rango": 1,
+      "id_pieza": "cma_135173",
+      "sha256_imagen": "0212bef97019727d5e057fc61c4c76b7fd02fff28aa120814db8bf54307650c2",
+      "url_pagina": "https://clevelandart.org/art/1958.20",
+      "activacion_media": -0.21883,
+      "activacion_min_celda_14x14": -0.7789,
+      "celda_14x14": [
+        12,
+        3
+      ]
+    },
+    {
+      "rango": 2,
+      "id_pieza": "met_wm_87914690",
+      "sha256_imagen": "4794e948dd97fcf999195515de047cec795f7c693065b28f7d9b430b085fbdc8",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Kitten_cav_2_-_Copy.png",
+      "activacion_media": -0.20597,
+      "activacion_min_celda_14x14": -1.06523,
+      "celda_14x14": [
+        12,
+        6
+      ]
+    },
+    {
+      "rango": 3,
+      "id_pieza": "cma_136922",
+      "sha256_imagen": "555149c7a7067d8cb0e2fa27a513028e7464f26542c0d7e1b79e6e399e73d094",
+      "url_pagina": "https://clevelandart.org/art/1961.40",
+      "activacion_media": -0.1922,
+      "activacion_min_celda_14x14": -1.18057,
+      "celda_14x14": [
+        1,
+        6
+      ]
+    },
+    {
+      "rango": 4,
+      "id_pieza": "cma_141290",
+      "sha256_imagen": "9f8ebce1d2bf07afc2fb999fad79eab691e19e6f34c5571a5956d6eaaf6e06ce",
+      "url_pagina": "https://clevelandart.org/art/1964.514",
+      "activacion_media": -0.17404,
+      "activacion_min_celda_14x14": -1.08082,
+      "celda_14x14": [
+        7,
+        2
+      ]
+    },
+    {
+      "rango": 5,
+      "id_pieza": "met_wm_57394177",
+      "sha256_imagen": "573eb7b311bec8cb4a9b94267507d992f85ef4b609bdd9eb7ac01761d7ee5665",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Fragment_of_a_Wall_Painting_MET_sf45-103-13.jpg",
+      "activacion_media": -0.17053,
+      "activacion_min_celda_14x14": -1.40444,
+      "celda_14x14": [
+        1,
+        8
+      ]
+    },
+    {
+      "rango": 6,
+      "id_pieza": "cma_129799",
+      "sha256_imagen": "f3774fa08673dbe7a8d5b4eaa851a95835ac55bcf24efa6b844d16280071e97a",
+      "url_pagina": "https://clevelandart.org/art/1952.233",
+      "activacion_media": -0.14419,
+      "activacion_min_celda_14x14": -1.23007,
+      "celda_14x14": [
+        2,
+        3
+      ]
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_117028",
+      "sha256_imagen": "28b36e7d268b864e9a2218bf8b9079698c6ef00958b96843fad8431d512b0660",
+      "url_pagina": "https://clevelandart.org/art/1937.573",
+      "activacion_media": -0.14372,
+      "activacion_min_celda_14x14": -1.10364,
+      "celda_14x14": [
+        10,
+        9
+      ]
+    },
+    {
+      "rango": 8,
+      "id_pieza": "cma_135539",
+      "sha256_imagen": "b39061bc5b38becba0daa9b5d485b5c5a8871e77031615879c2c437b04687739",
+      "url_pagina": "https://clevelandart.org/art/1958.67",
+      "activacion_media": -0.14058,
+      "activacion_min_celda_14x14": -0.98846,
+      "celda_14x14": [
+        0,
+        5
+      ]
+    },
+    {
+      "rango": 9,
+      "id_pieza": "cma_157339",
+      "sha256_imagen": "8929b9438bc3f0f6aa4612bf4b7d57abb720fd014de37184dd68725e2460dafa",
+      "url_pagina": "https://clevelandart.org/art/1994.201",
+      "activacion_media": -0.13792,
+      "activacion_min_celda_14x14": -0.91521,
+      "celda_14x14": [
+        10,
+        12
+      ]
+    }
+  ]
+}

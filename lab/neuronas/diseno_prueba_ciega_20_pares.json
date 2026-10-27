@@ -1,0 +1,134 @@
+{
+  "fase": "FASE 5c · Diseño público de la prueba ciega (20 pares, sin respuestas ni imágenes)",
+  "semilla": 2610,
+  "total_candidatas_legibles_pool": 58,
+  "legibles_features_7_pool": 26,
+  "legibles_features_5_pool": 32,
+  "num_pares_sorteados": 20,
+  "umbral_acierto_humano": "15/20 (p = 0.02069 < 0.05 frente al azar)",
+  "ruta_pagina_html_local": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/prueba-ciega-bruno/prueba_ciega_20_pares.html",
+  "sha256_pagina_html_local": "9317c53f430f2b3c19df1ca17de6922d9057bab744fd55f7dc55c6d361fc4110",
+  "sha256_clave_secreta_local": "02a6b30c0d5c2e70f32dd5c1efdcd60d56120686684c20fbe53f4588f2f96cf2",
+  "pares_publicos": [
+    {
+      "id_par": 1,
+      "etiqueta": "Responde a líneas horizontales de horizonte, alto contraste lumínico entre figura y fondo y estructura tendida en planos horizontales (como en «Gorge at Eaux Chaudes, Pyrenees») frente a tierras sepias y pardas, rayado vertical dominante y centrado vertical equilibrado.",
+      "sha256_mosaico_izquierda": "c1fb5fd4c89362c18ce18364c2a3a489bb9317b693f3b70a1ce7044869b12e17",
+      "sha256_mosaico_derecha": "72d67e5474ae81cfeb3e4573a7e6934414153359ecaccdd91e9c927d7ad79666"
+    },
+    {
+      "id_par": 2,
+      "etiqueta": "Prefiere trama tupida de líneas finas y bordes nítidos de escala media acompañados de detalle menudo repartido sin grandes bloques (ej. «British Manufactory; A Sketch») contra composiciones con piezas tridimensionales de museo en estudio, recipientes de cerámica vidriada y alfarería y medallón cromático central.",
+      "sha256_mosaico_izquierda": "b88dbe6f2fd1924b3590e8c63ab951baa4621d4421a9feb3f9267f64823b4869",
+      "sha256_mosaico_derecha": "7d5a7804a1cc0a2439d0be596ab31bbb11aa38e085e4f8ab5062f30def27a89d"
+    },
+    {
+      "id_par": 3,
+      "etiqueta": "Se activa ante objetos exentos con volumen físico combinados con jarrones, platos y tazas de porcelana y contorno anular de plato o vasija redonda —por ejemplo «Hunting Party with Badger, Loire Valle»— en contraste con piezas de grabados, aguafuertes y estampas sobre papel con cabecera clara con tercio inferior sombreado y achurado minucioso de alta frecuencia.",
+      "sha256_mosaico_izquierda": "996d599c9bbd5d8e2631befa5d86e94092b88e2ff09544347b005379e8dad9e7",
+      "sha256_mosaico_derecha": "1003d8c6e0942a12c4e44bfb96896777456bd8ca7eef9819153a8a421daf497e"
+    },
+    {
+      "id_par": 4,
+      "etiqueta": "Responde a esculturas, bronces y bajorrelieves, objetos exentos con volumen físico y acabado pulido sin textura lineal (como en «Shell with Seated Noble») frente a verdes de follaje y oliva, rayado denso de microtextura gráfica y detalle menudo repartido sin grandes bloques.",
+      "sha256_mosaico_izquierda": "1bffc618d8ad39c3830be6e8466654e659af7db1b8f0f3b5ce7c519c69139196",
+      "sha256_mosaico_derecha": "208fca389ca23054bd9d6029056bf1c9e08e561162caede21c4829b91f0567da"
+    },
+    {
+      "id_par": 5,
+      "etiqueta": "Prefiere piezas tridimensionales de museo en estudio y tallas tridimensionales, bustos y relieves en metal o piedra acompañados de acabado pulido sin textura lineal (ej. «Karnak, Les Pylônes d'Horus») contra composiciones con equilibrio simétrico arriba-abajo, obra gráfica impresa en tinta sobre papel y registro luminoso global.",
+      "sha256_mosaico_izquierda": "3c55332bb96a276533e2cb07f4bd04cb0862f84fed1a8db10bc1a7523bd5a84e",
+      "sha256_mosaico_derecha": "883d1af77896f051f007da307ba0972adad32d7889a9c1bb259c7bcecfc682a7"
+    },
+    {
+      "id_par": 6,
+      "etiqueta": "Se activa ante tallas tridimensionales, bustos y relieves en metal o piedra combinados con artefactos escultóricos o cerámicos fotografiados en estudio y núcleo policromo sobre margen neutro —por ejemplo «Zaō Gongen»— en contraste con piezas de cielo luminoso sobre base oscura con positivos fotográficos de cámara con grano óptico y xilografías, litografías y grabados calcográficos.",
+      "sha256_mosaico_izquierda": "a970013ca56c8c53a82fc38ae8bd653d8258af136f5a99b07d76bb89dedbe7b0",
+      "sha256_mosaico_derecha": "752da32edd8d710325a5ad2d06680c60db16aba030dfef752316093cdd232f1b"
+    },
+    {
+      "id_par": 7,
+      "etiqueta": "Reacciona a bloques cuadrados y molduras rectas con retícula ortogonal de trazos a 0 y 90 grados y tallas tridimensionales, bustos y relieves en metal o piedra (caso de «Red-Figure Kylix (Drinking Cup): Diony»); en el extremo negativo aparecen escenas de curvas orgánicas y diagonales dinámicas, positivos fotográficos de cámara con grano óptico y arquitectura compositiva de grandes planos.",
+      "sha256_mosaico_izquierda": "27cb4edf4d64e1bb48a66fe957b0d0e5e76a793170c9ce40c02eee70764abbc9",
+      "sha256_mosaico_derecha": "b6dc619ee1638c3a1784b465d01632d8f7560300c7749e8b2eddb01b21431943"
+    },
+    {
+      "id_par": 8,
+      "etiqueta": "Se activa ante color concentrado en el centro rodeado de borde apagado combinados con figura exenta en el centro del encuadre y contorno anular de plato o vasija redonda en contraste con piezas de cielo luminoso sobre base oscura con escena llena sin márgenes libres y choque marcado de luces y sombras.",
+      "sha256_mosaico_izquierda": "4c9718a60f3594e6488c117899e72fc090ee65641f79946312a3407039ce5f66",
+      "sha256_mosaico_derecha": "3f3b9019ee50360d4f2d2b1458341fc26fd9c7314a40c40d7bcd92c29835b9e3"
+    },
+    {
+      "id_par": 9,
+      "etiqueta": "Responde a trama tupida de líneas finas, grano fino continuo sobre plano homogéneo y estrías y pliegues de caída vertical frente a contorno anular de plato o vasija redonda, color concentrado en el centro rodeado de borde apagado y figura exenta en el centro del encuadre.",
+      "sha256_mosaico_izquierda": "5c6efa7e92c4e16554c2fb406689b590b9feb7789ff7788af7bc271b06a59eab",
+      "sha256_mosaico_derecha": "f82840d97eb802fd83182a4554806ebd976bf682aca9f1dc6c8a7b9521b426d6"
+    },
+    {
+      "id_par": 10,
+      "etiqueta": "Prefiere trama tupida de líneas finas y cabecera clara con tercio inferior sombreado acompañados de detalle menudo repartido sin grandes bloques contra composiciones con núcleo policromo sobre margen neutro, campos tersos de gradiente suave y dirección apaisada de aguas o llanuras.",
+      "sha256_mosaico_izquierda": "09bce721fc3e70b67166ae758cd3dd745a656a0cd6ba5e415b3546801360a9a5",
+      "sha256_mosaico_derecha": "e993375c03d0085806594780c4c9cb7dc5fe20bfea3159b6e56c1829ffb0111b"
+    },
+    {
+      "id_par": 11,
+      "etiqueta": "Reacciona a ausencia de croma en blanco y negro con dominante térmica fría azulada y soporte de papel claro despejado; en el extremo negativo aparecen escenas de acentos bermellón y terracota, colores saturados e intensos y temperatura de color cálida.",
+      "sha256_mosaico_izquierda": "da2b69c8647f437a3d2d6a8503eec84998505e5cdbef367e779db1b6dd4b7321",
+      "sha256_mosaico_derecha": "07dd504c4101e64bf9ed9262de9615da538627b2d34b1a322a9c6120024bc65e"
+    },
+    {
+      "id_par": 12,
+      "etiqueta": "Detecta detalle menudo repartido sin grandes bloques junto a trama tupida de líneas finas además de bordes nítidos de escala media mientras el polo opuesto reúne superficies lisas sin grano asociados a color concentrado en el centro rodeado de borde apagado y figura exenta en el centro del encuadre.",
+      "sha256_mosaico_izquierda": "50661fdba521a4fbcb31bace30834e23f8a80e63784553dde9ea7c7d3b6f89e6",
+      "sha256_mosaico_derecha": "92fda8205fe8284516ecf8ea9cb7090c63b6818d8999cd269aa11376aa69c572"
+    },
+    {
+      "id_par": 13,
+      "etiqueta": "Concentra su activación en pieza concentrada en el núcleo con periferia calma, perímetro curvo de pieza cerámica o tondo y núcleo policromo sobre margen neutro oponiéndose a grises carbón sombríos junto con vegetación en tonos verde musgo y celadón y gradiente vertical de cielo claro a tierra oscura.",
+      "sha256_mosaico_izquierda": "cc3795dd1fee29188f637ef0fac794b135cdc7f99086837e4c35b9b74e9aca34",
+      "sha256_mosaico_derecha": "09bce721fc3e70b67166ae758cd3dd745a656a0cd6ba5e415b3546801360a9a5"
+    },
+    {
+      "id_par": 14,
+      "etiqueta": "Reacciona a medallón cromático central con motivo central aislado del borde y borde circular en el anillo medio; en el extremo negativo aparecen escenas de cielo luminoso sobre base oscura, trazos oblicuos, arabescos y formas sinuosas y amplios blancos de papel.",
+      "sha256_mosaico_izquierda": "8aa579c74ff123c44ec3c7f593878b342b050e1150a619bb8cff2f993f947db7",
+      "sha256_mosaico_derecha": "033f4a8029f76d5e65820165169f0a921165b7f6181c878d3316bf9465a93ed2"
+    },
+    {
+      "id_par": 15,
+      "etiqueta": "Se activa ante claridad tonal elevada en toda la toma combinados con amplios blancos de papel y papel crema apergaminado en contraste con piezas de verdes de follaje y oliva con colores saturados e intensos y movimiento diagonal sin aristas rectas.",
+      "sha256_mosaico_izquierda": "a8276e77cbb72e8f241f696328fbd32be0b696bc45bd62c70d7acf17849d20f8",
+      "sha256_mosaico_derecha": "e9e990feba62c53e45c13783db47c61615b87d8db40477527475661c2b15614c"
+    },
+    {
+      "id_par": 16,
+      "etiqueta": "Reacciona a achurado minucioso de alta frecuencia con contornos estructurales definidos y veladuras pardas de tierra de sombra; en el extremo negativo aparecen escenas de superficies lisas sin grano, diferencia marcada de luz entre disco interno y periferia y medallón cromático central.",
+      "sha256_mosaico_izquierda": "6e1526f43f25cd0e84de0259fe87c182de85e84cd8742506d33b2cff6f6eca6a",
+      "sha256_mosaico_derecha": "c6b6c132f3993324a5f840585604c80f08fa07c67807143d2ffafd8a99b2577f"
+    },
+    {
+      "id_par": 17,
+      "etiqueta": "Responde a luminosidad general alta, soporte de papel claro despejado y estructura tendida en planos horizontales frente a composición erguida en columnas verticales, estructura geométrica de ángulos rectos y cruces ortogonales de marco o arquitectura.",
+      "sha256_mosaico_izquierda": "3f3b9019ee50360d4f2d2b1458341fc26fd9c7314a40c40d7bcd92c29835b9e3",
+      "sha256_mosaico_derecha": "57469c591c40af38473d6e45f0b85c4ee7d1484032d6ca15b6a1ec39c4222ca6"
+    },
+    {
+      "id_par": 18,
+      "etiqueta": "Concentra su activación en grano fino continuo sobre plano homogéneo, temperatura de color cálida y trama tupida de líneas finas oponiéndose a núcleo policromo sobre margen neutro junto con atmósfera fría de azules y grises y acabado pulido sin textura lineal.",
+      "sha256_mosaico_izquierda": "fee5e94b228d0b941054c758c3982e3d1c2ce223ae423dbd8b92b1632e174361",
+      "sha256_mosaico_derecha": "7291fca9124e927a7d86fd1822582e48c4dd743c59e923a36e63068e59340c58"
+    },
+    {
+      "id_par": 19,
+      "etiqueta": "Se activa ante grano fino continuo sobre plano homogéneo combinados con achurado minucioso de alta frecuencia y contornos estructurales definidos en contraste con piezas de superficies lisas sin grano con encuadre rectilíneo de líneas rectas finas y foco circular centrado.",
+      "sha256_mosaico_izquierda": "c6b6c132f3993324a5f840585604c80f08fa07c67807143d2ffafd8a99b2577f",
+      "sha256_mosaico_derecha": "2e7bd9797ffb1244ad6d7739d3dee9468b44e3e1a7d784fef2090a655b832017"
+    },
+    {
+      "id_par": 20,
+      "etiqueta": "Responde a sombras profundas de claroscuro, vegetación en tonos verde musgo y celadón y riqueza cromática de pigmento vivo frente a luminosidad general alta, grano fino continuo sobre plano homogéneo y fondo crema envejecido.",
+      "sha256_mosaico_izquierda": "7401e91ffc61c76329469555265e17ba128fcf59aceec9c7a0a860c16455292a",
+      "sha256_mosaico_derecha": "bcc514b922bf4bbbcd7e85589e0f14015da275c42a49c3a11293f94481b22752"
+    }
+  ]
+}

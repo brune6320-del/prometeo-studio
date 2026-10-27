@@ -1,0 +1,323 @@
+{
+  "schema_version": "3.0.0",
+  "id_neurona": "neurona_f5_177",
+  "canal_indice": 177,
+  "modelo": "convnext_tiny",
+  "etapa": "features.5",
+  "modalidad_corpus": "cc0_630_train441_val189",
+  "etiqueta": "no lo sé",
+  "etiquetador": "Argon",
+  "legible": false,
+  "confirmada": false,
+  "confirmada_a": true,
+  "confirmada_b": false,
+  "fecha": "2026-10-27",
+  "sha256_pesos": "983f1562536e84ff750a1576fb08e54de751dbf2e17c0d8a4a13704341fdcd3d",
+  "licencia_pesos": "BSD-3-Clause (https://github.com/pytorch/vision/blob/main/LICENSE)",
+  "sha256_prerregistro_v1": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
+  "sha256_prerregistro_v2": "729bb150cc75e50e9ec5d2e43145f5e4d8876aa7119cc9b639f336d8c9ca1555",
+  "sha256_prerregistro_v3": "230303d5388312ef30652ae09c97a1aef3ecd1ec647db0db58f07599371b78a8",
+  "sha256_corpus_cc0": "f0c3483fafa8c04be6492ff62190071c8f6278beb8dec78b05110a6cabb5875f",
+  "sha256_mosaico_local": "7202f13c90e420fd524031cfdc5676473280e26f7420de1ea2d40e6d37e52e93",
+  "prueba_a_apagado_control_justo": {
+    "etapa_siguiente": "features.6 -> features.7 -> avgpool -> classifier (1000 logits)",
+    "activacion_media_abs_train": 0.04968,
+    "efecto_l2_neurona_x_top9_train": 3.21473,
+    "ratio_medio_x_vs_controles": 2.6378,
+    "sorteos_ganados_de_5": 5,
+    "minimo_sorteos_requerido": 4,
+    "factor_minimo_efecto": 2.0,
+    "controles_y_sorteados": [
+      {
+        "canal_y": 239,
+        "activacion_media_abs_train": 0.05195,
+        "efecto_l2_en_top9_de_x": 0.89709,
+        "ratio_x_vs_y": 3.5835,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 270,
+        "activacion_media_abs_train": 0.04813,
+        "efecto_l2_en_top9_de_x": 1.32592,
+        "ratio_x_vs_y": 2.4245,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 71,
+        "activacion_media_abs_train": 0.04725,
+        "efecto_l2_en_top9_de_x": 1.09347,
+        "ratio_x_vs_y": 2.9399,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 74,
+        "activacion_media_abs_train": 0.04834,
+        "efecto_l2_en_top9_de_x": 1.32792,
+        "ratio_x_vs_y": 2.4209,
+        "supera_2x": true
+      },
+      {
+        "canal_y": 360,
+        "activacion_media_abs_train": 0.05019,
+        "efecto_l2_en_top9_de_x": 1.44926,
+        "ratio_x_vs_y": 2.2182,
+        "supera_2x": true
+      }
+    ],
+    "confirmada_a": true
+  },
+  "prueba_b_prediccion_validacion_ciega": {
+    "split_evaluado": "validacion (189 imágenes ciegas)",
+    "vocabulario_usado": "38 rasgos visuales y compositivos puros (0 metadatos de museo)",
+    "escala_puntuacion": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "conteo_puntuaciones_0_a_3": {
+      "0": 189,
+      "1": 0,
+      "2": 0,
+      "3": 0
+    },
+    "positivos_reales_validacion_top20pct": 38,
+    "roc_auc_validacion": 0.5,
+    "umbral_auc_minimo": 0.7,
+    "etiqueta_es_no_lo_se": true,
+    "confirmada_b": false
+  },
+  "coherencia_descubrimiento_train": {
+    "roc_auc_train": 0.6287,
+    "umbral_claridad_train": 0.64
+  },
+  "polo_pos": [
+    {
+      "rango": 1,
+      "id_pieza": "cma_384221",
+      "sha256_imagen": "60bf6623b81a7aeedab34909e0554f63947ef251b927ea55825326bab35a9f70",
+      "url_pagina": "https://clevelandart.org/art/2020.210",
+      "activacion_media": 0.17481,
+      "activacion_max_celda_14x14": 0.68319,
+      "celda_14x14": [
+        12,
+        0
+      ],
+      "efecto_l2_al_apagar": 3.90372
+    },
+    {
+      "rango": 2,
+      "id_pieza": "cma_137319",
+      "sha256_imagen": "597f8b07c86296ad41a4db0e4cbc272f337b5d7021e12b105175e207f7c6cf4c",
+      "url_pagina": "https://clevelandart.org/art/1962.247",
+      "activacion_media": 0.15405,
+      "activacion_max_celda_14x14": 0.48894,
+      "celda_14x14": [
+        13,
+        12
+      ],
+      "efecto_l2_al_apagar": 3.05005
+    },
+    {
+      "rango": 3,
+      "id_pieza": "cma_399499",
+      "sha256_imagen": "8bc6e3b5e4c12eda6a4229b5d7c054c6ed0a67424c4f0c76fc7115d5f837a748",
+      "url_pagina": "https://clevelandart.org/art/2021.3",
+      "activacion_media": 0.13899,
+      "activacion_max_celda_14x14": 0.47886,
+      "celda_14x14": [
+        3,
+        3
+      ],
+      "efecto_l2_al_apagar": 3.40428
+    },
+    {
+      "rango": 4,
+      "id_pieza": "cma_147588",
+      "sha256_imagen": "f00d37b1ec5da426c4c597ab25f431b36d8f631c070495a055a52d5275cbf530",
+      "url_pagina": "https://clevelandart.org/art/1973.85",
+      "activacion_media": 0.13347,
+      "activacion_max_celda_14x14": 0.5584,
+      "celda_14x14": [
+        7,
+        4
+      ],
+      "efecto_l2_al_apagar": 3.29591
+    },
+    {
+      "rango": 5,
+      "id_pieza": "cma_167459",
+      "sha256_imagen": "1830b923d49f7fe4381a5163d832dc1c1d9ed556e436431855fad0f6cecf7d4c",
+      "url_pagina": "https://clevelandart.org/art/2009.271",
+      "activacion_media": 0.13015,
+      "activacion_max_celda_14x14": 0.50227,
+      "celda_14x14": [
+        12,
+        10
+      ],
+      "efecto_l2_al_apagar": 2.67917
+    },
+    {
+      "rango": 6,
+      "id_pieza": "met_wm_148857277",
+      "sha256_imagen": "ab83c6db26ebe1a2375c7cf3a3cdd6082f74eab8f84c4980eb9653b008b852d0",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:It%C5%8D_Jakuch%C5%AB_%E4%BC%8A%E8%97%A4%E8%8B%A5%E5%86%B2_-_Banana_Leaves_-_2020.396.35_-_Metropolitan_Museum_of_Art.jpg",
+      "activacion_media": 0.12935,
+      "activacion_max_celda_14x14": 0.58479,
+      "celda_14x14": [
+        12,
+        10
+      ],
+      "efecto_l2_al_apagar": 2.92885
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_384222",
+      "sha256_imagen": "e22ba181da7b6223501a8637c02152eb4954f49b2925a9f40e1678c99297128e",
+      "url_pagina": "https://clevelandart.org/art/2020.211",
+      "activacion_media": 0.12759,
+      "activacion_max_celda_14x14": 0.51955,
+      "celda_14x14": [
+        6,
+        2
+      ],
+      "efecto_l2_al_apagar": 2.85793
+    },
+    {
+      "rango": 8,
+      "id_pieza": "cma_148794",
+      "sha256_imagen": "760bccf5974aee1ba817044c5292d64b9d3d7111a73861ff41f32ec7f04bee5e",
+      "url_pagina": "https://clevelandart.org/art/1976.4",
+      "activacion_media": 0.12669,
+      "activacion_max_celda_14x14": 0.72421,
+      "celda_14x14": [
+        4,
+        10
+      ],
+      "efecto_l2_al_apagar": 3.66381
+    },
+    {
+      "rango": 9,
+      "id_pieza": "cma_161865",
+      "sha256_imagen": "062806f42b16ff27dca5f32f566acc46d8878385499cf83f66104ac3f1711a66",
+      "url_pagina": "https://clevelandart.org/art/2001.152",
+      "activacion_media": 0.1257,
+      "activacion_max_celda_14x14": 0.52757,
+      "celda_14x14": [
+        5,
+        1
+      ],
+      "efecto_l2_al_apagar": 3.14883
+    }
+  ],
+  "polo_neg": [
+    {
+      "rango": 1,
+      "id_pieza": "met_wm_60868108",
+      "sha256_imagen": "435302a9a72b80537b0d01aaff3b64a4de0e772424ac38a8d92fd3e37d79f50a",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:%27Jos%C3%A9_Guadalupe_Posada-_36_Grabados%27_(Mexico,_1943)_MET_DP872853.jpg",
+      "activacion_media": -0.11431,
+      "activacion_min_celda_14x14": -0.43868,
+      "celda_14x14": [
+        0,
+        3
+      ]
+    },
+    {
+      "rango": 2,
+      "id_pieza": "cma_136592",
+      "sha256_imagen": "12e2d22d148cafa2c6c325ffa196100af7735d27fd8cb42454cc310759aca108",
+      "url_pagina": "https://clevelandart.org/art/1961.154",
+      "activacion_media": -0.08884,
+      "activacion_min_celda_14x14": -0.34159,
+      "celda_14x14": [
+        12,
+        5
+      ]
+    },
+    {
+      "rango": 3,
+      "id_pieza": "cma_95271",
+      "sha256_imagen": "b2ac0293eba58815e74b99a52dd333dad6d9404ef72dd112da2337b8c615f091",
+      "url_pagina": "https://clevelandart.org/art/1916.1043",
+      "activacion_media": -0.08266,
+      "activacion_min_celda_14x14": -0.48949,
+      "celda_14x14": [
+        2,
+        4
+      ]
+    },
+    {
+      "rango": 4,
+      "id_pieza": "met_wm_57394189",
+      "sha256_imagen": "b16c9ec7fb1deefa78f5319f693bbb244c46f0a0c0652741afeacde69fbb7ab1",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Fragment_of_a_Wall_Painting_MET_135348.jpg",
+      "activacion_media": -0.07367,
+      "activacion_min_celda_14x14": -0.37892,
+      "celda_14x14": [
+        11,
+        7
+      ]
+    },
+    {
+      "rango": 5,
+      "id_pieza": "cma_105001",
+      "sha256_imagen": "70981ccfd8fd2e204b128bcba90ae81e3b719cff979ff42ba4ee0be1a27850ba",
+      "url_pagina": "https://clevelandart.org/art/1923.227",
+      "activacion_media": -0.06779,
+      "activacion_min_celda_14x14": -0.36452,
+      "celda_14x14": [
+        12,
+        2
+      ]
+    },
+    {
+      "rango": 6,
+      "id_pieza": "cma_160073",
+      "sha256_imagen": "52023806541d90463cc6b8be4713a73df7c72f7083eac4d4c464805b657d2d91",
+      "url_pagina": "https://clevelandart.org/art/1997.45",
+      "activacion_media": -0.0666,
+      "activacion_min_celda_14x14": -0.48173,
+      "celda_14x14": [
+        7,
+        10
+      ]
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_136172",
+      "sha256_imagen": "78319cbb02766b57913351843a9c6b061df2746908a118df98e1985e81abb542",
+      "url_pagina": "https://clevelandart.org/art/1959.99",
+      "activacion_media": -0.06017,
+      "activacion_min_celda_14x14": -0.39684,
+      "celda_14x14": [
+        7,
+        4
+      ]
+    },
+    {
+      "rango": 8,
+      "id_pieza": "met_wm_60280575",
+      "sha256_imagen": "bd6f414551a53a1f4a101171d760f0b4d4b3e790017c487468bdde6d5e9ff885",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:%27Anno_1690%27_(the_Year_1690),_with_numerous_warring_figures_clambering_on_and_hanging_from_the_numbers,_allusions_to_the_Four_Elements_and_the_Four_Continents_MET_DP860327.jpg",
+      "activacion_media": -0.05705,
+      "activacion_min_celda_14x14": -0.39445,
+      "celda_14x14": [
+        2,
+        0
+      ]
+    },
+    {
+      "rango": 9,
+      "id_pieza": "met_wm_57395816",
+      "sha256_imagen": "303c371564631e1fa1589c37f27dc7b4a4f410dfa4fa9f5468f97bcd228711f6",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Masqueraders_MET_0825.jpg",
+      "activacion_media": -0.05669,
+      "activacion_min_celda_14x14": -0.44042,
+      "celda_14x14": [
+        6,
+        0
+      ]
+    }
+  ]
+}

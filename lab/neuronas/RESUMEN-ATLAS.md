@@ -1,47 +1,39 @@
-# FASE 5b · Atlas con prueba de verdad (N-1 v2 · ConvNeXt-tiny `features.7`)
+# FASE 5b y 5c · Atlas con prueba de verdad (`features.7` vs `features.5`) y Prueba Ciega Humana
 
-## 1. Corrección de las tres fallas metodológicas de la Fase 5
+## 1. Comparativa de capas: `features.5` (Etapa 3, 384 canales, $14 \times 14$) vs `features.7` (Etapa 4, 768 canales, $7 \times 7$)
 
-| Falla señalada en Fase 5 | Corrección aplicada en Fase 5b (`prerregistro_v2.json` sellado en `4ac4cd3`) |
-|---|---|
-| **1. Apagado tautológico** (`control-9` con caída `0,0000` y ratio `>99,9x`) | **Prueba (a) — Apagado con control justo**: sobre las **mismas `top-9` imágenes de `train`** de la neurona $X$, se mide el cambio $L_2$ en los 1000 logits del clasificador al apagar $X$ frente a apagar cada una de **5 neuronas control $Y_1\dots Y_5$** sorteadas al azar (`SEED = 2610 + X`) entre las 25 neuronas con **activación media absoluta más parecida en `train`**. Pasa (`confirmada_a = true`) si $E(X) \ge 2{,}0 \times E(Y_m)$ en al menos **4 de 5** sorteos. |
-| **2. Etiquetas de plantilla rígida** (`6 ejes fijos`, colisiones como `113 = 196`) | **Etiquetas libres en español natural**: redactadas observando únicamente el conjunto `train` (`441` imágenes), sin plantilla repetida (`137/137` etiquetas con contenido son **100 % únicas**). Cuando en `train` no se aprecia separación visual clara ($\text{AUC}_{\text{train}} < 0{,}64$), se escribe honestamente **`«no lo sé»`** (`63/200` neuronas), que cuenta como no legible. |
-| **3. Corpus insuficiente** (`22` imágenes frente a `768` canales) | **Corpus ampliado a `630` imágenes CC0 verificadas** (`lab/neuronas/corpus_cc0_630.json`, SHA-256 `f0c3483f...`) descargadas de las APIs Open Access del **Cleveland Museum of Art (CMA)** (`565`) y **The Metropolitan Museum of Art (Met)** (`59`) más `6` piezas CC0 de D-3, mezclando pintura (`168`), grabados (`154`), objetos tridimensionales (`130`), fotografía (`120`) y carteles/obra gráfica (`58`). Split aleatorio (`SEED = 2610`): **`441` `train` (70 %)** y **`189` `validacion` (30 % ciego)**. |
+En **FASE 5c** (`prerregistro_v3.json` sellado en `53aa6c3` antes de mirar las activaciones de `features.5`, dejando intactos `v1` y `v2`), evaluamos `200` neuronas al azar (`SEED = 2610`) de la capa media `features.5` sobre el mismo corpus de `630` obras CC0 (`441` `train` / `189` `validacion`) con los mismos umbrales (`a`: apagado $\ge 2\times$ control en $\ge 4/5$ sorteos; `b`: $\text{ROC AUC}_{\text{val}} \ge 0{,}70$ puntuando de `0` a `3` solo con la etiqueta escrita). Además, en `features.5` eliminamos por completo los términos de catálogo de museo («escultura», «cerámica», «grabado») para que las etiquetas expresen **exclusivamente verbos visuales y compositivos de diseño** (claroscuro, temperatura cromática, saturación, trama lineal, orientación vertical/horizontal, aislamiento central vs sangrado):
 
-## 2. Resultados globales sobre las 200 neuronas (`SEED = 2610`)
-
-*Nota sobre la referencia bibliográfica:* El **~90 % preliminar** citado por Nick Cammarata corresponde a su ensayo de **2026 sobre Qwen3-32B** (no a la serie *Circuits* de *Distill* 2020). En `ConvNeXt-tiny` (`features.7`, 768 canales convolucionales entrenados en ImageNet-1k) evaluado con pruebas no tautológicas sobre un corpus artístico multicanal de 630 obras CC0, la fracción de neuronas simultáneamente selectivas en apagado causal y predecibles a ciegas por un humano/etiquetador desde una etiqueta breve es sustancialmente menor:
-
-| Categoría de resultado | Conteo (`/ 200`) | Porcentaje | IC 95 % (Wilson score) |
+| Métrica (`N = 200` neuronas por capa, `SEED = 2610`) | `features.5` (Capa media, 384 canales, $14 \times 14$) | `features.7` (Última etapa, 768 canales, $7 \times 7$) | Diferencia (`features.5` − `features.7`) |
 |---|---:|---:|---:|
-| **Neuronas LEGIBLES (pasan `a` y `b`)** | **26 / 200** | **13,00 %** | **`[9,03 %, 18,37 %]`** |
-| **Pasan SOLO `a` (`confirmada_a = true`, `confirmada_b = false`)** | **112 / 200** | **56,00 %** | **`[49,07 %, 62,70 %]`** |
-| **Pasan SOLO `b` (`confirmada_a = false`, `confirmada_b = true`)** | **12 / 200** | **6,00 %** | **`[3,47 %, 10,19 %]`** |
-| No pasan ni `a` ni `b` | 50 / 200 | 25,00 % | `[19,51 %, 31,44 %]` |
-| *Total que pasan `a` (Apagado con control justo $\ge 4/5$)* | *138 / 200* | *69,00 %* | *`[62,28 %, 75,00 %]`* |
-| *Total que pasan `b` (Predicción ciega en validación $\text{AUC} \ge 0{,}70$)* | *38 / 200* | *19,00 %* | *`[14,17 %, 25,00 %]`* |
-| *Declaradas «no lo sé» (sin patrón visual claro en `train`)* | *63 / 200* | *31,50 %* | *`[25,46 %, 38,24 %]`* |
+| **Neuronas LEGIBLES (pasan `a` y `b`)** | **32 / 200 (`16,00 %`)**<br>IC 95 %: `[11,57 %, 21,71 %]` | **26 / 200 (`13,00 %`)**<br>IC 95 %: `[9,03 %, 18,37 %]` | **`+3,00 pp`** (`+6` neuronas) |
+| **Pasan SOLO `a` (`confirmada_a = true`, `confirmada_b = false`)** | **50 / 200 (`25,00 %`)**<br>IC 95 %: `[19,51 %, 31,43 %]` | **112 / 200 (`56,00 %`)**<br>IC 95 %: `[49,07 %, 62,70 %]` | **`-31,00 pp`** (`-62` neuronas) |
+| **Pasan SOLO `b` (`confirmada_a = false`, `confirmada_b = true`)** | **22 / 200 (`11,00 %`)**<br>IC 95 %: `[7,38 %, 16,09 %]` | **12 / 200 (`6,00 %`)**<br>IC 95 %: `[3,47 %, 10,19 %]` | **`+5,00 pp`** (`+10` neuronas) |
+| No pasan ni `a` ni `b` | 96 / 200 (`48,00 %`)<br>IC 95 %: `[41,18 %, 54,90 %]` | 50 / 200 (`25,00 %`)<br>IC 95 %: `[19,51 %, 31,44 %]` | `+23,00 pp` |
+| *Total que pasan Prueba `a` (efecto causal en logits)* | *82 / 200 (`41,00 %`)*<br>IC 95 %: `[34,42 %, 47,92 %]` | *138 / 200 (`69,00 %`)*<br>IC 95 %: `[62,28 %, 75,00 %]` | *`-28,00 pp`* |
+| *Total que pasan Prueba `b` (predicción ciega $\text{AUC}_{\text{val}} \ge 0{,}70$)* | *54 / 200 (`27,00 %`)*<br>IC 95 %: `[21,32 %, 33,54 %]` | *38 / 200 (`19,00 %`)*<br>IC 95 %: `[14,17 %, 25,00 %]` | *`+8,00 pp`* |
+| *Declaradas `«no lo sé»` (sin patrón claro en `train`)* | *49 / 200 (`24,50 %`)* | *63 / 200 (`31,50 %`)* | *`-7,00 pp`* |
 
-## 3. Diez ejemplos (5 legibles y 5 no legibles)
+### Lectura metodológica del contraste `features.5` vs `features.7`
+1. **Evaluación de la hipótesis de la Parte 1:** La estimación puntual en `features.5` (**`16,00 %`**, `32/200`) supera el `13,00 %` (`26/200`) de `features.7` en `+3,0` puntos porcentuales, aunque los intervalos de confianza al 95 % (`[11,57 %, 21,71 %]` frente a `[9,03 %, 18,37 %]`) se solapan ampliamente y ambas capas quedan muy lejos del `~90 %` preliminar de Cammarata (2026, Qwen3-32B).
+2. **Inversión entre selectividad causal (`a`) y descriptibilidad visual (`b`):**
+   - En `features.5`, la **Prueba `b`** sube del `19,00 %` al **`27,00 %` (`54/200`)** usando únicamente propiedades visuales de diseño (sin tipos de objeto de museo), y las neuronas sin patrón claro (`«no lo sé»`) bajan de `63` a `49`. Es decir, la capa media sí responde con mayor limpieza a verbos visuales (claroscuro, temperatura cálida/fría, trama lineal, aislamiento central).
+   - En cambio, la **Prueba `a`** baja del `69,00 %` en `features.7` al **`41,00 %` en `features.5`**, porque al apagar un solo canal en la etapa 3 la señal atraviesa todavía el *downsampling* `features.6` y los 3 bloques residuales de `features.7`, que amortiguan parte del impacto individual sobre los 1000 logits finales.
 
-Los 10 mosaicos (`polo +` frente a `polo −` en `train`) están guardados localmente fuera de Git en `/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/neuronas-mosaicos/10_ejemplos_v2/`:
+## 2. Cinco ejemplos legibles de `features.5`
 
-| # | Neurona | Estado | Prueba `a` (sorteos / ratio medio) | Prueba `b` ($\text{AUC}_{\text{val}}$) | Etiqueta libre escrita desde `train` | Mosaico local (fuera de Git) |
-|---:|---|---|---:|---:|---|---|
-| 1 | `neurona_421` | **LEGIBLE (`a` y `b`)** | `5/5` (`4,15x`) | **`0,8351`** | Se activa ante tallas tridimensionales, bustos y relieves en metal o piedra combinados con artefactos escultóricos o cerámicos fotografiados en estudio y núcleo policromo sobre margen neutro —por ejemplo «Zaō Gongen»— en contraste con piezas de cielo luminoso sobre base oscura con positivos fotográficos de cámara con grano óptico y xilografías, litografías y grabados calcográficos. | `ejemplo_01_legible_neurona_421.png` (`11bae6e4...`) |
-| 2 | `neurona_694` | **LEGIBLE (`a` y `b`)** | `4/5` (`2,77x`) | **`0,8185`** | Concentra su activación en objetos exentos con volumen físico, figuras escultóricas de bulto redondo y núcleo policromo sobre margen neutro, destacando «Shell with Seated Noble» oponiéndose a pinturas al óleo o temple sobre lienzo y tabla junto con cabecera clara con tercio inferior sombreado y riqueza cromática de pigmento vivo. | `ejemplo_02_legible_neurona_694.png` (`79ebdff3...`) |
-| 3 | `neurona_542` | **LEGIBLE (`a` y `b`)** | `4/5` (`3,18x`) | **`0,8104`** | Detecta artefactos escultóricos o cerámicos fotografiados en estudio junto a núcleo policromo sobre margen neutro además de recipientes de cerámica vidriada y alfarería, visible en «Black-Figure Neck-Amphora (Storage Ves» mientras el polo opuesto reúne grabados, aguafuertes y estampas sobre papel asociados a claridad tonal elevada en toda la toma y gradiente vertical de cielo claro a tierra oscura. | `ejemplo_03_legible_neurona_542.png` (`6075b451...`) |
-| 4 | `neurona_299` | **LEGIBLE (`a` y `b`)** | `4/5` (`2,74x`) | **`0,8019`** | Reacciona a gradiente vertical de cielo claro a tierra oscura con franjas anchas de composición horizontal y positivos fotográficos de cámara con grano óptico (caso de «The Bridge of Palalda (near Amelieles-»); en el extremo negativo aparecen escenas de equilibrio simétrico arriba-abajo, diferencia marcada de luz entre disco interno y periferia y formato vertical dominante. | `ejemplo_04_legible_neurona_299.png` (`db25edab...`) |
-| 5 | `neurona_428` | **LEGIBLE (`a` y `b`)** | `5/5` (`2,71x`) | **`0,8019`** | Detecta estructura tendida en planos horizontales junto a líneas horizontales de horizonte además de cabecera clara con tercio inferior sombreado, visible en «Nymphs and a Satyr (Amor Vincit Omnia)» mientras el polo opuesto reúne composición erguida en columnas verticales asociados a rayado vertical dominante y artefactos escultóricos o cerámicos fotografiados en estudio. | `ejemplo_05_legible_neurona_428.png` (`34a72d6a...`) |
-| 6 | `neurona_198` | **NO LEGIBLE (solo `a`)** | `5/5` (`3,44x`) | `0,4811` | Responde a equilibrio simétrico arriba-abajo, grano fino continuo sobre plano homogéneo y formato vertical dominante (como en «The Crucifixion of Saint Andrew») frente a vasijas, cuencos y porcelanas cerámicas, positivos fotográficos de cámara con grano óptico y estructura tendida en planos horizontales. | `ejemplo_06_no_legible_neurona_198.png` (`1f7b0dd1...`) |
-| 7 | `neurona_159` | **NO LEGIBLE (solo `a`)** | `5/5` (`2,91x`) | `0,4977` | Prefiere fotografías históricas en albúmina o plata y ejes verticales de figura de pie o pilastra acompañados de movimiento diagonal sin aristas rectas (ej. «Figure 54: Abaissement volontaire de l») contra composiciones con vasijas, cuencos y porcelanas cerámicas, objetos exentos con volumen físico y estructura tendida en planos horizontales. | `ejemplo_07_no_legible_neurona_159.png` (`3de74b90...`) |
-| 8 | `neurona_113` | **NO LEGIBLE (solo `b`)** | `0/5` (`1,19x`) | **`0,7852`** | Reacciona a jarrones, platos y tazas de porcelana con piezas tridimensionales de museo en estudio y pieza concentrada en el núcleo con periferia calma (caso de «Fragment of a Wall Painting MET 135348»); en el extremo negativo aparecen escenas de dominante térmica cálida rojiza, obra gráfica impresa en tinta sobre papel y formato vertical dominante. | `ejemplo_08_no_legible_neurona_113.png` (`bb70ba40...`) |
-| 9 | `neurona_090` | **NO LEGIBLE (`«no lo sé»`)** | `0/5` (`1,48x`) | `0,5000` | `no lo sé` | `ejemplo_09_no_legible_neurona_090.png` (`57f1ecf7...`) |
-| 10 | `neurona_264` | **NO LEGIBLE (solo `a`, `«no lo sé»`)** | `4/5` (`1,77x`) | `0,5000` | `no lo sé` | `ejemplo_10_no_legible_neurona_264.png` (`282f4cf9...`) |
+Mosaicos locales fuera de Git en `/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/neuronas-mosaicos/5_ejemplos_f5/`:
 
-## 4. Verificación reproducible
+| # | Neurona (`features.5`) | Prueba `a` (sorteos / ratio) | Prueba `b` ($\text{AUC}_{\text{val}}$) | Etiqueta libre en `train` (100 % verbos visuales de diseño) | Mosaico local (fuera de Git) |
+|---:|---|---:|---:|---|---|
+| 1 | `neurona_f5_360` | `5/5` (`3,91x`) | **`0,8676`** | Responde a sombras profundas de claroscuro, vegetación en tonos verde musgo y celadón y riqueza cromática de pigmento vivo frente a luminosidad general alta, grano fino continuo sobre plano homogéneo y fondo crema envejecido. | `ejemplo_f5_01_neurona_f5_360.png` (`f2c755a2...`) |
+| 2 | `neurona_f5_180` | `5/5` (`6,23x`) | **`0,8432`** | Responde a dominante térmica cálida rojiza, soporte cálido marfil y pergamino y paleta dorada y ámbar frente a dominante térmica fría azulada, tonos pizarra oscuros de baja luz y arquitectura compositiva de grandes planos. | `ejemplo_f5_02_neurona_f5_180.png` (`149b805a...`) |
+| 3 | `neurona_f5_126` | `5/5` (`2,96x`) | **`0,8429`** | Responde a trama tupida de líneas finas, grano fino continuo sobre plano homogéneo y estrías y pliegues de caída vertical frente a contorno anular de plato o vasija redonda, color concentrado en el centro rodeado de borde apagado y figura exenta en el centro del encuadre. | `ejemplo_f5_03_neurona_f5_126.png` (`d3ee139a...`) |
+| 4 | `neurona_f5_063` | `5/5` (`2,62x`) | **`0,8349`** | Prefiere núcleo policromo sobre margen neutro y escala acromática de tintas grises y negras acompañados de temperatura de color fría contra composiciones con dominante térmica cálida rojiza, correspondencia tonal entre mitad superior e inferior y manchas carmesí y bermellón. | `ejemplo_f5_04_neurona_f5_063.png` (`cfab4d74...`) |
+| 5 | `neurona_f5_355` | `5/5` (`4,19x`) | **`0,8265`** | Se activa ante grano fino continuo sobre plano homogéneo combinados con achurado minucioso de alta frecuencia y contornos estructurales definidos en contraste con piezas de superficies lisas sin grano con encuadre rectilíneo de líneas rectas finas y foco circular centrado. | `ejemplo_f5_05_neurona_f5_355.png` (`e46ff987...`) |
 
-```bash
-.venv/bin/python lab/neuronas/medir_atlas.py
-```
-Pasa las **8/8 comprobaciones** (`prerregistro.json` v1 intacto, `prerregistro_v2.json` v2 intacto, `corpus_cc0_630.json` con 630 SHA-256 únicos y split 441/189, 200 fichas v2 completas con negativos preservados, 137/137 etiquetas con contenido únicas + 63 `«no lo sé»`, pruebas `a` y `b` verificadas y 0 imágenes/pesos en Git).
+## 3. Prueba ciega humana para Bruno (20 pares)
+
+- **Página HTML única autocontenida (sin internet):** `/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/prueba-ciega-bruno/prueba_ciega_20_pares.html` (`sha256 = 9317c53f430f2b3c19df1ca17de6922d9057bab744fd55f7dc55c6d361fc4110`)
+- **Clave secreta de corrección (Bruno NO la abre):** `/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/prueba-ciega-bruno/clave_secreta_no_abrir.json` (`sha256 = 02a6b30c0d5c2e70f32dd5c1efdcd60d56120686684c20fbe53f4588f2f96cf2`)
+- **Script evaluador:** `lab/neuronas/evaluar_prueba_ciega.py` (compara `respuestas_bruno_20_pares.json` con la clave secreta y verifica si acierta $\ge 15/20$, $p = 0{,}02069 < 0{,}05$).

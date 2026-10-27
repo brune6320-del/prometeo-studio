@@ -1,0 +1,323 @@
+{
+  "schema_version": "3.0.0",
+  "id_neurona": "neurona_f5_160",
+  "canal_indice": 160,
+  "modelo": "convnext_tiny",
+  "etapa": "features.5",
+  "modalidad_corpus": "cc0_630_train441_val189",
+  "etiqueta": "no lo sé",
+  "etiquetador": "Argon",
+  "legible": false,
+  "confirmada": false,
+  "confirmada_a": false,
+  "confirmada_b": false,
+  "fecha": "2026-10-27",
+  "sha256_pesos": "983f1562536e84ff750a1576fb08e54de751dbf2e17c0d8a4a13704341fdcd3d",
+  "licencia_pesos": "BSD-3-Clause (https://github.com/pytorch/vision/blob/main/LICENSE)",
+  "sha256_prerregistro_v1": "a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388",
+  "sha256_prerregistro_v2": "729bb150cc75e50e9ec5d2e43145f5e4d8876aa7119cc9b639f336d8c9ca1555",
+  "sha256_prerregistro_v3": "230303d5388312ef30652ae09c97a1aef3ecd1ec647db0db58f07599371b78a8",
+  "sha256_corpus_cc0": "f0c3483fafa8c04be6492ff62190071c8f6278beb8dec78b05110a6cabb5875f",
+  "sha256_mosaico_local": "be05458df02ae5bdbf7822c1d5e2b94b3985075ae925be2931fd906491011761",
+  "prueba_a_apagado_control_justo": {
+    "etapa_siguiente": "features.6 -> features.7 -> avgpool -> classifier (1000 logits)",
+    "activacion_media_abs_train": 0.07061,
+    "efecto_l2_neurona_x_top9_train": 1.21869,
+    "ratio_medio_x_vs_controles": 1.0994,
+    "sorteos_ganados_de_5": 0,
+    "minimo_sorteos_requerido": 4,
+    "factor_minimo_efecto": 2.0,
+    "controles_y_sorteados": [
+      {
+        "canal_y": 295,
+        "activacion_media_abs_train": 0.07014,
+        "efecto_l2_en_top9_de_x": 1.42732,
+        "ratio_x_vs_y": 0.8538,
+        "supera_2x": false
+      },
+      {
+        "canal_y": 380,
+        "activacion_media_abs_train": 0.0722,
+        "efecto_l2_en_top9_de_x": 0.97063,
+        "ratio_x_vs_y": 1.2556,
+        "supera_2x": false
+      },
+      {
+        "canal_y": 241,
+        "activacion_media_abs_train": 0.06963,
+        "efecto_l2_en_top9_de_x": 0.87141,
+        "ratio_x_vs_y": 1.3985,
+        "supera_2x": false
+      },
+      {
+        "canal_y": 44,
+        "activacion_media_abs_train": 0.072,
+        "efecto_l2_en_top9_de_x": 1.03583,
+        "ratio_x_vs_y": 1.1765,
+        "supera_2x": false
+      },
+      {
+        "canal_y": 287,
+        "activacion_media_abs_train": 0.07197,
+        "efecto_l2_en_top9_de_x": 1.23728,
+        "ratio_x_vs_y": 0.985,
+        "supera_2x": false
+      }
+    ],
+    "confirmada_a": false
+  },
+  "prueba_b_prediccion_validacion_ciega": {
+    "split_evaluado": "validacion (189 imágenes ciegas)",
+    "vocabulario_usado": "38 rasgos visuales y compositivos puros (0 metadatos de museo)",
+    "escala_puntuacion": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "conteo_puntuaciones_0_a_3": {
+      "0": 189,
+      "1": 0,
+      "2": 0,
+      "3": 0
+    },
+    "positivos_reales_validacion_top20pct": 38,
+    "roc_auc_validacion": 0.5,
+    "umbral_auc_minimo": 0.7,
+    "etiqueta_es_no_lo_se": true,
+    "confirmada_b": false
+  },
+  "coherencia_descubrimiento_train": {
+    "roc_auc_train": 0.63282,
+    "umbral_claridad_train": 0.64
+  },
+  "polo_pos": [
+    {
+      "rango": 1,
+      "id_pieza": "cma_325414",
+      "sha256_imagen": "f67bb821fc171a98e6cffc425dc1623e71dae2f2d77b57d195d9d08ac8a29c45",
+      "url_pagina": "https://clevelandart.org/art/2019.69",
+      "activacion_media": 0.18926,
+      "activacion_max_celda_14x14": 0.94466,
+      "celda_14x14": [
+        1,
+        1
+      ],
+      "efecto_l2_al_apagar": 1.70433
+    },
+    {
+      "rango": 2,
+      "id_pieza": "cma_164940",
+      "sha256_imagen": "5a4b749536cd520847ee16aa4da72bfcdcc05bac51ccc5a61183d098af54c8b3",
+      "url_pagina": "https://clevelandart.org/art/2006.4",
+      "activacion_media": 0.1693,
+      "activacion_max_celda_14x14": 0.60947,
+      "celda_14x14": [
+        4,
+        6
+      ],
+      "efecto_l2_al_apagar": 1.30427
+    },
+    {
+      "rango": 3,
+      "id_pieza": "cma_110123",
+      "sha256_imagen": "0ae3cdd156212858827f98afab2705a1bdd56adf3af05e2d3e325af4862ef8a3",
+      "url_pagina": "https://clevelandart.org/art/1928.750",
+      "activacion_media": 0.15921,
+      "activacion_max_celda_14x14": 0.62797,
+      "celda_14x14": [
+        12,
+        11
+      ],
+      "efecto_l2_al_apagar": 1.00346
+    },
+    {
+      "rango": 4,
+      "id_pieza": "cma_154698",
+      "sha256_imagen": "c1285ab2aaf47cc516dc547ff937c934f8efdbb306ca40916e9bcb24ae6b0a0d",
+      "url_pagina": "https://clevelandart.org/art/1989.29",
+      "activacion_media": 0.15694,
+      "activacion_max_celda_14x14": 0.75047,
+      "celda_14x14": [
+        1,
+        7
+      ],
+      "efecto_l2_al_apagar": 1.19675
+    },
+    {
+      "rango": 5,
+      "id_pieza": "d3_met_360179",
+      "sha256_imagen": "c12143be65a0eabc2f40c105929ccf3a7aa70af8b943f41f41cc45c7fa175efd",
+      "url_pagina": "local://corpus-editorial/CORPUS.md",
+      "activacion_media": 0.15063,
+      "activacion_max_celda_14x14": 0.92713,
+      "celda_14x14": [
+        6,
+        13
+      ],
+      "efecto_l2_al_apagar": 1.23005
+    },
+    {
+      "rango": 6,
+      "id_pieza": "met_wm_148856952",
+      "sha256_imagen": "40f02e0da1b6bf7faaf9d9a8ce263acf14efb36e105f20ccf4a8c8614f7b44d7",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Matsumura_Keibun_%E6%9D%BE%E6%9D%91%E6%99%AF%E6%96%87_-_Plum_Blossoms_-_2015.500.9.57a%E2%80%93c_-_Metropolitan_Museum_of_Art.jpg",
+      "activacion_media": 0.14059,
+      "activacion_max_celda_14x14": 1.17925,
+      "celda_14x14": [
+        1,
+        11
+      ],
+      "efecto_l2_al_apagar": 1.61634
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_108401",
+      "sha256_imagen": "b9d1eadb55b688094274c2c29c52a4ecd79f77d77ef90c6a553805830407008c",
+      "url_pagina": "https://clevelandart.org/art/1926.140.6",
+      "activacion_media": 0.14048,
+      "activacion_max_celda_14x14": 1.00842,
+      "celda_14x14": [
+        10,
+        1
+      ],
+      "efecto_l2_al_apagar": 1.31551
+    },
+    {
+      "rango": 8,
+      "id_pieza": "cma_136510",
+      "sha256_imagen": "da2f843f1ad70e4a4dd2e9389702fa9b7e9409cb6589f972ab162ca12e449ecb",
+      "url_pagina": "https://clevelandart.org/art/1960.81",
+      "activacion_media": 0.11769,
+      "activacion_max_celda_14x14": 0.61084,
+      "celda_14x14": [
+        11,
+        2
+      ],
+      "efecto_l2_al_apagar": 0.81532
+    },
+    {
+      "rango": 9,
+      "id_pieza": "cma_109204",
+      "sha256_imagen": "d6cc08148802b21a3618bfbec4405d24713e13b174d9dd8994d0acff0825065e",
+      "url_pagina": "https://clevelandart.org/art/1927.477.8",
+      "activacion_media": 0.11691,
+      "activacion_max_celda_14x14": 1.00311,
+      "celda_14x14": [
+        11,
+        12
+      ],
+      "efecto_l2_al_apagar": 0.7822
+    }
+  ],
+  "polo_neg": [
+    {
+      "rango": 1,
+      "id_pieza": "met_wm_60868094",
+      "sha256_imagen": "4167efdfb952163b604ba0ad831474f3dc0cb4963c73561b4891d8fc6895467f",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:%27Jos%C3%A9_Guadalupe_Posada-_36_Grabados%27_(Mexico,_1943)_MET_DP872821.jpg",
+      "activacion_media": -0.28612,
+      "activacion_min_celda_14x14": -0.6818,
+      "celda_14x14": [
+        9,
+        4
+      ]
+    },
+    {
+      "rango": 2,
+      "id_pieza": "cma_115405",
+      "sha256_imagen": "18e38bbd0fc883bfc5d10deaaf8301ea2ee0889d960500da6f890331252749d9",
+      "url_pagina": "https://clevelandart.org/art/1936.19",
+      "activacion_media": -0.26553,
+      "activacion_min_celda_14x14": -0.97413,
+      "celda_14x14": [
+        10,
+        10
+      ]
+    },
+    {
+      "rango": 3,
+      "id_pieza": "cma_160073",
+      "sha256_imagen": "52023806541d90463cc6b8be4713a73df7c72f7083eac4d4c464805b657d2d91",
+      "url_pagina": "https://clevelandart.org/art/1997.45",
+      "activacion_media": -0.25103,
+      "activacion_min_celda_14x14": -1.25142,
+      "celda_14x14": [
+        1,
+        3
+      ]
+    },
+    {
+      "rango": 4,
+      "id_pieza": "cma_144743",
+      "sha256_imagen": "b2ec11b6bf8ed22008cd8e7fcce5a6903075eb103147d607a73c5b41a7880d16",
+      "url_pagina": "https://clevelandart.org/art/1969.53",
+      "activacion_media": -0.22012,
+      "activacion_min_celda_14x14": -1.35066,
+      "celda_14x14": [
+        12,
+        10
+      ]
+    },
+    {
+      "rango": 5,
+      "id_pieza": "met_wm_84968004",
+      "sha256_imagen": "42cfc1d621af275509f25c9811de4993de7414a94ce2386f570d9bd773af3382",
+      "url_pagina": "https://commons.wikimedia.org/wiki/File:Johan_Vilhelm_Gertner_-_A_Bedroom_in_Bernstorff_Palace_near_Copenhagen_-_2018.289.3_-_Metropolitan_Museum_of_Art.jpg",
+      "activacion_media": -0.20138,
+      "activacion_min_celda_14x14": -0.92141,
+      "celda_14x14": [
+        7,
+        3
+      ]
+    },
+    {
+      "rango": 6,
+      "id_pieza": "cma_109207",
+      "sha256_imagen": "7fbcdf8767e392da45f4f9f44faf88e2b8829fb2e41fd2c594e65d11af088836",
+      "url_pagina": "https://clevelandart.org/art/1927.477.11",
+      "activacion_media": -0.20134,
+      "activacion_min_celda_14x14": -1.02064,
+      "celda_14x14": [
+        11,
+        10
+      ]
+    },
+    {
+      "rango": 7,
+      "id_pieza": "cma_137319",
+      "sha256_imagen": "597f8b07c86296ad41a4db0e4cbc272f337b5d7021e12b105175e207f7c6cf4c",
+      "url_pagina": "https://clevelandart.org/art/1962.247",
+      "activacion_media": -0.19232,
+      "activacion_min_celda_14x14": -1.00225,
+      "celda_14x14": [
+        5,
+        6
+      ]
+    },
+    {
+      "rango": 8,
+      "id_pieza": "cma_135299",
+      "sha256_imagen": "b9637deb1b36298ffb15b5aa827f358f3b7b379eaed0dd62e641e8d4d80b7946",
+      "url_pagina": "https://clevelandart.org/art/1958.31",
+      "activacion_media": -0.18053,
+      "activacion_min_celda_14x14": -1.43221,
+      "celda_14x14": [
+        9,
+        4
+      ]
+    },
+    {
+      "rango": 9,
+      "id_pieza": "cma_109295",
+      "sha256_imagen": "915d7f89bf54a575969fe312507cb9832df25ee4a321b984bedebd8420868116",
+      "url_pagina": "https://clevelandart.org/art/1927.437",
+      "activacion_media": -0.17974,
+      "activacion_min_celda_14x14": -1.14485,
+      "celda_14x14": [
+        0,
+        5
+      ]
+    }
+  ]
+}
