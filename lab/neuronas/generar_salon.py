@@ -617,7 +617,7 @@ function render() {{
         </div>
         <div class="timer-bar" id="bar-5s" style="width:${{state.oculto1 ? '0%' : '100%'}};"></div>
         <div class="question-box">${{item.pregunta}}</div>
-        <p style="font-size:13px;">Mira ambos lados durante 5 segundos y toca el que más se te haya quedado en la cabeza.</p>
+        <p style="font-size:13px;">No hay respuesta correcta: elige por instinto</p>
         <div class="pair-grid">
           <div class="mosaic-btn" onclick="responderParte1('izquierda')">
             ${{state.oculto1
@@ -1021,7 +1021,7 @@ def generar_salon(
             {
                 "orden": item1["orden"],
                 "id_item": id_it,
-                "pregunta": item1["pregunta"],
+                "pregunta": "¿Cuál te llamó más la atención?",
                 "b64_polo_pos": b64_p,
                 "b64_polo_neg": b64_n,
                 "sha256_polo_pos": sha_p,
