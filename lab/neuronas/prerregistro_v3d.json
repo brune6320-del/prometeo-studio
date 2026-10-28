@@ -1,0 +1,543 @@
+{
+  "version_prerregistro": "3.3.0 (v3d · Indicaciones de director y botón central Ninguno)",
+  "fase": "FASE 5d · «El salón»: prueba de sensaciones con personas (v3d)",
+  "fecha_prerregistro": "2026-10-28",
+  "semilla_base_salon": 2810,
+  "prerregistros_intactos": {
+    "v1": "lab/neuronas/prerregistro.json (sha256=a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388)",
+    "v2": "lab/neuronas/prerregistro_v2.json (sha256=729bb150cc75e50e9ec5d2e43145f5e4d8876aa7119cc9b639f336d8c9ca1555)",
+    "v3": "lab/neuronas/prerregistro_v3.json (sha256=230303d5388312ef30652ae09c97a1aef3ecd1ec647db0db58f07599371b78a8)",
+    "v3b": "lab/neuronas/prerregistro_v3b.json (sha256=0d110469817fd5fff8ec8473adc0f587d7b5f2da2a1e14f06d06883b8084ecfa)",
+    "v3c": "lab/neuronas/prerregistro_v3c.json (sha256=90e0aa75132c4742bf6dac453dc3f830e39f8748b8e71e394b43d8487ea11bd5)"
+  },
+  "tres_cambios_v3d": {
+    "cambio_1_texto_parte_1": {
+      "pregunta": "¿Cuál te llamó más la atención?",
+      "subtitulo": "No hay respuesta correcta: elige por instinto"
+    },
+    "cambio_2_tercer_boton_ninguno": {
+      "partes_aplicadas": [
+        "Parte 1 (Primer golpe de vista)",
+        "Parte 2 (Sentir)"
+      ],
+      "texto_boton_central": "Ninguno / se sienten igual",
+      "valor_json": "ninguno",
+      "regla_analisis_conservadora": "En analizar_salon.py toda respuesta «ninguno» entra en el denominador N de participantes válidos y cuenta como NO acierto (0 aciertos, conservador). Se reporta explícitamente el % de «Ninguno / se sienten igual» por cada una de las 20 neuronas, en la Parte 1 y en los 4 controles al azar."
+    },
+    "cambio_3_indicaciones_de_director": {
+      "regla": "Cada eje de la Parte 2 lleva debajo una indicación de director de máximo 12 palabras, concreta, que indica que se juzga A LA VISTA y no por el tema representado, sin palabras prohibidas.",
+      "ejemplo_canonico": "pesado: se ve macizo, como si costara moverlo",
+      "revision_previa": "Las 20 indicaciones quedan selladas en v3d y se entregan a Claude para su revisión ANTES de regenerar la página HTML."
+    }
+  },
+  "estructura_sesion_v3d": {
+    "parte_1_primer_golpe_vista_12_pares": [
+      {
+        "orden": 1,
+        "id_neurona": "neurona_f5_288",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 2,
+        "id_neurona": "neurona_f5_348",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 3,
+        "id_neurona": "neurona_146",
+        "lado_polo_pos": "derecha",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 4,
+        "id_neurona": "neurona_484",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 5,
+        "id_neurona": "neurona_f5_174",
+        "lado_polo_pos": "derecha",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 6,
+        "id_neurona": "neurona_224",
+        "lado_polo_pos": "derecha",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 7,
+        "id_neurona": "neurona_f5_035",
+        "lado_polo_pos": "derecha",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 8,
+        "id_neurona": "neurona_714",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 9,
+        "id_neurona": "neurona_694",
+        "lado_polo_pos": "derecha",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 10,
+        "id_neurona": "neurona_257",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 11,
+        "id_neurona": "neurona_f5_074",
+        "lado_polo_pos": "derecha",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      },
+      {
+        "orden": 12,
+        "id_neurona": "neurona_f5_088",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "¿Cuál te llamó más la atención?",
+        "subtitulo": "No hay respuesta correcta: elige por instinto"
+      }
+    ],
+    "parte_2_sentir_20_neuronas": [
+      {
+        "orden": 1,
+        "id_neurona": "neurona_f5_025",
+        "etapa": "features.5",
+        "delta_e_lab": 29.62,
+        "delta_L": -29.1,
+        "delta_b": -4.85,
+        "es_eje_color": true,
+        "eje_sensacion": "oscuro / luminoso",
+        "polo_predicho": "oscuro",
+        "pregunta": "¿Cuál de los dos se siente más oscuro?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": true,
+        "indicacion_director": "oscuro: a simple vista domina la sombra, sin importar qué muestre",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 2,
+        "id_neurona": "neurona_f5_180",
+        "etapa": "features.5",
+        "delta_e_lab": 28.29,
+        "delta_L": 22.95,
+        "delta_b": 15.47,
+        "es_eje_color": true,
+        "eje_sensacion": "cálido / frío",
+        "polo_predicho": "cálido",
+        "pregunta": "¿Cuál de los dos se siente más cálido?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "cálido: sus tonos dan sensación de calor o sol al mirarlos",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 3,
+        "id_neurona": "neurona_727",
+        "etapa": "features.7",
+        "delta_e_lab": 25.7,
+        "delta_L": 25.37,
+        "delta_b": 3.95,
+        "es_eje_color": false,
+        "eje_sensacion": "ligero / pesado",
+        "polo_predicho": "ligero",
+        "pregunta": "¿Cuál de los dos se siente más ligero?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "ligero: a la vista parece liviano y aireado, casi sin peso",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 4,
+        "id_neurona": "neurona_599",
+        "etapa": "features.7",
+        "delta_e_lab": 24.83,
+        "delta_L": 24.74,
+        "delta_b": 1.59,
+        "es_eje_color": true,
+        "eje_sensacion": "luminoso / oscuro",
+        "polo_predicho": "luminoso",
+        "pregunta": "¿Cuál de los dos se siente más luminoso?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": true,
+        "indicacion_director": "luminoso: desprende más claridad y luz propia al primer vistazo",
+        "num_palabras_indicacion": 10
+      },
+      {
+        "orden": 5,
+        "id_neurona": "neurona_f5_155",
+        "etapa": "features.5",
+        "delta_e_lab": 22.38,
+        "delta_L": 22.34,
+        "delta_b": -0.03,
+        "es_eje_color": false,
+        "eje_sensacion": "suave / áspero",
+        "polo_predicho": "suave",
+        "pregunta": "¿Cuál de los dos se siente más suave?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "suave: a la vista parece liso, como si no raspara nada",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 6,
+        "id_neurona": "neurona_f5_362",
+        "etapa": "features.5",
+        "delta_e_lab": 21.57,
+        "delta_L": -21.42,
+        "delta_b": -2.49,
+        "es_eje_color": false,
+        "eje_sensacion": "encerrado / abierto",
+        "polo_predicho": "encerrado",
+        "pregunta": "¿Cuál de los dos se siente más encerrado?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "encerrado: la vista queda atrapada adentro, sin salida hacia los bordes",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 7,
+        "id_neurona": "neurona_f5_221",
+        "etapa": "features.5",
+        "delta_e_lab": 18.7,
+        "delta_L": -17.94,
+        "delta_b": -4.89,
+        "es_eje_color": false,
+        "eje_sensacion": "cercano / lejano",
+        "polo_predicho": "cercano",
+        "pregunta": "¿Cuál de los dos se siente más cercano?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "cercano: se ve tan próximo que parece al alcance de la mano",
+        "num_palabras_indicacion": 12
+      },
+      {
+        "orden": 8,
+        "id_neurona": "neurona_f5_137",
+        "etapa": "features.5",
+        "delta_e_lab": 18.19,
+        "delta_L": -16.65,
+        "delta_b": -7.13,
+        "es_eje_color": false,
+        "eje_sensacion": "tranquilo / agitado",
+        "polo_predicho": "tranquilo",
+        "pregunta": "¿Cuál de los dos se siente más tranquilo?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "tranquilo: a la vista transmite quietud y reposo, sin trazos bruscos",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 9,
+        "id_neurona": "neurona_f5_332",
+        "etapa": "features.5",
+        "delta_e_lab": 17.56,
+        "delta_L": -17.05,
+        "delta_b": 4.05,
+        "es_eje_color": true,
+        "eje_sensacion": "colorido / apagado",
+        "polo_predicho": "colorido",
+        "pregunta": "¿Cuál de los dos se siente más colorido?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "colorido: los colores se ven vivos e intensos al primer golpe",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 10,
+        "id_neurona": "neurona_374",
+        "etapa": "features.7",
+        "delta_e_lab": 17.17,
+        "delta_L": -16.8,
+        "delta_b": -3.49,
+        "es_eje_color": false,
+        "eje_sensacion": "pesado / ligero",
+        "polo_predicho": "pesado",
+        "pregunta": "¿Cuál de los dos se siente más pesado?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "pesado: se ve macizo, como si costara moverlo",
+        "num_palabras_indicacion": 8
+      },
+      {
+        "orden": 11,
+        "id_neurona": "neurona_f5_178",
+        "etapa": "features.5",
+        "delta_e_lab": 15.89,
+        "delta_L": 14.49,
+        "delta_b": -5.6,
+        "es_eje_color": true,
+        "eje_sensacion": "apagado / colorido",
+        "polo_predicho": "apagado",
+        "pregunta": "¿Cuál de los dos se siente más apagado?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "apagado: a la vista luce grisáceo o descolorido, sin tonos vivos",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 12,
+        "id_neurona": "neurona_f5_143",
+        "etapa": "features.5",
+        "delta_e_lab": 14.95,
+        "delta_L": -12.3,
+        "delta_b": 8.25,
+        "es_eje_color": false,
+        "eje_sensacion": "antiguo / nuevo",
+        "polo_predicho": "antiguo",
+        "pregunta": "¿Cuál de los dos se siente más antiguo?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "antiguo: se ve gastado y envejecido a simple vista",
+        "num_palabras_indicacion": 9
+      },
+      {
+        "orden": 13,
+        "id_neurona": "neurona_f5_285",
+        "etapa": "features.5",
+        "delta_e_lab": 13.89,
+        "delta_L": 13.1,
+        "delta_b": 4.54,
+        "es_eje_color": false,
+        "eje_sensacion": "ordenado / caótico",
+        "polo_predicho": "ordenado",
+        "pregunta": "¿Cuál de los dos se siente más ordenado?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "ordenado: a la vista las formas están alineadas en su sitio",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 14,
+        "id_neurona": "neurona_428",
+        "etapa": "features.7",
+        "delta_e_lab": 13.51,
+        "delta_L": 12.77,
+        "delta_b": 3.39,
+        "es_eje_color": false,
+        "eje_sensacion": "abierto / encerrado",
+        "polo_predicho": "abierto",
+        "pregunta": "¿Cuál de los dos se siente más abierto?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "abierto: deja respirar la vista con espacio despejado a lo ancho",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 15,
+        "id_neurona": "neurona_760",
+        "etapa": "features.7",
+        "delta_e_lab": 13.39,
+        "delta_L": -13.03,
+        "delta_b": -3.08,
+        "es_eje_color": false,
+        "eje_sensacion": "vacío / lleno",
+        "polo_predicho": "vacío",
+        "pregunta": "¿Cuál de los dos se siente más vacío?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "vacío: a la vista deja mucho fondo libre y despejado alrededor",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 16,
+        "id_neurona": "neurona_542",
+        "etapa": "features.7",
+        "delta_e_lab": 13.12,
+        "delta_L": -12.37,
+        "delta_b": -3.9,
+        "es_eje_color": false,
+        "eje_sensacion": "sólido / plano",
+        "polo_predicho": "sólido",
+        "pregunta": "¿Cuál de los dos se siente más sólido?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "sólido: se ve con bulto y volumen firme a simple vista",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 17,
+        "id_neurona": "neurona_f5_063",
+        "etapa": "features.5",
+        "delta_e_lab": 11.54,
+        "delta_L": 0.94,
+        "delta_b": -11.5,
+        "es_eje_color": true,
+        "eje_sensacion": "frío / cálido",
+        "polo_predicho": "frío",
+        "pregunta": "¿Cuál de los dos se siente más frío?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "frío: sus tonos azules o grises se sienten frescos a la vista",
+        "num_palabras_indicacion": 12
+      },
+      {
+        "orden": 18,
+        "id_neurona": "neurona_323",
+        "etapa": "features.7",
+        "delta_e_lab": 10.69,
+        "delta_L": 10.49,
+        "delta_b": 2.04,
+        "es_eje_color": false,
+        "eje_sensacion": "recto / curvo",
+        "polo_predicho": "recto",
+        "pregunta": "¿Cuál de los dos se siente más recto?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "recto: a simple vista mandan las líneas derechas y las esquinas",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 19,
+        "id_neurona": "neurona_f5_274",
+        "etapa": "features.5",
+        "delta_e_lab": 7.91,
+        "delta_L": 7.66,
+        "delta_b": -1.13,
+        "es_eje_color": false,
+        "eje_sensacion": "agitado / tranquilo",
+        "polo_predicho": "agitado",
+        "pregunta": "¿Cuál de los dos se siente más agitado?",
+        "lado_predicho_sorteado": "izquierda",
+        "polo_mas_claro": "polo_pos",
+        "polo_mas_oscuro": "polo_neg",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "agitado: se ven trazos revueltos y movidos que inquietan la vista",
+        "num_palabras_indicacion": 11
+      },
+      {
+        "orden": 20,
+        "id_neurona": "neurona_299",
+        "etapa": "features.7",
+        "delta_e_lab": 3.36,
+        "delta_L": -1.76,
+        "delta_b": -2.04,
+        "es_eje_color": false,
+        "eje_sensacion": "lejano / cercano",
+        "polo_predicho": "lejano",
+        "pregunta": "¿Cuál de los dos se siente más lejano?",
+        "lado_predicho_sorteado": "derecha",
+        "polo_mas_claro": "polo_neg",
+        "polo_mas_oscuro": "polo_pos",
+        "es_eje_solo_brillo": false,
+        "indicacion_director": "lejano: aleja la vista hacia el fondo, como mirado a distancia",
+        "num_palabras_indicacion": 11
+      }
+    ],
+    "parte_2_controles_azar_4": [
+      {
+        "id_item": "control_azar_01",
+        "pregunta": "¿Cuál de los dos se siente más sereno?",
+        "indicacion_director": "sereno: a la vista transmite calma y silencio, sin tensión visual"
+      },
+      {
+        "id_item": "control_azar_02",
+        "pregunta": "¿Cuál de los dos se siente más intenso?",
+        "indicacion_director": "intenso: golpea más fuerte la vista por su fuerza y contraste"
+      },
+      {
+        "id_item": "control_azar_03",
+        "pregunta": "¿Cuál de los dos se siente más liviano?",
+        "indicacion_director": "liviano: parece flotar a la vista, sin manchas densas ni pesadas"
+      },
+      {
+        "id_item": "control_azar_04",
+        "pregunta": "¿Cuál de los dos se siente más firme?",
+        "indicacion_director": "firme: se ve estable y bien plantado, sin formas que tiemblen"
+      }
+    ],
+    "parte_3_ponerle_nombre_6_pares": [
+      {
+        "orden": 1,
+        "id_neurona": "neurona_596",
+        "lado_polo_pos": "derecha",
+        "pregunta": "Si tuvieras que describir la diferencia en 2 o 3 palabras, ¿cuáles serían?"
+      },
+      {
+        "orden": 2,
+        "id_neurona": "neurona_328",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "Si tuvieras que describir la diferencia en 2 o 3 palabras, ¿cuáles serían?"
+      },
+      {
+        "orden": 3,
+        "id_neurona": "neurona_754",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "Si tuvieras que describir la diferencia en 2 o 3 palabras, ¿cuáles serían?"
+      },
+      {
+        "orden": 4,
+        "id_neurona": "neurona_710",
+        "lado_polo_pos": "derecha",
+        "pregunta": "Si tuvieras que describir la diferencia en 2 o 3 palabras, ¿cuáles serían?"
+      },
+      {
+        "orden": 5,
+        "id_neurona": "neurona_f5_250",
+        "lado_polo_pos": "izquierda",
+        "pregunta": "Si tuvieras que describir la diferencia en 2 o 3 palabras, ¿cuáles serían?"
+      },
+      {
+        "orden": 6,
+        "id_neurona": "neurona_233",
+        "lado_polo_pos": "derecha",
+        "pregunta": "Si tuvieras que describir la diferencia en 2 o 3 palabras, ¿cuáles serían?"
+      }
+    ]
+  }
+}
