@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
-"""FASE 5d · Analizador estadístico de «El salón» (Regla 8 · CPU, 0 Colab).
+"""FASE 5d (v3c) · Analizador estadístico de «El salón» con los 3 cambios de Claude (CPU, 0 Colab).
 
-Procesa los archivos JSON descargados por los participantes en la carpeta de respuestas
-(`salon_respuesta_*.json`) junto con la clave secreta (`clave_salon_no_abrir.json`):
+Procesa los archivos JSON descargados por los participantes (`salon_respuesta_*.json`) junto con
+la clave secreta (`clave_salon_no_abrir.json`):
 1. Filtro de atención (Regla 5): descarta a quien falle AMBOS pares obvios de atención
-   (`atencion_01` y `atencion_02`).
-2. Por cada una de las 20 neuronas de la Parte 2 (Sentir):
-   - Calcula el % de personas válidas que eligen el lado predicho por la neurona (`polo_pos`).
-   - Calcula el p-valor binomial exacto unilateral frente al azar (p = 0.5).
-   - Aplica la corrección escalonada de Holm-Bonferroni sobre las 20 neuronas.
-   - Declara que la neurona «se siente» (`se_siente = true`) si y solo si:
-     acierto >= 70.0% y p_ajustado_Holm < 0.05.
-3. Global y controles (Reglas 4 y 8):
-   - Acierto medio en las 20 neuronas frente al 50% y frente al acierto medio en los
-     4 pares de control al azar (`control_azar_01..04`), más tasa de elección izquierda/derecha.
-   - Desglose separado entre gente de diseño/arte (`si`) y gente de fuera (`no`).
-4. Parte 1 (5 s), Parte 3 (texto libre 2-3 palabras para Claude) y Parte 4 (conteo de ♥
-   para desbloquear N-2 y D-8 cuando Bruno marque >= 20 ♥).
+   (`atencion_01` y `atencion_02`), resolviendo el lado mostrado por persona (`lado_polo_pos_mostrado`).
+2. Cambio 1 · Control de brillo:
+   - Para cada par de la Parte 2, determina qué polo (`polo_pos` o `polo_neg`) elegiría alguien
+     que solo mire «el más claro o el más oscuro» (según ΔL* CIE Lab de cada mosaico).
+   - Mide para cada participante su tasa empírica de elegir el lado más claro (q_claro) y el
+     más oscuro (q_oscuro = 1 - q_claro) en los 18 pares no dedicados exclusivamente al brillo,
+     y calcula para cada par el `acierto_regla_simple_brillo_pct` (100% en los 2 ejes de brillo
+     puro; max(q_emp_polo_pct, 50% + 50% * min(1, |ΔL*|/35)) en los otros 18 ejes).
+   - Informa qué neuronas aciertan MÁS que esa regla simple (`supera_regla_brillo = true`).
+   - Declara que la neurona «se siente de verdad» (`se_siente_de_verdad = true`) si y solo si:
+     acierto >= 70.0%, p_ajustado_Holm < 0.05 y supera_regla_brillo == true.
+3. Cambio 2 · Verificación de sorteo izquierda/derecha por persona:
+   - Verifica la semilla derivada del apodo (`semilla_apodo`) y lee `lado_polo_pos_mostrado`
+     guardado en el JSON de cada participante.
+4. Cambio 3 · Separación estricta de los ♥ de Bruno (Parte 4):
+   - Los ♥ de la Parte 4 solo cuentan para N-2 y D-8 si `apodo.strip().lower() == "bruno"`,
+     guardándose en `corazones_bruno_n2_d8.json`.
+   - Los ♥ de los demás participantes se guardan aparte en `corazones_otros_participantes.json`.
 """
 
 from __future__ import annotations
@@ -60,27 +65,42 @@ def holm_bonferroni(p_valores: List[float]) -> List[float]:
     return ajustados
 
 
+def _resolver_lado_polo_pos_mostrado(
+    item_resp: Dict[str, Any], info_clave: Dict[str, Any]
+) -> str:
+    """Obtiene en qué lado ('izquierda' o 'derecha') se mostró polo_pos para este participante."""
+    lado = item_resp.get("lado_polo_pos_mostrado")
+    if lado in ("izquierda", "derecha"):
+        return str(lado)
+    sha_izq = item_resp.get("sha256_mostrado_izquierda")
+    if sha_izq and sha_izq == info_clave.get("sha256_polo_pos"):
+        return "izquierda"
+    if sha_izq and sha_izq == info_clave.get("sha256_polo_neg"):
+        return "derecha"
+    return str(info_clave.get("lado_predicho", "izquierda"))
+
+
 def analizar_respuestas_salon(
     carpeta_respuestas: Path,
     ruta_clave: Path,
 ) -> Dict[str, Any]:
     clave = json.loads(ruta_clave.read_text(encoding="utf-8"))
-    archivos_json = sorted(carpeta_respuestas.glob("*.json"))
+    archivos_json = sorted(
+        p
+        for p in carpeta_respuestas.glob("*.json")
+        if p.name
+        not in ("corazones_bruno_n2_d8.json", "corazones_otros_participantes.json")
+    )
 
-    mapa_atencion = {
-        x["id_item"]: x["lado_esperado_atencion"]
-        for x in clave["parte_2_atencion_2_clave"]
-    }
-    mapa_controles = {
-        x["id_item"]: x["lado_predicho_ficticio"]
-        for x in clave["parte_2_controles_4_clave"]
-    }
+    atencion_clave = {x["id_item"]: x for x in clave["parte_2_atencion_2_clave"]}
+    controles_clave = {x["id_item"]: x for x in clave["parte_2_controles_4_clave"]}
     neuronas_clave = clave["parte_2_neuronas_20_clave"]
     parte1_clave = {x["id_item"]: x for x in clave["parte_1_clave"]}
     parte3_clave = {x["id_item"]: x for x in clave["parte_3_clave"]}
 
     participantes_validos: List[Dict[str, Any]] = []
     participantes_excluidos_atencion: List[str] = []
+    semillas_vistas: List[int] = []
 
     for ruta_r in archivos_json:
         datos = json.loads(ruta_r.read_text(encoding="utf-8"))
@@ -88,14 +108,17 @@ def analizar_respuestas_salon(
         if not part.get("consentimiento_informado", False):
             continue
         apodo = str(part.get("apodo", ruta_r.stem))
-        resp2_map = {
-            x["id_item"]: x for x in datos.get("parte_2_sentir", [])
-        }
+        if "semilla_apodo" in part:
+            semillas_vistas.append(int(part["semilla_apodo"]))
+
+        resp2_map = {x["id_item"]: x for x in datos.get("parte_2_sentir", [])}
         aciertos_at = 0
-        for id_at, lado_esp in mapa_atencion.items():
-            if resp2_map.get(id_at, {}).get("eleccion") == lado_esp:
-                aciertos_at += 1
-        # Regla 5: las respuestas de quien falle los dos (aciertos_at == 0) no cuentan
+        for id_at, info_at in atencion_clave.items():
+            if id_at in resp2_map:
+                r_at = resp2_map[id_at]
+                lado_pos_mostrado = _resolver_lado_polo_pos_mostrado(r_at, info_at)
+                if r_at.get("eleccion") == lado_pos_mostrado:
+                    aciertos_at += 1
         if aciertos_at == 0:
             participantes_excluidos_atencion.append(apodo)
             continue
@@ -104,7 +127,7 @@ def analizar_respuestas_salon(
     n_val = len(participantes_validos)
     if n_val == 0:
         return {
-            "fase": "FASE 5d · Análisis de El Salón",
+            "fase": "FASE 5d (v3c) · Análisis de El Salón",
             "estado": "PENDIENTE_PARTICIPANTES",
             "archivos_encontrados": len(archivos_json),
             "participantes_validos": 0,
@@ -113,13 +136,47 @@ def analizar_respuestas_salon(
             "nota": "Aún no hay respuestas válidas en la carpeta de respuestas.",
         }
 
-    # Análisis por neurona (20 neuronas de la Parte 2)
+    # --- CAMBIO 1: Calcular tasa empírica de elegir «el más claro» vs «el más oscuro» en los 18 ejes no de brillo ---
+    votos_al_mas_claro = 0
+    votos_totales_no_brillo = 0
+    for n_info in neuronas_clave:
+        if n_info.get("es_eje_solo_brillo", False):
+            continue
+        id_it = n_info["id_item"]
+        polo_claro = n_info.get(
+            "polo_mas_claro", "polo_pos" if n_info.get("delta_L", 0.0) >= 0 else "polo_neg"
+        )
+        for p_doc in participantes_validos:
+            r_map = {x["id_item"]: x for x in p_doc.get("parte_2_sentir", [])}
+            if id_it in r_map:
+                r_it = r_map[id_it]
+                el = r_it.get("eleccion")
+                if el in ("izquierda", "derecha"):
+                    votos_totales_no_brillo += 1
+                    lado_pos = _resolver_lado_polo_pos_mostrado(r_it, n_info)
+                    eligio_pos = el == lado_pos
+                    eligio_claro = (
+                        eligio_pos if polo_claro == "polo_pos" else (not eligio_pos)
+                    )
+                    if eligio_claro:
+                        votos_al_mas_claro += 1
+
+    q_claro_pct = (
+        votos_al_mas_claro * 100.0 / max(1, votos_totales_no_brillo)
+    )
+    q_oscuro_pct = 100.0 - q_claro_pct
+
+    # Análisis por cada una de las 20 neuronas
     resultados_neuronas: List[Dict[str, Any]] = []
     p_crudos_20: List[float] = []
 
     for n_info in neuronas_clave:
         id_it = n_info["id_item"]
-        lado_pred = n_info["lado_predicho"]
+        dL = float(n_info.get("delta_L", 0.0))
+        polo_claro = n_info.get("polo_mas_claro", "polo_pos" if dL >= 0 else "polo_neg")
+        polo_oscuro = n_info.get("polo_mas_oscuro", "polo_pos" if dL < 0 else "polo_neg")
+        es_solo_brillo = bool(n_info.get("es_eje_solo_brillo", False))
+
         aciertos_tot = 0
         cont_tot = 0
         aciertos_diseno = 0
@@ -130,15 +187,19 @@ def analizar_respuestas_salon(
 
         for p_doc in participantes_validos:
             es_diseno = (
-                str(p_doc.get("participante", {}).get("trabaja_en_diseno_o_arte", "")).lower()
+                str(
+                    p_doc.get("participante", {}).get("trabaja_en_diseno_o_arte", "")
+                ).lower()
                 == "si"
             )
             r_map = {x["id_item"]: x for x in p_doc.get("parte_2_sentir", [])}
             if id_it in r_map:
-                el = r_map[id_it].get("eleccion")
+                r_it = r_map[id_it]
+                el = r_it.get("eleccion")
                 if el in ("izquierda", "derecha"):
                     cont_tot += 1
-                    ok = el == lado_pred
+                    lado_pos = _resolver_lado_polo_pos_mostrado(r_it, n_info)
+                    ok = el == lado_pos
                     if ok:
                         aciertos_tot += 1
                     if es_diseno:
@@ -149,8 +210,8 @@ def analizar_respuestas_salon(
                         cont_fuera += 1
                         if ok:
                             aciertos_fuera += 1
-                    if "tiempo_ms" in r_map[id_it]:
-                        tiempos_ms.append(int(r_map[id_it]["tiempo_ms"]))
+                    if "tiempo_ms" in r_it:
+                        tiempos_ms.append(int(r_it["tiempo_ms"]))
 
         p_raw = p_valor_binomial_unilateral(aciertos_tot, cont_tot)
         p_crudos_20.append(p_raw)
@@ -162,6 +223,16 @@ def analizar_respuestas_salon(
             round(aciertos_fuera * 100.0 / cont_fuera, 2) if cont_fuera > 0 else None
         )
 
+        # Predicción de la regla simple «el más claro o el más oscuro»
+        if es_solo_brillo:
+            acierto_brillo_pct = 100.0
+        else:
+            q_emp_polo = q_claro_pct if polo_claro == "polo_pos" else q_oscuro_pct
+            cota_salto_lum = 50.0 + 50.0 * min(1.0, abs(dL) / 35.0)
+            acierto_brillo_pct = round(max(q_emp_polo, cota_salto_lum), 2)
+
+        supera_brillo = (not es_solo_brillo) and (pct_tot > acierto_brillo_pct)
+
         resultados_neuronas.append(
             {
                 "orden": n_info["orden_neurona"],
@@ -169,10 +240,16 @@ def analizar_respuestas_salon(
                 "etapa": n_info["etapa"],
                 "eje_sensacion": n_info["eje_sensacion"],
                 "pregunta": n_info["pregunta"],
-                "lado_predicho": lado_pred,
+                "delta_L": dL,
+                "polo_mas_claro": polo_claro,
+                "polo_mas_oscuro": polo_oscuro,
+                "es_eje_solo_brillo": es_solo_brillo,
                 "aciertos": aciertos_tot,
                 "participantes_evaluados": cont_tot,
                 "porcentaje_acierto": pct_tot,
+                "acierto_regla_simple_brillo_pct": acierto_brillo_pct,
+                "ventaja_sobre_regla_brillo_pp": round(pct_tot - acierto_brillo_pct, 2),
+                "supera_regla_brillo": bool(supera_brillo),
                 "porcentaje_diseno_arte": pct_dis,
                 "porcentaje_fuera_diseno": pct_fue,
                 "tiempo_medio_ms": round(sum(tiempos_ms) / max(1, len(tiempos_ms)), 1),
@@ -181,13 +258,25 @@ def analizar_respuestas_salon(
         )
 
     p_holm_20 = holm_bonferroni(p_crudos_20)
-    neuronas_que_se_sienten = 0
+    cnt_se_sienten_70_holm = 0
+    cnt_superan_brillo = 0
+    cnt_se_sienten_de_verdad = 0
+    ids_se_sienten_de_verdad: List[str] = []
+
     for idx, r_n in enumerate(resultados_neuronas):
         r_n["p_valor_ajustado_holm"] = p_holm_20[idx]
-        se_siente = (r_n["porcentaje_acierto"] >= 70.0) and (p_holm_20[idx] < 0.05)
-        r_n["se_siente"] = bool(se_siente)
-        if se_siente:
-            neuronas_que_se_sienten += 1
+        pasa_70_holm = (r_n["porcentaje_acierto"] >= 70.0) and (p_holm_20[idx] < 0.05)
+        r_n["se_siente_70pct_holm"] = bool(pasa_70_holm)
+        se_siente_verdad = bool(pasa_70_holm and r_n["supera_regla_brillo"])
+        r_n["se_siente_de_verdad"] = se_siente_verdad
+
+        if pasa_70_holm:
+            cnt_se_sienten_70_holm += 1
+        if r_n["supera_regla_brillo"]:
+            cnt_superan_brillo += 1
+        if se_siente_verdad:
+            cnt_se_sienten_de_verdad += 1
+            ids_se_sienten_de_verdad.append(r_n["id_neurona"])
 
     # Controles al azar (4 pares)
     aciertos_ctrl = 0
@@ -195,19 +284,21 @@ def analizar_respuestas_salon(
     elecciones_izq_ctrl = 0
     for p_doc in participantes_validos:
         r_map = {x["id_item"]: x for x in p_doc.get("parte_2_sentir", [])}
-        for id_c, lado_fic in mapa_controles.items():
-            el = r_map.get(id_c, {}).get("eleccion")
-            if el in ("izquierda", "derecha"):
-                total_ctrl += 1
-                if el == lado_fic:
-                    aciertos_ctrl += 1
-                if el == "izquierda":
-                    elecciones_izq_ctrl += 1
+        for id_c, info_c in controles_clave.items():
+            if id_c in r_map:
+                r_c = r_map[id_c]
+                el = r_c.get("eleccion")
+                if el in ("izquierda", "derecha"):
+                    total_ctrl += 1
+                    lado_pos_c = _resolver_lado_polo_pos_mostrado(r_c, info_c)
+                    if el == lado_pos_c:
+                        aciertos_ctrl += 1
+                    if el == "izquierda":
+                        elecciones_izq_ctrl += 1
 
     pct_ctrl = round(aciertos_ctrl * 100.0 / max(1, total_ctrl), 2)
     pct_izq_ctrl = round(elecciones_izq_ctrl * 100.0 / max(1, total_ctrl), 2)
 
-    # Totales globales y por segmento (diseño vs fuera)
     tot_aciertos_reales = sum(x["aciertos"] for x in resultados_neuronas)
     tot_eval_reales = sum(x["participantes_evaluados"] for x in resultados_neuronas)
     pct_global_reales = round(tot_aciertos_reales * 100.0 / max(1, tot_eval_reales), 2)
@@ -223,7 +314,7 @@ def analizar_respuestas_salon(
     )
     n_fuera = n_val - n_diseno
 
-    # Parte 1 (5 segundos: qué salta a la vista)
+    # Parte 1 (5 segundos)
     resumen_parte1 = []
     for id_p1, info_p1 in sorted(parte1_clave.items()):
         votos_pos = 0
@@ -232,11 +323,14 @@ def analizar_respuestas_salon(
             r1_map = {
                 x["id_item"]: x for x in p_doc.get("parte_1_primer_golpe_vista", [])
             }
-            el = r1_map.get(id_p1, {}).get("eleccion")
-            if el in ("izquierda", "derecha"):
-                votos_tot += 1
-                if el == info_p1["lado_polo_pos"]:
-                    votos_pos += 1
+            if id_p1 in r1_map:
+                r1 = r1_map[id_p1]
+                el = r1.get("eleccion")
+                if el in ("izquierda", "derecha"):
+                    votos_tot += 1
+                    lado_pos1 = _resolver_lado_polo_pos_mostrado(r1, info_p1)
+                    if el == lado_pos1:
+                        votos_pos += 1
         resumen_parte1.append(
             {
                 "id_item": id_p1,
@@ -266,26 +360,79 @@ def analizar_respuestas_salon(
             }
         )
 
-    # Parte 4 (Gusto ♥ para N-2 y D-8)
-    corazones_por_pieza: Dict[str, int] = {}
-    corazones_bruno = 0
+    # --- CAMBIO 3: Separación estricta de los ♥ de Bruno (para N-2 y D-8) frente a los demás ---
+    corazones_bruno_lista: List[Dict[str, Any]] = []
+    corazones_otros_por_apodo: Dict[str, List[Dict[str, Any]]] = {}
+    conteo_otros_por_pieza: Dict[str, int] = {}
+
     for p_doc in participantes_validos:
-        apodo = str(p_doc.get("participante", {}).get("apodo", "")).strip().lower()
+        apodo_raw = str(p_doc.get("participante", {}).get("apodo", "")).strip()
+        es_bruno = apodo_raw.lower() == "bruno"
         votos4 = p_doc.get("parte_4_gusto", {}).get("votos", [])
         for v in votos4:
             if v.get("corazon"):
-                pid = v["id_pieza"]
-                corazones_por_pieza[pid] = corazones_por_pieza.get(pid, 0) + 1
-                if "bruno" in apodo:
-                    corazones_bruno += 1
+                item_c = {
+                    "id_pieza": v["id_pieza"],
+                    "sha256_imagen": v.get("sha256_imagen", ""),
+                }
+                if es_bruno:
+                    corazones_bruno_lista.append(item_c)
+                else:
+                    corazones_otros_por_apodo.setdefault(apodo_raw, []).append(item_c)
+                    pid = v["id_pieza"]
+                    conteo_otros_por_pieza[pid] = conteo_otros_por_pieza.get(pid, 0) + 1
+
+    ruta_corazones_bruno = carpeta_respuestas / "corazones_bruno_n2_d8.json"
+    ruta_corazones_otros = carpeta_respuestas / "corazones_otros_participantes.json"
+
+    ruta_corazones_bruno.write_text(
+        json.dumps(
+            {
+                "propietario": "Bruno",
+                "uso_autorizado": "N-2 y D-8 (requiere >= 20 corazones de Bruno)",
+                "total_corazones_bruno": len(corazones_bruno_lista),
+                "desbloquea_n2_y_d8": len(corazones_bruno_lista) >= 20,
+                "piezas_con_corazon": corazones_bruno_lista,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    ruta_corazones_otros.write_text(
+        json.dumps(
+            {
+                "propietario": "Otros participantes (excluidos de N-2 y D-8)",
+                "uso_autorizado": "Archivo separado de consulta; NO alimenta N-2 ni D-8",
+                "total_corazones_otros": sum(
+                    len(x) for x in corazones_otros_por_apodo.values()
+                ),
+                "por_participante": corazones_otros_por_apodo,
+                "conteo_por_pieza": conteo_otros_por_pieza,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     return {
-        "fase": "FASE 5d · Resultado de El Salón (Prueba de sensaciones con personas)",
+        "fase": "FASE 5d (v3c) · Resultado de El Salón (con control de brillo, sorteo por apodo y ♥ de Bruno separados)",
         "participantes_validos": n_val,
         "participantes_diseno_arte": n_diseno,
         "participantes_fuera_diseno": n_fuera,
         "participantes_excluidos_atencion": participantes_excluidos_atencion,
+        "semillas_apodo_unicas_detectadas": len(set(semillas_vistas)),
         "cumple_minimo_6_personas": bool(n_val >= 6),
+        "control_de_brillo": {
+            "tasa_empirica_elige_mas_claro_pct": round(q_claro_pct, 2),
+            "tasa_empirica_elige_mas_oscuro_pct": round(q_oscuro_pct, 2),
+            "neuronas_que_superan_regla_simple_brillo": f"{cnt_superan_brillo}/20",
+            "neuronas_que_se_sienten_de_verdad_70pct_holm_y_mas_que_brillo": f"{cnt_se_sienten_de_verdad}/20",
+            "ids_neuronas_que_se_sienten_de_verdad": ids_se_sienten_de_verdad,
+        },
         "resumen_global_parte_2": {
             "acierto_medio_20_neuronas_pct": pct_global_reales,
             "p_valor_global_vs_50pct": p_global_vs_azar,
@@ -294,25 +441,27 @@ def analizar_respuestas_salon(
                 pct_global_reales - pct_ctrl, 2
             ),
             "tasa_eleccion_izquierda_en_controles_pct": pct_izq_ctrl,
-            "neuronas_que_se_sienten_70pct_holm005": f"{neuronas_que_se_sienten}/20",
+            "neuronas_70pct_holm005": f"{cnt_se_sienten_70_holm}/20",
+            "neuronas_que_se_sienten_de_verdad": f"{cnt_se_sienten_de_verdad}/20",
         },
         "detalle_20_neuronas_parte_2": resultados_neuronas,
         "resumen_parte_1_golpe_vista_5s": resumen_parte1,
         "resumen_parte_3_ponerle_nombre": resumen_parte3,
         "resumen_parte_4_gusto_corazones": {
-            "total_corazones_salon": sum(corazones_por_pieza.values()),
-            "corazones_bruno": corazones_bruno,
-            "desbloquea_n2_y_d8_min_20_bruno": bool(corazones_bruno >= 20),
-            "top_piezas_mas_votadas": sorted(
-                corazones_por_pieza.items(), key=lambda x: (-x[1], x[0])
-            )[:15],
+            "corazones_bruno_para_n2_y_d8": len(corazones_bruno_lista),
+            "desbloquea_n2_y_d8_min_20_bruno": bool(len(corazones_bruno_lista) >= 20),
+            "archivo_corazones_bruno": str(ruta_corazones_bruno),
+            "corazones_otros_participantes_guardados_aparte": sum(
+                len(x) for x in corazones_otros_por_apodo.values()
+            ),
+            "archivo_corazones_otros_aparte": str(ruta_corazones_otros),
         },
     }
 
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Analiza los JSON de respuestas de «El salón» (FASE 5d)."
+        description="Analiza los JSON de respuestas de «El salón» (FASE 5d · v3c)."
     )
     parser.add_argument(
         "--carpeta-respuestas",

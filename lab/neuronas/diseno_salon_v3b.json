@@ -1,12 +1,13 @@
 {
-  "fase": "FASE 5d · Diseño público de El Salón (sin imágenes ni respuestas secretas)",
+  "fase": "FASE 5d (v3c) · Diseño público de El Salón (con los 3 cambios condicionales de Claude)",
   "sha256_prerregistro_v3b": "0d110469817fd5fff8ec8473adc0f587d7b5f2da2a1e14f06d06883b8084ecfa",
-  "semilla_salon": 2810,
+  "sha256_prerregistro_v3c": "90e0aa75132c4742bf6dac453dc3f830e39f8748b8e71e394b43d8487ea11bd5",
+  "semilla_base_salon": 2810,
   "ruta_html_local": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/salon_sensaciones.html",
-  "sha256_html_local": "6b27e8e1e57d88a2e37fab5c69f17744f3db1ddfdc5dd303a7ba72deeeb30f1f",
-  "tamano_bytes_html_local": 3190741,
+  "sha256_html_local": "13ae3e6fdbe74e4eba814ca61a1cb4251867bf6b85ec69269bb43952d0f1a0af",
+  "tamano_bytes_html_local": 3202000,
   "ruta_clave_secreta_local": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/clave_salon_no_abrir.json",
-  "sha256_clave_secreta_local": "a91af3ffc7942816974544f7d85fa66180ce280b60a3afd56fece337b6eb1d99",
+  "sha256_clave_secreta_local": "32527bae4de639eca0fc32d9240fde3c201fe0b5784a50eea41cd009fd773442",
   "carpeta_respuestas_participantes": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/respuestas",
   "resumen_items": {
     "parte_1_golpe_vista_5s": 12,
@@ -24,9 +25,8 @@
       "eje_sensacion": "oscuro / luminoso",
       "pregunta": "¿Cuál de los dos se siente más oscuro?",
       "delta_e_lab": 29.62,
-      "lado_predicho": "izquierda",
       "ruta_captura": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/ejemplos_claude/captura_par_01_neurona_f5_025.png",
-      "sha256_captura": "cb52fd739babc86183a0abb04ffd2671c1cff8a193a6ff7fb0253a858b6526d6"
+      "sha256_captura": "1dd569972b4139b247c325f7d63d7f2304849ea4807dc1a1af758729f55d444f"
     },
     {
       "ejemplo": 2,
@@ -34,9 +34,8 @@
       "eje_sensacion": "cálido / frío",
       "pregunta": "¿Cuál de los dos se siente más cálido?",
       "delta_e_lab": 28.29,
-      "lado_predicho": "derecha",
       "ruta_captura": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/ejemplos_claude/captura_par_02_neurona_f5_180.png",
-      "sha256_captura": "20927483dc3f7df0bca22abd5fbd6cb7e76c1fab422d2ca9424176b7d5e99f2d"
+      "sha256_captura": "39f95e55f6ef32c19c506a37c5589d423322d18869af3a61a8b1f4ddf8892d90"
     },
     {
       "ejemplo": 3,
@@ -44,9 +43,8 @@
       "eje_sensacion": "ligero / pesado",
       "pregunta": "¿Cuál de los dos se siente más ligero?",
       "delta_e_lab": 25.7,
-      "lado_predicho": "izquierda",
       "ruta_captura": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/ejemplos_claude/captura_par_03_neurona_727.png",
-      "sha256_captura": "e76a974eff16475dba2e7d5e5a0bc3843bff5e4d7426cb523345965f167d305c"
+      "sha256_captura": "611ba958b7e642bea2b0818cc23c8e2888a9f7ca3b223c75b8ffcf0b4b614d3d"
     }
   ]
 }
