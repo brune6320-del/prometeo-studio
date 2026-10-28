@@ -1,0 +1,52 @@
+{
+  "fase": "FASE 5d · Diseño público de El Salón (sin imágenes ni respuestas secretas)",
+  "sha256_prerregistro_v3b": "0d110469817fd5fff8ec8473adc0f587d7b5f2da2a1e14f06d06883b8084ecfa",
+  "semilla_salon": 2810,
+  "ruta_html_local": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/salon_sensaciones.html",
+  "sha256_html_local": "6b27e8e1e57d88a2e37fab5c69f17744f3db1ddfdc5dd303a7ba72deeeb30f1f",
+  "tamano_bytes_html_local": 3190741,
+  "ruta_clave_secreta_local": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/clave_salon_no_abrir.json",
+  "sha256_clave_secreta_local": "a91af3ffc7942816974544f7d85fa66180ce280b60a3afd56fece337b6eb1d99",
+  "carpeta_respuestas_participantes": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/respuestas",
+  "resumen_items": {
+    "parte_1_golpe_vista_5s": 12,
+    "parte_2_neuronas_reales": 20,
+    "parte_2_controles_azar": 4,
+    "parte_2_controles_atencion": 2,
+    "parte_2_total_presentados": 26,
+    "parte_3_ponerle_nombre": 6,
+    "parte_4_gusto_imagenes": 40
+  },
+  "tres_capturas_para_visto_bueno_claude": [
+    {
+      "ejemplo": 1,
+      "id_neurona": "neurona_f5_025",
+      "eje_sensacion": "oscuro / luminoso",
+      "pregunta": "¿Cuál de los dos se siente más oscuro?",
+      "delta_e_lab": 29.62,
+      "lado_predicho": "izquierda",
+      "ruta_captura": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/ejemplos_claude/captura_par_01_neurona_f5_025.png",
+      "sha256_captura": "cb52fd739babc86183a0abb04ffd2671c1cff8a193a6ff7fb0253a858b6526d6"
+    },
+    {
+      "ejemplo": 2,
+      "id_neurona": "neurona_f5_180",
+      "eje_sensacion": "cálido / frío",
+      "pregunta": "¿Cuál de los dos se siente más cálido?",
+      "delta_e_lab": 28.29,
+      "lado_predicho": "derecha",
+      "ruta_captura": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/ejemplos_claude/captura_par_02_neurona_f5_180.png",
+      "sha256_captura": "20927483dc3f7df0bca22abd5fbd6cb7e76c1fab422d2ca9424176b7d5e99f2d"
+    },
+    {
+      "ejemplo": 3,
+      "id_neurona": "neurona_727",
+      "eje_sensacion": "ligero / pesado",
+      "pregunta": "¿Cuál de los dos se siente más ligero?",
+      "delta_e_lab": 25.7,
+      "lado_predicho": "izquierda",
+      "ruta_captura": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/ejemplos_claude/captura_par_03_neurona_727.png",
+      "sha256_captura": "e76a974eff16475dba2e7d5e5a0bc3843bff5e4d7426cb523345965f167d305c"
+    }
+  ]
+}
