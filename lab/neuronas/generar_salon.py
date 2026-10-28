@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
-"""FASE 5d (v3c) · «El salón»: generador con visto bueno condicional de Claude (CPU, 0 Colab).
+"""FASE 5d (v3d.1) · «El salón»: generador con indicaciones de director y botón «Ninguno» (CPU, 0 Colab).
 
-Lee lab/neuronas/prerregistro_v3c.json (sha256 = 90e0aa75...) y genera:
+Lee lab/neuronas/prerregistro_v3d.json (v3d.1, sha256 = a857ecf0...) y genera:
 1. Un único archivo HTML móvil y autocontenido (sin internet, apto para WhatsApp/AirDrop) en:
    ~/Desktop/REFERENTES/el-salon/salon_sensaciones.html
-   con los tres cambios condicionales de Claude:
-   - Cambio 1 (Control de brillo): guarda en la clave secreta el ΔL* (CIE Lab) y qué polo
-     (`polo_pos` o `polo_neg`) es el más claro y cuál el más oscuro para cada par.
-   - Cambio 2 (Sorteo izquierda/derecha por persona desde el apodo): la página calcula una
-     semilla determinista FNV-1a a partir del `apodo` + 2810 y sortea con PRNG `mulberry32`
-     la posición izquierda/derecha de forma equilibrada (10/10 en las 20 neuronas, 2/2 en
-     controles, 1/1 en atención, 6/6 en Parte 1, 3/3 en Parte 3) para cada persona, guardando
-     en el JSON descargado `semilla_apodo`, `lado_polo_pos_mostrado`,
-     `sha256_mostrado_izquierda`, `sha256_mostrado_derecha` y `eleccion`.
-   - Cambio 3 (♥ de Bruno separados de los demás): etiqueta explícitamente en el JSON si el
-     participante es Bruno (`es_bruno_n2_d8`) para que `analizar_salon.py` cuente para N-2 y
-     D-8 exclusivamente los ♥ de Bruno y guarde los de los demás en archivo aparte.
+   incorporando todos los requisitos de v3c y v3d.1:
+   - Parte 1: pregunta «¿Cuál te llamó más la atención?» y debajo «No hay respuesta correcta:
+     elige por instinto».
+   - Partes 1 y 2: tercer botón en el centro, «Ninguno / se sienten igual» (`eleccion = "ninguno"`).
+   - Parte 2: debajo de cada pregunta muestra la `indicacion_director` de <= 12 palabras sellada
+     en v3d.1 (incluidas las enmiendas #2 cálido, #10 pesado y #12 antiguo).
+   - Sorteo izquierda/derecha por persona con semilla FNV-1a derivada del apodo y registro de
+     `lado_polo_pos_mostrado` en el JSON.
+   - Separación de los ♥ de Bruno frente a los demás participantes.
 2. La clave secreta en ~/Desktop/REFERENTES/el-salon/clave_salon_no_abrir.json.
-3. Las 3 capturas de muestra en ~/Desktop/REFERENTES/el-salon/ejemplos_claude/.
+3. Las 3 capturas de muestra actualizadas en ~/Desktop/REFERENTES/el-salon/ejemplos_claude/.
 4. El manifiesto público `lab/neuronas/diseno_salon_v3b.json` en Git.
 """
 
@@ -42,6 +39,9 @@ SHA256_PRERREG_V3B_ESPERADO = (
 )
 SHA256_PRERREG_V3C_ESPERADO = (
     "90e0aa75132c4742bf6dac453dc3f830e39f8748b8e71e394b43d8487ea11bd5"
+)
+SHA256_PRERREG_V3D_ESPERADO = (
+    "a857ecf0b6644d825dc986ab312bbcf3a8ca54c4d8eb988cba63f4f7a8234ad4"
 )
 
 
@@ -153,6 +153,7 @@ def _guardar_captura_par_claude(
     ruta_png: Path,
     num_ejemplo: int,
     pregunta: str,
+    indicacion: str,
     eje: str,
     id_neurona: str,
     delta_e: float,
@@ -161,7 +162,7 @@ def _guardar_captura_par_claude(
     img_der: Image.Image,
 ) -> str:
     W = 720
-    H = 470
+    H = 490
     lienzo = Image.new("RGB", (W, H), (17, 19, 24))
     draw = ImageDraw.Draw(lienzo)
     font = ImageFont.load_default()
@@ -177,38 +178,44 @@ def _guardar_captura_par_claude(
             pass
 
     draw.rounded_rectangle(
-        [16, 14, W - 16, 86],
+        [16, 12, W - 16, 102],
         radius=10,
         fill=(27, 31, 39),
         outline=(46, 52, 64),
         width=1,
     )
     draw.text(
-        (32, 22),
-        f"EL SALÓN · Parte 2 (Sentir) · Ejemplo #{num_ejemplo} para revisión de Claude",
+        (32, 18),
+        f"EL SALÓN (v3d.1) · Parte 2 (Sentir) · Ejemplo #{num_ejemplo}",
         fill=(136, 192, 208),
         font=font,
     )
     draw.text(
-        (32, 43),
-        f"Pregunta en pantalla: «{pregunta}»",
+        (32, 38),
+        f"Pregunta: «{pregunta}»",
         fill=(236, 239, 244),
         font=font,
     )
     draw.text(
-        (32, 64),
-        f"[Eje: {eje} | Neurona: {id_neurona} | Contraste CIE Lab dE={delta_e:.2f} | Predice: {lado_predicho.upper()}]",
+        (32, 58),
+        f"Indicación: «{indicacion}»",
+        fill=(235, 203, 139),
+        font=font,
+    )
+    draw.text(
+        (32, 78),
+        f"[Eje: {eje} | Neurona: {id_neurona} | CIE Lab dE={delta_e:.2f} | Predice: {lado_predicho.upper()}]",
         fill=(163, 190, 140),
         font=font,
     )
 
-    tam_m = 304
+    tam_m = 296
     izq_res = img_izq.resize((tam_m, tam_m), Image.Resampling.BILINEAR)
     der_res = img_der.resize((tam_m, tam_m), Image.Resampling.BILINEAR)
 
     x_izq = 34
     x_der = W - 34 - tam_m
-    y_mos = 104
+    y_mos = 114
 
     lienzo.paste(izq_res, (x_izq, y_mos))
     lienzo.paste(der_res, (x_der, y_mos))
@@ -226,40 +233,46 @@ def _guardar_captura_par_claude(
         width=2,
     )
 
+    # 3 botones inferiores: Izquierda | Ninguno / se sienten igual | Derecha
+    y_btn = y_mos + tam_m + 14
     draw.rounded_rectangle(
-        [x_izq, y_mos + tam_m + 12, x_izq + tam_m, H - 14],
+        [34, y_btn, 224, H - 14],
         radius=8,
         fill=(37, 43, 55),
         outline=col_izq,
         width=1,
     )
+    draw.text((76, y_btn + 18), "👈 Izquierda", fill=(236, 239, 244), font=font)
+
+    draw.rounded_rectangle(
+        [238, y_btn, 482, H - 14],
+        radius=8,
+        fill=(30, 35, 45),
+        outline=(129, 161, 193),
+        width=1,
+    )
     draw.text(
-        (x_izq + 92, y_mos + tam_m + 24),
-        "Opción A · IZQUIERDA",
-        fill=(236, 239, 244),
+        (265, y_btn + 18),
+        "Ninguno / se sienten igual",
+        fill=(216, 222, 233),
         font=font,
     )
 
     draw.rounded_rectangle(
-        [x_der, y_mos + tam_m + 12, x_der + tam_m, H - 14],
+        [496, y_btn, W - 34, H - 14],
         radius=8,
         fill=(37, 43, 55),
         outline=col_der,
         width=1,
     )
-    draw.text(
-        (x_der + 98, y_mos + tam_m + 24),
-        "Opción B · DERECHA",
-        fill=(236, 239, 244),
-        font=font,
-    )
+    draw.text((544, y_btn + 18), "Derecha 👉", fill=(236, 239, 244), font=font)
 
     ruta_png.parent.mkdir(parents=True, exist_ok=True)
     lienzo.save(ruta_png, format="PNG")
     return hashlib.sha256(ruta_png.read_bytes()).hexdigest()
 
 
-def _construir_html_salon_v3c(
+def _construir_html_salon_v3d(
     ruta_html: Path,
     parte1_raw: List[Dict[str, Any]],
     neuronas20_raw: List[Dict[str, Any]],
@@ -285,7 +298,7 @@ def _construir_html_salon_v3c(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>El Salón · Prueba de Sensaciones Visuales (v3c)</title>
+<title>El Salón · Prueba de Sensaciones Visuales (v3d.1)</title>
 <style>
   :root {{
     --bg: #111318;
@@ -294,6 +307,7 @@ def _construir_html_salon_v3c(
     --text: #eceff4;
     --muted: #a3abb8;
     --accent: #88c0d0;
+    --warn: #ebcb8b;
     --ok: #a3be8c;
     --heart: #bf616a;
   }}
@@ -325,7 +339,17 @@ def _construir_html_salon_v3c(
     border-left: 4px solid var(--accent);
     padding: 12px 14px;
     border-radius: 8px;
-    margin: 10px 0 14px 0;
+    margin: 10px 0 8px 0;
+  }}
+  .director-note {{
+    font-size: 14px;
+    color: var(--warn);
+    background: #171a22;
+    border: 1px solid #353c4a;
+    border-radius: 8px;
+    padding: 8px 12px;
+    margin: 0 0 12px 0;
+    font-weight: 500;
   }}
   .pair-grid {{
     display: grid;
@@ -364,6 +388,25 @@ def _construir_html_salon_v3c(
     background: #252b37;
     color: var(--text);
     width: 100%;
+  }}
+  .center-neutral-wrap {{
+    margin-top: 10px;
+    text-align: center;
+  }}
+  .btn-ninguno {{
+    background: #232834;
+    color: #d8dee9;
+    border: 1px solid #4c566a;
+    padding: 11px 18px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    width: 100%;
+    cursor: pointer;
+  }}
+  .btn-ninguno:active {{
+    border-color: var(--accent);
+    background: #2b3242;
   }}
   .btn-primary {{
     background: var(--accent);
@@ -632,6 +675,9 @@ function render() {{
             <span class="side-label">Derecha 👉</span>
           </div>
         </div>
+        <div class="center-neutral-wrap">
+          <button class="btn-ninguno" onclick="responderParte1('ninguno')">Ninguno / se sienten igual</button>
+        </div>
       </div>
     `;
     return;
@@ -646,6 +692,7 @@ function render() {{
           <span>Par ${{state.idx2 + 1}} / ${{DATA.parte2.length}}</span>
         </div>
         <div class="question-box">${{item.pregunta}}</div>
+        <div class="director-note">${{item.indicacion_director}}</div>
         <div class="pair-grid">
           <div class="mosaic-btn" onclick="responderParte2('izquierda')">
             <img src="data:image/jpeg;base64,${{item.b64_izquierda}}" alt="Izquierda">
@@ -655,6 +702,9 @@ function render() {{
             <img src="data:image/jpeg;base64,${{item.b64_derecha}}" alt="Derecha">
             <span class="side-label">Derecha 👉</span>
           </div>
+        </div>
+        <div class="center-neutral-wrap">
+          <button class="btn-ninguno" onclick="responderParte2('ninguno')">Ninguno / se sienten igual</button>
         </div>
       </div>
     `;
@@ -791,6 +841,7 @@ function responderParte2(lado) {{
     id_item: item.id_item,
     tipo_item: item.tipo_item,
     pregunta: item.pregunta,
+    indicacion_director: item.indicacion_director,
     semilla_apodo: state.semilla_apodo,
     lado_polo_pos_mostrado: item.lado_polo_pos_mostrado,
     sha256_mostrado_izquierda: item.sha256_mostrado_izquierda,
@@ -858,8 +909,8 @@ function actualizarCierre(val) {{
 function construirResultadoFinal() {{
   const esBruno = (state.apodo || "").trim().toLowerCase() === "bruno";
   return {{
-    fase: "FASE 5d · El Salón (Prueba de sensaciones con personas · v3c)",
-    version_prerregistro: "3.2.0 (v3c)",
+    fase: "FASE 5d · El Salón (Prueba de sensaciones con personas · v3d.1)",
+    version_prerregistro: "3.3.1 (v3d.1)",
     fecha_iso: new Date().toISOString(),
     participante: {{
       apodo: state.apodo,
@@ -929,6 +980,7 @@ render();
 
 
 def generar_salon(
+    ruta_prerregistro_v3d: Path,
     ruta_prerregistro_v3c: Path,
     ruta_prerregistro_v3b: Path,
     ruta_corpus_json: Path,
@@ -937,6 +989,11 @@ def generar_salon(
     carpeta_atlas_f5: Path,
     carpeta_salida_salon: Path,
 ) -> Dict[str, Any]:
+    sha_v3d = hashlib.sha256(ruta_prerregistro_v3d.read_bytes()).hexdigest()
+    if sha_v3d != SHA256_PRERREG_V3D_ESPERADO:
+        raise ValueError(
+            f"SHA-256 de prerregistro_v3d.json alterado: {sha_v3d} != {SHA256_PRERREG_V3D_ESPERADO}"
+        )
     sha_v3c = hashlib.sha256(ruta_prerregistro_v3c.read_bytes()).hexdigest()
     if sha_v3c != SHA256_PRERREG_V3C_ESPERADO:
         raise ValueError(
@@ -948,7 +1005,7 @@ def generar_salon(
             f"SHA-256 de prerregistro_v3b.json alterado: {sha_v3b} != {SHA256_PRERREG_V3B_ESPERADO}"
         )
 
-    prerreg = json.loads(ruta_prerregistro_v3c.read_text(encoding="utf-8"))
+    prerreg = json.loads(ruta_prerregistro_v3d.read_text(encoding="utf-8"))
     seed_salon = int(prerreg["semilla_base_salon"])
     corpus_items = json.loads(ruta_corpus_json.read_text(encoding="utf-8"))["imagenes"]
 
@@ -1012,7 +1069,7 @@ def generar_salon(
     # Parte 1: 12 pares (Primer golpe de vista, 5 s)
     parte1_raw: List[Dict[str, Any]] = []
     clave_parte1: List[Dict[str, Any]] = []
-    for item1 in prerreg["estructura_sesion_v3c"][
+    for item1 in prerreg["estructura_sesion_v3d"][
         "parte_1_primer_golpe_vista_12_pares"
     ]:
         b64_p, b64_n, sha_p, sha_n, _, _, dL = armar_polos_neurona(item1["id_neurona"])
@@ -1039,14 +1096,14 @@ def generar_salon(
             }
         )
 
-    # Parte 2: 20 neuronas reales
+    # Parte 2: 20 neuronas reales con su indicación de director v3d.1
     neuronas20_raw: List[Dict[str, Any]] = []
     clave_neuronas_20: List[Dict[str, Any]] = []
     dir_ejemplos_claude = carpeta_salida_salon / "ejemplos_claude"
     dir_ejemplos_claude.mkdir(parents=True, exist_ok=True)
     capturas_claude: List[Dict[str, Any]] = []
 
-    for item2 in prerreg["estructura_sesion_v3c"]["parte_2_sentir_20_neuronas"]:
+    for item2 in prerreg["estructura_sesion_v3d"]["parte_2_sentir_20_neuronas"]:
         b64_p, b64_n, sha_p, sha_n, pil_p, pil_n, dL = armar_polos_neurona(
             item2["id_neurona"]
         )
@@ -1056,6 +1113,7 @@ def generar_salon(
                 "id_item": id_it,
                 "tipo_item": "neurona_real",
                 "pregunta": item2["pregunta"],
+                "indicacion_director": item2["indicacion_director"],
                 "b64_polo_pos": b64_p,
                 "b64_polo_neg": b64_n,
                 "sha256_polo_pos": sha_p,
@@ -1071,6 +1129,7 @@ def generar_salon(
                 "etapa": item2["etapa"],
                 "eje_sensacion": item2["eje_sensacion"],
                 "pregunta": item2["pregunta"],
+                "indicacion_director": item2["indicacion_director"],
                 "delta_e_lab": item2["delta_e_lab"],
                 "delta_L": dL,
                 "polo_mas_claro": item2["polo_mas_claro"],
@@ -1092,6 +1151,7 @@ def generar_salon(
                 ruta_cap,
                 num_ejemplo=item2["orden"],
                 pregunta=item2["pregunta"],
+                indicacion=item2["indicacion_director"],
                 eje=item2["eje_sensacion"],
                 id_neurona=item2["id_neurona"],
                 delta_e=item2["delta_e_lab"],
@@ -1105,34 +1165,32 @@ def generar_salon(
                     "id_neurona": item2["id_neurona"],
                     "eje_sensacion": item2["eje_sensacion"],
                     "pregunta": item2["pregunta"],
+                    "indicacion_director": item2["indicacion_director"],
                     "delta_e_lab": item2["delta_e_lab"],
                     "ruta_captura": str(ruta_cap),
                     "sha256_captura": sha_cap,
                 }
             )
 
-    # 4 Controles al azar (Regla 4)
+    # 4 Controles al azar (Regla 4) con sus indicaciones de director
     rng_ctrl = np.random.default_rng(seed_salon + 400)
-    preguntas_ctrl = [
-        "¿Cuál de los dos se siente más sereno?",
-        "¿Cuál de los dos se siente más intenso?",
-        "¿Cuál de los dos se siente más liviano?",
-        "¿Cuál de los dos se siente más firme?",
-    ]
     controles4_raw: List[Dict[str, Any]] = []
     clave_controles_4: List[Dict[str, Any]] = []
-    for idx_c, preg_c in enumerate(preguntas_ctrl, start=1):
+    for ctrl_cfg in prerreg["estructura_sesion_v3d"]["parte_2_controles_azar_4"]:
+        id_it = ctrl_cfg["id_item"]
+        preg_c = ctrl_cfg["pregunta"]
+        ind_c = ctrl_cfg["indicacion_director"]
         sel_18 = rng_ctrl.choice(train_ids, size=18, replace=False)
         ids_a = list(sel_18[:9])
         ids_b = list(sel_18[9:])
         b_a, sha_a, _ = _renderizar_mosaico_3x3_jpeg([imagenes_224[i] for i in ids_a])
         b_b, sha_b, _ = _renderizar_mosaico_3x3_jpeg([imagenes_224[i] for i in ids_b])
-        id_it = f"control_azar_{idx_c:02d}"
         controles4_raw.append(
             {
                 "id_item": id_it,
                 "tipo_item": "control_azar",
                 "pregunta": preg_c,
+                "indicacion_director": ind_c,
                 "b64_polo_pos": base64.b64encode(b_a).decode("ascii"),
                 "b64_polo_neg": base64.b64encode(b_b).decode("ascii"),
                 "sha256_polo_pos": sha_a,
@@ -1144,12 +1202,13 @@ def generar_salon(
                 "id_item": id_it,
                 "tipo_item": "control_azar",
                 "pregunta": preg_c,
+                "indicacion_director": ind_c,
                 "sha256_polo_pos": sha_a,
                 "sha256_polo_neg": sha_b,
             }
         )
 
-    # 2 Controles de atención obvios (Regla 5): polo_pos es siempre la respuesta obvia correcta
+    # 2 Controles de atención obvios (Regla 5)
     train_por_lum = sorted(train_ids, key=lambda pid: float(labs_por_id[pid][0]))
     oscuras_18 = train_por_lum[:18]
     claras_18 = list(reversed(train_por_lum[-18:]))
@@ -1158,19 +1217,21 @@ def generar_salon(
         (
             "atencion_01",
             "¿Cuál de los dos se siente más oscuro?",
+            "oscuro: a simple vista domina la sombra, sin importar qué muestre",
             oscuras_18[:9],
             claras_18[:9],
         ),
         (
             "atencion_02",
             "¿Cuál de los dos se siente más luminoso?",
+            "luminoso: desprende más claridad y luz propia al primer vistazo",
             claras_18[9:18],
             oscuras_18[9:18],
         ),
     ]
     atencion2_raw: List[Dict[str, Any]] = []
     clave_atencion_2: List[Dict[str, Any]] = []
-    for id_at, preg_at, ids_correcto, ids_opuesto in atencion_cfg:
+    for id_at, preg_at, ind_at, ids_correcto, ids_opuesto in atencion_cfg:
         b_p, sha_p, _ = _renderizar_mosaico_3x3_jpeg(
             [imagenes_224[i] for i in ids_correcto]
         )
@@ -1182,6 +1243,7 @@ def generar_salon(
                 "id_item": id_at,
                 "tipo_item": "control_atencion",
                 "pregunta": preg_at,
+                "indicacion_director": ind_at,
                 "b64_polo_pos": base64.b64encode(b_p).decode("ascii"),
                 "b64_polo_neg": base64.b64encode(b_n).decode("ascii"),
                 "sha256_polo_pos": sha_p,
@@ -1193,6 +1255,7 @@ def generar_salon(
                 "id_item": id_at,
                 "tipo_item": "control_atencion",
                 "pregunta": preg_at,
+                "indicacion_director": ind_at,
                 "sha256_polo_pos": sha_p,
                 "sha256_polo_neg": sha_n,
             }
@@ -1201,7 +1264,7 @@ def generar_salon(
     # Parte 3: 6 pares (Ponerle nombre en 2 o 3 palabras)
     parte3_raw: List[Dict[str, Any]] = []
     clave_parte3: List[Dict[str, Any]] = []
-    for item3 in prerreg["estructura_sesion_v3c"]["parte_3_ponerle_nombre_6_pares"]:
+    for item3 in prerreg["estructura_sesion_v3d"]["parte_3_ponerle_nombre_6_pares"]:
         b64_p, b64_n, sha_p, sha_n, _, _, _ = armar_polos_neurona(item3["id_neurona"])
         id_it = f"p3_{item3['orden']:02d}"
         ficha3 = fichas_por_id[item3["id_neurona"]]
@@ -1245,7 +1308,7 @@ def generar_salon(
     (carpeta_salida_salon / "respuestas").mkdir(parents=True, exist_ok=True)
 
     ruta_html = carpeta_salida_salon / "salon_sensaciones.html"
-    _construir_html_salon_v3c(
+    _construir_html_salon_v3d(
         ruta_html,
         parte1_raw,
         neuronas20_raw,
@@ -1258,9 +1321,10 @@ def generar_salon(
 
     ruta_clave = carpeta_salida_salon / "clave_salon_no_abrir.json"
     obj_clave = {
-        "fase": "FASE 5d (v3c) · Clave secreta de El Salón",
+        "fase": "FASE 5d (v3d.1) · Clave secreta de El Salón",
         "sha256_prerregistro_v3b": sha_v3b,
         "sha256_prerregistro_v3c": sha_v3c,
+        "sha256_prerregistro_v3d": sha_v3d,
         "sha256_html_salon": sha_html,
         "semilla_base_salon": seed_salon,
         "parte_1_clave": clave_parte1,
@@ -1274,11 +1338,12 @@ def generar_salon(
     )
     sha_clave = hashlib.sha256(ruta_clave.read_bytes()).hexdigest()
 
-    ruta_diseno_git = ruta_prerregistro_v3c.parent / "diseno_salon_v3b.json"
+    ruta_diseno_git = ruta_prerregistro_v3d.parent / "diseno_salon_v3b.json"
     obj_diseno_git = {
-        "fase": "FASE 5d (v3c) · Diseño público de El Salón (con los 3 cambios condicionales de Claude)",
+        "fase": "FASE 5d (v3d.1) · Diseño público de El Salón (con botón Ninguno y 20 indicaciones de director)",
         "sha256_prerregistro_v3b": sha_v3b,
         "sha256_prerregistro_v3c": sha_v3c,
+        "sha256_prerregistro_v3d": sha_v3d,
         "semilla_base_salon": seed_salon,
         "ruta_html_local": str(ruta_html),
         "sha256_html_local": sha_html,
@@ -1309,7 +1374,10 @@ def generar_salon(
 def main(argv: List[str] | None = None) -> int:
     base_dir = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(
-        description="Genera la sesión web «El salón» (FASE 5d · v3c) a partir de prerregistro_v3c.json."
+        description="Genera la sesión web «El salón» (FASE 5d · v3d.1) a partir de prerregistro_v3d.json."
+    )
+    parser.add_argument(
+        "--prerregistro-v3d", default=str(base_dir / "prerregistro_v3d.json")
     )
     parser.add_argument(
         "--prerregistro-v3c", default=str(base_dir / "prerregistro_v3c.json")
@@ -1331,6 +1399,7 @@ def main(argv: List[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     res = generar_salon(
+        ruta_prerregistro_v3d=Path(args.prerregistro_v3d).expanduser().resolve(),
         ruta_prerregistro_v3c=Path(args.prerregistro_v3c).expanduser().resolve(),
         ruta_prerregistro_v3b=Path(args.prerregistro_v3b).expanduser().resolve(),
         ruta_corpus_json=Path(args.corpus_json).expanduser().resolve(),

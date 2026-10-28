@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
-"""FASE 5d (v3c) · Analizador estadístico de «El salón» con los 3 cambios de Claude (CPU, 0 Colab).
+"""FASE 5d (v3d.1) · Analizador estadístico de «El salón» (CPU, 0 Colab).
 
 Procesa los archivos JSON descargados por los participantes (`salon_respuesta_*.json`) junto con
 la clave secreta (`clave_salon_no_abrir.json`):
 1. Filtro de atención (Regla 5): descarta a quien falle AMBOS pares obvios de atención
    (`atencion_01` y `atencion_02`), resolviendo el lado mostrado por persona (`lado_polo_pos_mostrado`).
-2. Cambio 1 · Control de brillo:
+2. Botón central «Ninguno / se sienten igual» (`eleccion == "ninguno"`, v3d):
+   - Entra en el denominador N de participantes válidos y cuenta como NO acierto (`0` aciertos,
+     criterio conservador).
+   - Se informa explícitamente `porcentaje_ninguno` por cada una de las 20 neuronas, en los
+     4 controles al azar (`porcentaje_ninguno_4_controles_azar_pct`) y en la Parte 1.
+3. Control de brillo (v3c):
    - Para cada par de la Parte 2, determina qué polo (`polo_pos` o `polo_neg`) elegiría alguien
      que solo mire «el más claro o el más oscuro» (según ΔL* CIE Lab de cada mosaico).
-   - Mide para cada participante su tasa empírica de elegir el lado más claro (q_claro) y el
-     más oscuro (q_oscuro = 1 - q_claro) en los 18 pares no dedicados exclusivamente al brillo,
-     y calcula para cada par el `acierto_regla_simple_brillo_pct` (100% en los 2 ejes de brillo
-     puro; max(q_emp_polo_pct, 50% + 50% * min(1, |ΔL*|/35)) en los otros 18 ejes).
    - Informa qué neuronas aciertan MÁS que esa regla simple (`supera_regla_brillo = true`).
    - Declara que la neurona «se siente de verdad» (`se_siente_de_verdad = true`) si y solo si:
      acierto >= 70.0%, p_ajustado_Holm < 0.05 y supera_regla_brillo == true.
-3. Cambio 2 · Verificación de sorteo izquierda/derecha por persona:
-   - Verifica la semilla derivada del apodo (`semilla_apodo`) y lee `lado_polo_pos_mostrado`
-     guardado en el JSON de cada participante.
-4. Cambio 3 · Separación estricta de los ♥ de Bruno (Parte 4):
-   - Los ♥ de la Parte 4 solo cuentan para N-2 y D-8 si `apodo.strip().lower() == "bruno"`,
-     guardándose en `corazones_bruno_n2_d8.json`.
-   - Los ♥ de los demás participantes se guardan aparte en `corazones_otros_participantes.json`.
+4. Sorteo izquierda/derecha por persona (v3c): verifica `semilla_apodo` y `lado_polo_pos_mostrado`.
+5. Separación estricta de los ♥ de Bruno (v3c): solo los ♥ de Bruno cuentan para N-2 y D-8
+   (`corazones_bruno_n2_d8.json`); los de los demás se guardan en `corazones_otros_participantes.json`.
 """
 
 from __future__ import annotations
@@ -34,6 +31,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 sys.dont_write_bytecode = True
+
+RESPUESTAS_VALIDAS_PAR = ("izquierda", "derecha", "ninguno")
 
 
 def p_valor_binomial_unilateral(exitos: int, n: int) -> float:
@@ -68,7 +67,6 @@ def holm_bonferroni(p_valores: List[float]) -> List[float]:
 def _resolver_lado_polo_pos_mostrado(
     item_resp: Dict[str, Any], info_clave: Dict[str, Any]
 ) -> str:
-    """Obtiene en qué lado ('izquierda' o 'derecha') se mostró polo_pos para este participante."""
     lado = item_resp.get("lado_polo_pos_mostrado")
     if lado in ("izquierda", "derecha"):
         return str(lado)
@@ -117,6 +115,7 @@ def analizar_respuestas_salon(
             if id_at in resp2_map:
                 r_at = resp2_map[id_at]
                 lado_pos_mostrado = _resolver_lado_polo_pos_mostrado(r_at, info_at)
+                # En atención obvia, elegir "ninguno" o el lado opuesto no suma acierto
                 if r_at.get("eleccion") == lado_pos_mostrado:
                     aciertos_at += 1
         if aciertos_at == 0:
@@ -127,7 +126,7 @@ def analizar_respuestas_salon(
     n_val = len(participantes_validos)
     if n_val == 0:
         return {
-            "fase": "FASE 5d (v3c) · Análisis de El Salón",
+            "fase": "FASE 5d (v3d.1) · Análisis de El Salón",
             "estado": "PENDIENTE_PARTICIPANTES",
             "archivos_encontrados": len(archivos_json),
             "participantes_validos": 0,
@@ -136,8 +135,9 @@ def analizar_respuestas_salon(
             "nota": "Aún no hay respuestas válidas en la carpeta de respuestas.",
         }
 
-    # --- CAMBIO 1: Calcular tasa empírica de elegir «el más claro» vs «el más oscuro» en los 18 ejes no de brillo ---
+    # --- Control de brillo: tasa empírica de elegir «el más claro» vs «el más oscuro» en los 18 ejes no de brillo ---
     votos_al_mas_claro = 0
+    votos_al_mas_oscuro = 0
     votos_totales_no_brillo = 0
     for n_info in neuronas_clave:
         if n_info.get("es_eje_solo_brillo", False):
@@ -151,20 +151,21 @@ def analizar_respuestas_salon(
             if id_it in r_map:
                 r_it = r_map[id_it]
                 el = r_it.get("eleccion")
-                if el in ("izquierda", "derecha"):
+                if el in RESPUESTAS_VALIDAS_PAR:
                     votos_totales_no_brillo += 1
-                    lado_pos = _resolver_lado_polo_pos_mostrado(r_it, n_info)
-                    eligio_pos = el == lado_pos
-                    eligio_claro = (
-                        eligio_pos if polo_claro == "polo_pos" else (not eligio_pos)
-                    )
-                    if eligio_claro:
-                        votos_al_mas_claro += 1
+                    if el in ("izquierda", "derecha"):
+                        lado_pos = _resolver_lado_polo_pos_mostrado(r_it, n_info)
+                        eligio_pos = el == lado_pos
+                        eligio_claro = (
+                            eligio_pos if polo_claro == "polo_pos" else (not eligio_pos)
+                        )
+                        if eligio_claro:
+                            votos_al_mas_claro += 1
+                        else:
+                            votos_al_mas_oscuro += 1
 
-    q_claro_pct = (
-        votos_al_mas_claro * 100.0 / max(1, votos_totales_no_brillo)
-    )
-    q_oscuro_pct = 100.0 - q_claro_pct
+    q_claro_pct = votos_al_mas_claro * 100.0 / max(1, votos_totales_no_brillo)
+    q_oscuro_pct = votos_al_mas_oscuro * 100.0 / max(1, votos_totales_no_brillo)
 
     # Análisis por cada una de las 20 neuronas
     resultados_neuronas: List[Dict[str, Any]] = []
@@ -178,6 +179,7 @@ def analizar_respuestas_salon(
         es_solo_brillo = bool(n_info.get("es_eje_solo_brillo", False))
 
         aciertos_tot = 0
+        ninguno_tot = 0
         cont_tot = 0
         aciertos_diseno = 0
         cont_diseno = 0
@@ -196,10 +198,15 @@ def analizar_respuestas_salon(
             if id_it in r_map:
                 r_it = r_map[id_it]
                 el = r_it.get("eleccion")
-                if el in ("izquierda", "derecha"):
+                if el in RESPUESTAS_VALIDAS_PAR:
                     cont_tot += 1
                     lado_pos = _resolver_lado_polo_pos_mostrado(r_it, n_info)
-                    ok = el == lado_pos
+                    # Regla v3d: "ninguno" cuenta en cont_tot pero como NO acierto (ok = False)
+                    if el == "ninguno":
+                        ninguno_tot += 1
+                        ok = False
+                    else:
+                        ok = el == lado_pos
                     if ok:
                         aciertos_tot += 1
                     if es_diseno:
@@ -216,6 +223,7 @@ def analizar_respuestas_salon(
         p_raw = p_valor_binomial_unilateral(aciertos_tot, cont_tot)
         p_crudos_20.append(p_raw)
         pct_tot = round(aciertos_tot * 100.0 / max(1, cont_tot), 2)
+        pct_ninguno = round(ninguno_tot * 100.0 / max(1, cont_tot), 2)
         pct_dis = (
             round(aciertos_diseno * 100.0 / cont_diseno, 2) if cont_diseno > 0 else None
         )
@@ -223,7 +231,6 @@ def analizar_respuestas_salon(
             round(aciertos_fuera * 100.0 / cont_fuera, 2) if cont_fuera > 0 else None
         )
 
-        # Predicción de la regla simple «el más claro o el más oscuro»
         if es_solo_brillo:
             acierto_brillo_pct = 100.0
         else:
@@ -240,13 +247,16 @@ def analizar_respuestas_salon(
                 "etapa": n_info["etapa"],
                 "eje_sensacion": n_info["eje_sensacion"],
                 "pregunta": n_info["pregunta"],
+                "indicacion_director": n_info.get("indicacion_director", ""),
                 "delta_L": dL,
                 "polo_mas_claro": polo_claro,
                 "polo_mas_oscuro": polo_oscuro,
                 "es_eje_solo_brillo": es_solo_brillo,
                 "aciertos": aciertos_tot,
+                "conteo_ninguno": ninguno_tot,
                 "participantes_evaluados": cont_tot,
                 "porcentaje_acierto": pct_tot,
+                "porcentaje_ninguno": pct_ninguno,
                 "acierto_regla_simple_brillo_pct": acierto_brillo_pct,
                 "ventaja_sobre_regla_brillo_pp": round(pct_tot - acierto_brillo_pct, 2),
                 "supera_regla_brillo": bool(supera_brillo),
@@ -278,8 +288,9 @@ def analizar_respuestas_salon(
             cnt_se_sienten_de_verdad += 1
             ids_se_sienten_de_verdad.append(r_n["id_neurona"])
 
-    # Controles al azar (4 pares)
+    # Controles al azar (4 pares): "ninguno" cuenta como NO acierto y se reporta su %
     aciertos_ctrl = 0
+    ninguno_ctrl = 0
     total_ctrl = 0
     elecciones_izq_ctrl = 0
     for p_doc in participantes_validos:
@@ -288,20 +299,25 @@ def analizar_respuestas_salon(
             if id_c in r_map:
                 r_c = r_map[id_c]
                 el = r_c.get("eleccion")
-                if el in ("izquierda", "derecha"):
+                if el in RESPUESTAS_VALIDAS_PAR:
                     total_ctrl += 1
                     lado_pos_c = _resolver_lado_polo_pos_mostrado(r_c, info_c)
-                    if el == lado_pos_c:
+                    if el == "ninguno":
+                        ninguno_ctrl += 1
+                    elif el == lado_pos_c:
                         aciertos_ctrl += 1
                     if el == "izquierda":
                         elecciones_izq_ctrl += 1
 
     pct_ctrl = round(aciertos_ctrl * 100.0 / max(1, total_ctrl), 2)
+    pct_ninguno_ctrl = round(ninguno_ctrl * 100.0 / max(1, total_ctrl), 2)
     pct_izq_ctrl = round(elecciones_izq_ctrl * 100.0 / max(1, total_ctrl), 2)
 
     tot_aciertos_reales = sum(x["aciertos"] for x in resultados_neuronas)
+    tot_ninguno_reales = sum(x["conteo_ninguno"] for x in resultados_neuronas)
     tot_eval_reales = sum(x["participantes_evaluados"] for x in resultados_neuronas)
     pct_global_reales = round(tot_aciertos_reales * 100.0 / max(1, tot_eval_reales), 2)
+    pct_ninguno_reales = round(tot_ninguno_reales * 100.0 / max(1, tot_eval_reales), 2)
     p_global_vs_azar = round(
         p_valor_binomial_unilateral(tot_aciertos_reales, tot_eval_reales), 6
     )
@@ -314,10 +330,11 @@ def analizar_respuestas_salon(
     )
     n_fuera = n_val - n_diseno
 
-    # Parte 1 (5 segundos)
+    # Parte 1 (5 segundos: incluye % de «Ninguno»)
     resumen_parte1 = []
     for id_p1, info_p1 in sorted(parte1_clave.items()):
         votos_pos = 0
+        votos_ninguno = 0
         votos_tot = 0
         for p_doc in participantes_validos:
             r1_map = {
@@ -326,10 +343,12 @@ def analizar_respuestas_salon(
             if id_p1 in r1_map:
                 r1 = r1_map[id_p1]
                 el = r1.get("eleccion")
-                if el in ("izquierda", "derecha"):
+                if el in RESPUESTAS_VALIDAS_PAR:
                     votos_tot += 1
                     lado_pos1 = _resolver_lado_polo_pos_mostrado(r1, info_p1)
-                    if el == lado_pos1:
+                    if el == "ninguno":
+                        votos_ninguno += 1
+                    elif el == lado_pos1:
                         votos_pos += 1
         resumen_parte1.append(
             {
@@ -337,6 +356,9 @@ def analizar_respuestas_salon(
                 "id_neurona": info_p1["id_neurona"],
                 "porcentaje_elige_polo_activo_5s": round(
                     votos_pos * 100.0 / max(1, votos_tot), 2
+                ),
+                "porcentaje_ninguno_5s": round(
+                    votos_ninguno * 100.0 / max(1, votos_tot), 2
                 ),
             }
         )
@@ -360,7 +382,7 @@ def analizar_respuestas_salon(
             }
         )
 
-    # --- CAMBIO 3: Separación estricta de los ♥ de Bruno (para N-2 y D-8) frente a los demás ---
+    # Separación estricta de los ♥ de Bruno (para N-2 y D-8) frente a los demás
     corazones_bruno_lista: List[Dict[str, Any]] = []
     corazones_otros_por_apodo: Dict[str, List[Dict[str, Any]]] = {}
     conteo_otros_por_pieza: Dict[str, int] = {}
@@ -419,7 +441,7 @@ def analizar_respuestas_salon(
     )
 
     return {
-        "fase": "FASE 5d (v3c) · Resultado de El Salón (con control de brillo, sorteo por apodo y ♥ de Bruno separados)",
+        "fase": "FASE 5d (v3d.1) · Resultado de El Salón",
         "participantes_validos": n_val,
         "participantes_diseno_arte": n_diseno,
         "participantes_fuera_diseno": n_fuera,
@@ -435,8 +457,10 @@ def analizar_respuestas_salon(
         },
         "resumen_global_parte_2": {
             "acierto_medio_20_neuronas_pct": pct_global_reales,
+            "porcentaje_ninguno_medio_20_neuronas_pct": pct_ninguno_reales,
             "p_valor_global_vs_50pct": p_global_vs_azar,
             "acierto_medio_4_controles_azar_pct": pct_ctrl,
+            "porcentaje_ninguno_4_controles_azar_pct": pct_ninguno_ctrl,
             "diferencia_neuronas_vs_controles_pp": round(
                 pct_global_reales - pct_ctrl, 2
             ),
@@ -461,7 +485,7 @@ def analizar_respuestas_salon(
 
 def main(argv: List[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Analiza los JSON de respuestas de «El salón» (FASE 5d · v3c)."
+        description="Analiza los JSON de respuestas de «El salón» (FASE 5d · v3d.1)."
     )
     parser.add_argument(
         "--carpeta-respuestas",
