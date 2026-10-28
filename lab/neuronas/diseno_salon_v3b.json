@@ -1,5 +1,5 @@
 {
-  "fase": "FASE 5d (v3d.1) · Diseño público de El Salón (con botón Ninguno y 20 indicaciones de director)",
+  "fase": "FASE 5d (v3d.1) + 5e · Diseño público de El Salón y El Salón para llevar",
   "sha256_prerregistro_v3b": "0d110469817fd5fff8ec8473adc0f587d7b5f2da2a1e14f06d06883b8084ecfa",
   "sha256_prerregistro_v3c": "90e0aa75132c4742bf6dac453dc3f830e39f8748b8e71e394b43d8487ea11bd5",
   "sha256_prerregistro_v3d": "a857ecf0b6644d825dc986ab312bbcf3a8ca54c4d8eb988cba63f4f7a8234ad4",
@@ -7,6 +7,9 @@
   "ruta_html_local": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/salon_sensaciones.html",
   "sha256_html_local": "60c899018e92609273de2e70b11588cdf9d16ca4c6407ac8521ad111ff091dd3",
   "tamano_bytes_html_local": 3205447,
+  "ruta_html_para_llevar_local": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/salon_para_llevar.html",
+  "sha256_html_para_llevar_local": "ce43fbbc46e4e83f7f9c531d99d37aa3070faedaf090b35625dc31a843529e4f",
+  "tamano_bytes_html_para_llevar_local": 3208234,
   "ruta_clave_secreta_local": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/clave_salon_no_abrir.json",
   "sha256_clave_secreta_local": "447a2fcb14dce63567f7b2deae5d260b832e0c28c10ef59543cdc613fc7d74fb",
   "carpeta_respuestas_participantes": "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/respuestas",

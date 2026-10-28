@@ -979,6 +979,161 @@ render();
     ruta_html.write_text(html, encoding="utf-8")
 
 
+def _construir_html_salon_para_llevar(
+    ruta_html_base: Path,
+    ruta_html_llevar: Path,
+) -> None:
+    """Construye `salon_para_llevar.html` a partir de `salon_sensaciones.html` (v3d.1) manteniendo
+    intactos el payload `RAW`, las 20 indicaciones de director, las preguntas, los pares, el
+    orden al azar por persona y el botón «Ninguno / se sienten igual», y añadiendo el ajuste móvil
+    a 400 px sin conexión y el código corto en Base64 con botón «Copiar resultado» al cierre."""
+    html_base = ruta_html_base.read_text(encoding="utf-8")
+
+    css_extra = """  @media (max-width: 420px) {
+    body { padding: 8px; }
+    .app { max-width: 400px; }
+    .card { padding: 12px; border-radius: 12px; }
+    .question-box { font-size: 17px; padding: 10px 12px; }
+    .director-note { font-size: 13px; padding: 7px 10px; }
+    .mosaic-btn { padding: 6px; }
+    .side-label { font-size: 14px; padding: 7px 8px; }
+  }
+  .code-box {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    background: #0d0f14;
+    border: 2px solid var(--accent);
+    color: var(--ok);
+    padding: 10px;
+    border-radius: 8px;
+    word-break: break-all;
+    user-select: all;
+  }
+</style>"""
+
+    assert "</style>" in html_base
+    html_llevar = html_base.replace("</style>", css_extra, 1)
+
+    bloque_cierre_orig = """  if (state.step === "cierre") {
+    const payload = construirResultadoFinal();
+    const jsonStr = JSON.stringify(payload, null, 2);
+    root.innerHTML = `
+      <div class="card">
+        <h2>¡Muchas gracias, ${state.apodo}!</h2>
+        <p><strong>¿Para qué era este experimento? (Transparencia sin engaño):</strong> Estamos estudiando si las unidades internas («neuronas») de un modelo de visión por computador agrupan las imágenes según sensaciones que cualquier persona percibe a simple vista (como calidez, orden, peso o calma), y reuniendo tus ♥ (${state.corazones} marcados).</p>
+        <label style="font-size:14px;font-weight:600;">Última pregunta abierta: ¿Qué te sorprendió de la sesión?</label>
+        <textarea id="in-cierre" rows="3" placeholder="Escribe libremente (opcional)..." oninput="actualizarCierre(this.value)">${state.comentario_cierre}</textarea>
+        <button class="btn-ok" onclick="descargarJSON()">📥 Descargar mis respuestas (.json)</button>
+        <button class="btn-primary" onclick="compartirJSON()" style="margin-top:8px;">📤 Compartir por WhatsApp / AirDrop</button>
+        <p style="font-size:12px;margin-top:12px;">Si estás en celular, envía el archivo descargado a Bruno para que lo guarde en la carpeta de respuestas del salón.</p>
+        <textarea id="out-json-box" rows="5" readonly style="font-family:monospace;font-size:11px;margin-top:8px;">${jsonStr}</textarea>
+      </div>
+    `;
+    return;
+  }"""
+
+    bloque_cierre_llevar = """  if (state.step === "cierre") {
+    const codigoB64 = generarCodigoBase64();
+    root.innerHTML = `
+      <div class="card">
+        <h2>¡Muchas gracias, ${state.apodo}!</h2>
+        <p><strong>¿Para qué era este experimento? (Transparencia sin engaño):</strong> Estamos estudiando si las unidades internas («neuronas») de un modelo de visión por computador agrupan las imágenes según sensaciones que cualquier persona percibe a simple vista (como calidez, orden, peso o calma), y reuniendo tus ♥ (${state.corazones} marcados).</p>
+        <label style="font-size:14px;font-weight:600;">Última pregunta abierta: ¿Qué te sorprendió de la sesión?</label>
+        <textarea id="in-cierre" rows="2" placeholder="Escribe libremente (opcional)..." oninput="actualizarCierre(this.value)">${state.comentario_cierre}</textarea>
+        <label style="font-size:14px;font-weight:700;color:var(--accent);display:block;margin-bottom:6px;">Tu código de resultado (para enviar por WhatsApp a Bruno):</label>
+        <textarea id="out-b64-box" class="code-box" rows="4" readonly>${codigoB64}</textarea>
+        <button class="btn-ok" id="btn-copiar-res" onclick="copiarCodigoResultado()">📋 Copiar resultado</button>
+        <p id="msg-copiado" style="font-size:13px;color:var(--ok);font-weight:700;margin-top:8px;display:none;">✅ ¡Código copiado! Pégalo en el WhatsApp de Bruno.</p>
+        <p style="font-size:12px;margin-top:8px;">No se guarda nada en ningún servidor. Toca «Copiar resultado» y pégalo en el chat de WhatsApp con Bruno.</p>
+      </div>
+    `;
+    return;
+  }"""
+
+    assert bloque_cierre_orig in html_llevar, "No se encontró el bloque de cierre original"
+    html_llevar = html_llevar.replace(bloque_cierre_orig, bloque_cierre_llevar, 1)
+
+    bloque_fn_orig = """function actualizarCierre(val) {
+  state.comentario_cierre = val;
+  const box = document.getElementById("out-json-box");
+  if (box) box.value = JSON.stringify(construirResultadoFinal(), null, 2);
+}"""
+
+    bloque_fn_llevar = """function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  return btoa(bin);
+}
+
+function generarCodigoBase64() {
+  const p1Compact = state.resp1.map(r => [
+    r.eleccion === "izquierda" ? "i" : (r.eleccion === "derecha" ? "d" : "n"),
+    r.tiempo_ms,
+    r.respondio_tras_ocultar_5s ? 1 : 0
+  ]);
+  const p2Compact = state.resp2.map(r => [
+    r.eleccion === "izquierda" ? "i" : (r.eleccion === "derecha" ? "d" : "n"),
+    r.tiempo_ms
+  ]);
+  const p3Compact = state.resp3.map(r => r.palabras_usuario);
+  const p4Bits = state.resp4.map(r => r.corazon ? "1" : "0").join("");
+  const paquete = {
+    v: "3.3.1 (v3d.1)",
+    sha256_prerregistro: "a857ecf0b6644d825dc986ab312bbcf3a8ca54c4d8eb988cba63f4f7a8234ad4",
+    sha256_prerregistro_md: "f9faf3fd8a01c565816db097f43f04f8d5f3bbe96c25661e5e369d260f6fb9ff",
+    apodo: state.apodo,
+    edad: state.edad_aprox,
+    diseno: state.trabaja_diseno,
+    consent: state.consiente,
+    seed: state.semilla_apodo,
+    fecha: new Date().toISOString(),
+    p1: p1Compact,
+    p2: p2Compact,
+    p3: p3Compact,
+    p4: p4Bits,
+    cierre: state.comentario_cierre
+  };
+  return utf8ToBase64(JSON.stringify(paquete));
+}
+
+function copiarCodigoResultado() {
+  const codigo = generarCodigoBase64();
+  const box = document.getElementById("out-b64-box");
+  if (box) box.value = codigo;
+  const mostrarExito = () => {
+    const msg = document.getElementById("msg-copiado");
+    const btn = document.getElementById("btn-copiar-res");
+    if (msg) msg.style.display = "block";
+    if (btn) btn.textContent = "✅ Resultado copiado (toca para copiar de nuevo)";
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(codigo).then(mostrarExito).catch(() => {
+      if (box) { box.focus(); box.select(); document.execCommand("copy"); mostrarExito(); }
+    });
+  } else if (box) {
+    box.focus();
+    box.select();
+    document.execCommand("copy");
+    mostrarExito();
+  }
+}
+
+function actualizarCierre(val) {
+  state.comentario_cierre = val;
+  const box = document.getElementById("out-b64-box");
+  if (box) box.value = generarCodigoBase64();
+}"""
+
+    assert bloque_fn_orig in html_llevar, "No se encontró actualizarCierre original"
+    html_llevar = html_llevar.replace(bloque_fn_orig, bloque_fn_llevar, 1)
+
+    ruta_html_llevar.parent.mkdir(parents=True, exist_ok=True)
+    ruta_html_llevar.write_text(html_llevar, encoding="utf-8")
+
+
 def generar_salon(
     ruta_prerregistro_v3d: Path,
     ruta_prerregistro_v3c: Path,
@@ -1319,6 +1474,10 @@ def generar_salon(
     )
     sha_html = hashlib.sha256(ruta_html.read_bytes()).hexdigest()
 
+    ruta_html_llevar = carpeta_salida_salon / "salon_para_llevar.html"
+    _construir_html_salon_para_llevar(ruta_html, ruta_html_llevar)
+    sha_html_llevar = hashlib.sha256(ruta_html_llevar.read_bytes()).hexdigest()
+
     ruta_clave = carpeta_salida_salon / "clave_salon_no_abrir.json"
     obj_clave = {
         "fase": "FASE 5d (v3d.1) · Clave secreta de El Salón",
@@ -1340,7 +1499,7 @@ def generar_salon(
 
     ruta_diseno_git = ruta_prerregistro_v3d.parent / "diseno_salon_v3b.json"
     obj_diseno_git = {
-        "fase": "FASE 5d (v3d.1) · Diseño público de El Salón (con botón Ninguno y 20 indicaciones de director)",
+        "fase": "FASE 5d (v3d.1) + 5e · Diseño público de El Salón y El Salón para llevar",
         "sha256_prerregistro_v3b": sha_v3b,
         "sha256_prerregistro_v3c": sha_v3c,
         "sha256_prerregistro_v3d": sha_v3d,
@@ -1348,6 +1507,9 @@ def generar_salon(
         "ruta_html_local": str(ruta_html),
         "sha256_html_local": sha_html,
         "tamano_bytes_html_local": ruta_html.stat().st_size,
+        "ruta_html_para_llevar_local": str(ruta_html_llevar),
+        "sha256_html_para_llevar_local": sha_html_llevar,
+        "tamano_bytes_html_para_llevar_local": ruta_html_llevar.stat().st_size,
         "ruta_clave_secreta_local": str(ruta_clave),
         "sha256_clave_secreta_local": sha_clave,
         "carpeta_respuestas_participantes": str(carpeta_salida_salon / "respuestas"),
