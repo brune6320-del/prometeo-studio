@@ -1,5 +1,5 @@
 {
-  "version_prerregistro": "3.3.0 (v3d · Indicaciones de director y botón central Ninguno)",
+  "version_prerregistro": "3.3.1 (v3d.1 · Enmienda de Claude a las indicaciones #2, #10 y #12)",
   "fase": "FASE 5d · «El salón»: prueba de sensaciones con personas (v3d)",
   "fecha_prerregistro": "2026-10-28",
   "semilla_base_salon": 2810,
@@ -151,8 +151,8 @@
         "polo_mas_claro": "polo_pos",
         "polo_mas_oscuro": "polo_neg",
         "es_eje_solo_brillo": false,
-        "indicacion_director": "cálido: sus tonos dan sensación de calor o sol al mirarlos",
-        "num_palabras_indicacion": 11
+        "indicacion_director": "cálido: predominan rojos, naranjas y amarillos, sin importar el tema",
+        "num_palabras_indicacion": 10
       },
       {
         "orden": 3,
@@ -295,8 +295,8 @@
         "polo_mas_claro": "polo_neg",
         "polo_mas_oscuro": "polo_pos",
         "es_eje_solo_brillo": false,
-        "indicacion_director": "pesado: se ve macizo, como si costara moverlo",
-        "num_palabras_indicacion": 8
+        "indicacion_director": "pesado: masas grandes y oscuras que cargan la imagen hacia abajo",
+        "num_palabras_indicacion": 11
       },
       {
         "orden": 11,
@@ -331,8 +331,8 @@
         "polo_mas_claro": "polo_neg",
         "polo_mas_oscuro": "polo_pos",
         "es_eje_solo_brillo": false,
-        "indicacion_director": "antiguo: se ve gastado y envejecido a simple vista",
-        "num_palabras_indicacion": 9
+        "indicacion_director": "antiguo: textura gastada y color amarillento, no por el objeto",
+        "num_palabras_indicacion": 10
       },
       {
         "orden": 13,
@@ -539,5 +539,14 @@
         "pregunta": "Si tuvieras que describir la diferencia en 2 o 3 palabras, ¿cuáles serían?"
       }
     ]
+  },
+  "enmienda_v3d_1": {
+    "prerregistro_v3d_0_previo": "commit 00b4917 (sha256 json = aee44989f98509a52f3f9583c127f18f2b8cfeb8d89d823ac66ef78426e81384)",
+    "motivo": "Visto bueno de Claude a las 20 indicaciones con 3 ajustes antes de regenerar la página (#2 cálido sin «sol», #10 pesado sin «costara moverlo», #12 antiguo con textura gastada y color amarillento).",
+    "indicaciones_modificadas": {
+      "2_calido": "cálido: predominan rojos, naranjas y amarillos, sin importar el tema",
+      "10_pesado": "pesado: masas grandes y oscuras que cargan la imagen hacia abajo",
+      "12_antiguo": "antiguo: textura gastada y color amarillento, no por el objeto"
+    }
   }
 }
