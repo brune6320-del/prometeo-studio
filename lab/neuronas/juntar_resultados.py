@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""FASE 5e · «El salón para llevar»: decodificador y agregador de códigos Base64 (CPU, 0 Colab).
+"""FASE 5e / 5e.1 · «El salón para llevar»: decodificador y agregador de códigos Base64 (CPU, 0 Colab).
 
 Lee un archivo de texto con todos los códigos Base64 pegados por Bruno (uno por línea, enviados
 por WhatsApp desde `salon_para_llevar.html`):
@@ -7,8 +7,12 @@ por WhatsApp desde `salon_para_llevar.html`):
    del prerregistro v3d.1 (`a857ecf0b6644d825dc986ab312bbcf3a8ca54c4d8eb988cba63f4f7a8234ad4` o
    el de `PRERREGISTRO-v3d.md` `f9faf3fd8a01c565816db097f43f04f8d5f3bbe96c25661e5e369d260f6fb9ff`).
 2. Reconstruye de forma determinista el archivo `salon_respuesta_<apodo>.json` de cada
-   participante válido con la misma estructura exacta que produce `salon_sensaciones.html`.
-3. Invoca `analizar_respuestas_salon` (de `lab/neuronas/analizar_salon.py`) y escribe la tabla
+   participante válido con la misma estructura exacta que produce `salon_sensaciones.html`,
+   añadiendo en cada pieza de la Parte 4 `px_lado_largo_mostrado`.
+3. Compatibilidad 5e -> 5e.1: los resultados de la 5e (y el de Bruno en 5e, sin `p4_px` o con
+   miniatura de 168 px) siguen siendo 100 % válidos para las Partes 1 a 3, y en la Parte 4 se
+   marcan explícitamente como `"imagen_baja_calidad"`.
+4. Invoca `analizar_respuestas_salon` (de `lab/neuronas/analizar_salon.py`) y escribe la tabla
    completa de resultados (`tabla_resultados_salon.json` y `TABLA-RESULTADOS-SALON.md`).
 """
 
@@ -50,7 +54,9 @@ MAPA_CODIGO_ELECCION = {
 }
 
 
-def codificar_resultado_a_base64(doc_participante: Dict[str, Any]) -> str:
+def codificar_resultado_a_base64(
+    doc_participante: Dict[str, Any], incluir_px_5e1: bool = True
+) -> str:
     """Convierte un documento completo `salon_respuesta_<apodo>.json` en el código corto Base64
     idéntico al que genera `salon_para_llevar.html` al terminar la sesión."""
     part = doc_participante.get("participante", {})
@@ -80,7 +86,7 @@ def codificar_resultado_a_base64(doc_participante: Dict[str, Any]) -> str:
     votos4 = doc_participante.get("parte_4_gusto", {}).get("votos", [])
     p4_bits = "".join("1" if v.get("corazon") else "0" for v in votos4)
 
-    compacto = {
+    compacto: Dict[str, Any] = {
         "v": "3.3.1 (v3d.1)",
         "sha256_prerregistro": SHA256_PRERREG_V3D_ESPERADO,
         "sha256_prerregistro_md": SHA256_PRERREG_V3D_MD_ESPERADO,
@@ -98,8 +104,11 @@ def codificar_resultado_a_base64(doc_participante: Dict[str, Any]) -> str:
         "p2": p2,
         "p3": p3,
         "p4": p4_bits,
-        "cierre": doc_participante.get("cierre", {}).get("que_te_sorprendio", ""),
     }
+    if incluir_px_5e1 and votos4 and all("px_lado_largo_mostrado" in v for v in votos4):
+        compacto["p4_px"] = [int(v["px_lado_largo_mostrado"]) for v in votos4]
+    compacto["cierre"] = doc_participante.get("cierre", {}).get("que_te_sorprendio", "")
+
     raw_bytes = json.dumps(compacto, ensure_ascii=False, separators=(",", ":")).encode(
         "utf-8"
     )
@@ -138,11 +147,19 @@ def _piezas_parte4_desde_prerregistro(
     ruta_corpus_json: Path,
     carpeta_atlas_f7: Path,
     carpeta_atlas_f5: Path,
-) -> List[Dict[str, str]]:
+) -> List[Dict[str, Any]]:
     """Obtiene la lista determinista de 40 piezas únicas mostradas en la Parte 4."""
     prerreg = json.loads(ruta_prerregistro_v3d.read_text(encoding="utf-8"))
     corpus_items = json.loads(ruta_corpus_json.read_text(encoding="utf-8"))["imagenes"]
     sha_por_id = {it["id_origen"]: it["sha256"] for it in corpus_items}
+
+    manif_p4_path = Path(
+        "/Users/gladys/.gemini/users/user1/Desktop/REFERENTES/el-salon/imagenes_parte4_1200px/manifiesto_parte4_1200px.json"
+    )
+    px_por_id: Dict[str, int] = {}
+    if manif_p4_path.is_file():
+        for m_it in json.loads(manif_p4_path.read_text(encoding="utf-8")).get("piezas", []):
+            px_por_id[m_it["id_pieza"]] = int(m_it["px_lado_largo_mostrado"])
 
     fichas_por_id: Dict[str, Dict[str, Any]] = {}
     for p in sorted(carpeta_atlas_f7.glob("neurona_*.json")) + sorted(
@@ -172,20 +189,26 @@ def _piezas_parte4_desde_prerregistro(
         reg(it3["id_neurona"])
 
     return [
-        {"id_pieza": pid, "sha256_imagen": sha_por_id[pid]} for pid in vistas[:40]
+        {
+            "id_pieza": pid,
+            "sha256_imagen": sha_por_id[pid],
+            "px_lado_largo_1200": px_por_id.get(pid, 1200),
+        }
+        for pid in vistas[:40]
     ]
 
 
 def decodificar_linea_base64(
     linea: str,
     clave_data: Dict[str, Any],
-    piezas_40: List[Dict[str, str]],
+    piezas_40: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Decodifica un código Base64 individual, valida el sha256 de v3d.1 y reconstruye el JSON."""
+    """Decodifica un código Base64 individual, valida el sha256 de v3d.1 y reconstruye el JSON.
+    Si el código proviene de la Fase 5e (sin `p4_px` o con imágenes < 600 px), conserva válidas
+    las Partes 1 a 3 y marca la Parte 4 como `imagen_baja_calidad`."""
     limpia = linea.strip()
     if limpia.startswith("SALON_V3D1:"):
         limpia = limpia.split("SALON_V3D1:", 1)[1].strip()
-    # Permitir que la línea venga pegada con espacios accidentales alrededor
     limpia = re.sub(r"\s+", "", limpia)
     if not limpia:
         raise ValueError("Línea vacía")
@@ -315,21 +338,43 @@ def decodificar_linea_base64(
             }
         )
 
-    # Reconstruir Parte 4 (40 piezas ♥ / ✕)
+    # Reconstruir Parte 4 (40 piezas ♥ / ✕) con verificación de resolución (5e vs 5e.1)
     p4_bits = str(obj.get("p4", ""))
+    p4_px_raw = obj.get("p4_px")
+    tiene_px_5e1 = (
+        isinstance(p4_px_raw, list)
+        and len(p4_px_raw) == len(piezas_40)
+        and all(int(x) >= 600 for x in p4_px_raw)
+    )
+
     votos4_full = []
     corazones_cnt = 0
     for i, p_meta in enumerate(piezas_40):
         gusta = (i < len(p4_bits)) and (p4_bits[i] == "1")
         if gusta:
             corazones_cnt += 1
-        votos4_full.append(
-            {
-                "id_pieza": p_meta["id_pieza"],
-                "sha256_imagen": p_meta["sha256_imagen"],
-                "corazon": bool(gusta),
-            }
+        px_mostrado = (
+            int(p4_px_raw[i])
+            if (isinstance(p4_px_raw, list) and i < len(p4_px_raw))
+            else 168
         )
+        voto_item: Dict[str, Any] = {
+            "id_pieza": p_meta["id_pieza"],
+            "sha256_imagen": p_meta["sha256_imagen"],
+            "px_lado_largo_mostrado": px_mostrado,
+            "corazon": bool(gusta),
+        }
+        if not tiene_px_5e1:
+            voto_item["calidad_imagen"] = "imagen_baja_calidad"
+        votos4_full.append(voto_item)
+
+    parte4_dict: Dict[str, Any] = {
+        "cuenta_para_n2_y_d8": bool(es_bruno and tiene_px_5e1),
+        "calidad_parte_4": "nitida_1200px" if tiene_px_5e1 else "imagen_baja_calidad",
+        "total_corazones": corazones_cnt,
+        "total_evaluadas": len(votos4_full),
+        "votos": votos4_full,
+    }
 
     return {
         "fase": "FASE 5d · El Salón (Prueba de sensaciones con personas · v3d.1)",
@@ -347,12 +392,7 @@ def decodificar_linea_base64(
         "parte_1_primer_golpe_vista": resp1_full,
         "parte_2_sentir": resp2_full,
         "parte_3_ponerle_nombre": resp3_full,
-        "parte_4_gusto": {
-            "cuenta_para_n2_y_d8": es_bruno,
-            "total_corazones": corazones_cnt,
-            "total_evaluadas": len(votos4_full),
-            "votos": votos4_full,
-        },
+        "parte_4_gusto": parte4_dict,
         "cierre": {
             "que_te_sorprendio": str(obj.get("cierre", "")),
         },
@@ -363,7 +403,7 @@ def _formatear_tabla_markdown(analisis: Dict[str, Any]) -> str:
     lineas = [
         "# Tabla de Resultados · El Salón (v3d.1)",
         "",
-        f"- **Participantes válidos:** `{analisis.get('participantes_validos', 0)}` "
+        f"- **Participantes válidos (Partes 1 a 3):** `{analisis.get('participantes_validos', 0)}` "
         f"(Diseño/arte: `{analisis.get('participantes_diseno_arte', 0)}`, "
         f"Fuera de diseño: `{analisis.get('participantes_fuera_diseno', 0)}`)",
         f"- **Excluidos por atención:** `{len(analisis.get('participantes_excluidos_atencion', []))}`",
@@ -442,7 +482,7 @@ def juntar_resultados_desde_txt(
     ruta_tabla_md = carpeta_salida_respuestas / "TABLA-RESULTADOS-SALON.md"
 
     salida = {
-        "fase": "FASE 5e · Juntar resultados de El Salón para llevar",
+        "fase": "FASE 5e.1 · Juntar resultados de El Salón para llevar",
         "sha256_prerregistro_requerido": SHA256_PRERREG_V3D_ESPERADO,
         "codigos_aceptados": aceptados,
         "codigos_rechazados": len(rechazados),

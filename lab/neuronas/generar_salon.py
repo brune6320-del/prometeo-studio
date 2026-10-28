@@ -982,14 +982,32 @@ render();
 def _construir_html_salon_para_llevar(
     ruta_html_base: Path,
     ruta_html_llevar: Path,
+    parte4_raw_nitida: List[Dict[str, Any]],
 ) -> None:
     """Construye `salon_para_llevar.html` a partir de `salon_sensaciones.html` (v3d.1) manteniendo
-    intactos el payload `RAW`, las 20 indicaciones de director, las preguntas, los pares, el
-    orden al azar por persona y el botón «Ninguno / se sienten igual», y añadiendo el ajuste móvil
-    a 400 px sin conexión y el código corto en Base64 con botón «Copiar resultado» al cierre."""
+    intactos los mosaicos de las partes 1 a 3, las 20 indicaciones de director, las preguntas, los
+    pares, el orden al azar por persona y el botón «Ninguno / se sienten igual», reemplazando solo
+    las 40 imágenes de la Parte 4 por sus versiones nítidas de 1200 px (o tamaño original si es
+    menor) y añadiendo `px_lado_largo_mostrado` al JSON y al código corto en Base64."""
+    import re as _re
+
     html_base = ruta_html_base.read_text(encoding="utf-8")
 
-    css_extra = """  @media (max-width: 420px) {
+    # Reemplazar únicamente RAW.parte4_raw conservando intactos parte1_raw..parte3_raw de 2d94df9
+    m_raw = _re.search(r"const RAW = (\{.*?\});\n\nfunction calcularSemillaApodo", html_base, _re.S)
+    assert m_raw is not None, "No se encontró const RAW en salon_sensaciones.html"
+    raw_obj = json.loads(m_raw.group(1))
+    raw_obj["parte4_raw"] = parte4_raw_nitida
+    nuevo_raw_json = json.dumps(raw_obj, ensure_ascii=False)
+    html_llevar = (
+        html_base[: m_raw.start(1)]
+        + nuevo_raw_json
+        + html_base[m_raw.end(1) :]
+    )
+
+    css_extra = """  .tinder-card { padding: 4px 0; }
+  .tinder-card img { max-width: 100%; width: 100%; height: auto; }
+  @media (max-width: 420px) {
     body { padding: 8px; }
     .app { max-width: 400px; }
     .card { padding: 12px; border-radius: 12px; }
@@ -1011,8 +1029,30 @@ def _construir_html_salon_para_llevar(
   }
 </style>"""
 
-    assert "</style>" in html_base
-    html_llevar = html_base.replace("</style>", css_extra, 1)
+    assert "</style>" in html_llevar
+    html_llevar = html_llevar.replace("</style>", css_extra, 1)
+
+    bloque_resp4_orig = """function responderParte4(gusta) {
+  const item = DATA.parte4[state.idx4];
+  if (gusta) state.corazones++;
+  state.resp4.push({
+    id_pieza: item.id_pieza,
+    sha256_imagen: item.sha256_imagen,
+    corazon: gusta
+  });"""
+
+    bloque_resp4_llevar = """function responderParte4(gusta) {
+  const item = DATA.parte4[state.idx4];
+  if (gusta) state.corazones++;
+  state.resp4.push({
+    id_pieza: item.id_pieza,
+    sha256_imagen: item.sha256_imagen,
+    px_lado_largo_mostrado: item.px_lado_largo_mostrado,
+    corazon: gusta
+  });"""
+
+    assert bloque_resp4_orig in html_llevar, "No se encontró responderParte4 original"
+    html_llevar = html_llevar.replace(bloque_resp4_orig, bloque_resp4_llevar, 1)
 
     bloque_cierre_orig = """  if (state.step === "cierre") {
     const payload = construirResultadoFinal();
@@ -1080,6 +1120,7 @@ function generarCodigoBase64() {
   ]);
   const p3Compact = state.resp3.map(r => r.palabras_usuario);
   const p4Bits = state.resp4.map(r => r.corazon ? "1" : "0").join("");
+  const p4Px = state.resp4.map(r => r.px_lado_largo_mostrado);
   const paquete = {
     v: "3.3.1 (v3d.1)",
     sha256_prerregistro: "a857ecf0b6644d825dc986ab312bbcf3a8ca54c4d8eb988cba63f4f7a8234ad4",
@@ -1094,6 +1135,7 @@ function generarCodigoBase64() {
     p2: p2Compact,
     p3: p3Compact,
     p4: p4Bits,
+    p4_px: p4Px,
     cierre: state.comentario_cierre
   };
   return utf8ToBase64(JSON.stringify(paquete));
@@ -1474,8 +1516,52 @@ def generar_salon(
     )
     sha_html = hashlib.sha256(ruta_html.read_bytes()).hexdigest()
 
+    dir_p4_1200 = carpeta_salida_salon / "imagenes_parte4_1200px"
+    manif_p4_path = dir_p4_1200 / "manifiesto_parte4_1200px.json"
+    if not manif_p4_path.is_file():
+        raise FileNotFoundError(
+            f"Falta el manifiesto de imágenes nítidas de Parte 4 en {manif_p4_path}"
+        )
+    manif_p4 = {
+        x["id_pieza"]: x
+        for x in json.loads(manif_p4_path.read_text(encoding="utf-8"))["piezas"]
+    }
+
+    def _armar_parte4_nitida(calidad_jpeg: int) -> List[Dict[str, Any]]:
+        lista_out: List[Dict[str, Any]] = []
+        for pid in piezas_40:
+            info_m = manif_p4[pid]
+            ruta_jpg = (
+                dir_p4_1200 / f"{pid}.jpg"
+                if calidad_jpeg == 85
+                else dir_p4_1200 / f"{pid}_q80.jpg"
+            )
+            raw_jpg = ruta_jpg.read_bytes()
+            lista_out.append(
+                {
+                    "id_pieza": pid,
+                    "sha256_imagen": sha_por_id[pid],
+                    "ancho_original_px": int(info_m["ancho_original_px"]),
+                    "alto_original_px": int(info_m["alto_original_px"]),
+                    "lado_largo_original_px": int(info_m["lado_largo_original_px"]),
+                    "ancho_mostrado_px": int(info_m["ancho_mostrado_px"]),
+                    "alto_mostrado_px": int(info_m["alto_mostrado_px"]),
+                    "px_lado_largo_mostrado": int(info_m["px_lado_largo_mostrado"]),
+                    "calidad_jpeg": int(calidad_jpeg),
+                    "b64_img": base64.b64encode(raw_jpg).decode("ascii"),
+                }
+            )
+        return lista_out
+
     ruta_html_llevar = carpeta_salida_salon / "salon_para_llevar.html"
-    _construir_html_salon_para_llevar(ruta_html, ruta_html_llevar)
+    calidad_p4_usada = 85
+    parte4_nitida = _armar_parte4_nitida(85)
+    _construir_html_salon_para_llevar(ruta_html, ruta_html_llevar, parte4_nitida)
+    # Regla 3 (Fase 5e.1): El archivo puede crecer hasta 12 MB. Si pasa de 12 MB, baja la calidad a 80, nunca el tamaño en px.
+    if ruta_html_llevar.stat().st_size > 12_000_000:
+        calidad_p4_usada = 80
+        parte4_nitida = _armar_parte4_nitida(80)
+        _construir_html_salon_para_llevar(ruta_html, ruta_html_llevar, parte4_nitida)
     sha_html_llevar = hashlib.sha256(ruta_html_llevar.read_bytes()).hexdigest()
 
     ruta_clave = carpeta_salida_salon / "clave_salon_no_abrir.json"
@@ -1499,7 +1585,7 @@ def generar_salon(
 
     ruta_diseno_git = ruta_prerregistro_v3d.parent / "diseno_salon_v3b.json"
     obj_diseno_git = {
-        "fase": "FASE 5d (v3d.1) + 5e · Diseño público de El Salón y El Salón para llevar",
+        "fase": "FASE 5d (v3d.1) + 5e.1 · Diseño público de El Salón y El Salón para llevar (Parte 4 a 1200 px)",
         "sha256_prerregistro_v3b": sha_v3b,
         "sha256_prerregistro_v3c": sha_v3c,
         "sha256_prerregistro_v3d": sha_v3d,
@@ -1510,6 +1596,7 @@ def generar_salon(
         "ruta_html_para_llevar_local": str(ruta_html_llevar),
         "sha256_html_para_llevar_local": sha_html_llevar,
         "tamano_bytes_html_para_llevar_local": ruta_html_llevar.stat().st_size,
+        "calidad_jpeg_parte4_para_llevar": calidad_p4_usada,
         "ruta_clave_secreta_local": str(ruta_clave),
         "sha256_clave_secreta_local": sha_clave,
         "carpeta_respuestas_participantes": str(carpeta_salida_salon / "respuestas"),

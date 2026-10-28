@@ -383,20 +383,39 @@ def analizar_respuestas_salon(
         )
 
     # Separación estricta de los ♥ de Bruno (para N-2 y D-8) frente a los demás
+    # Regla Fase 5e.1: los resultados de la 5e siguen siendo válidos para las partes 1 a 3,
+    # y en la parte 4 se marcan como «imagen_baja_calidad».
     corazones_bruno_lista: List[Dict[str, Any]] = []
     corazones_otros_por_apodo: Dict[str, List[Dict[str, Any]]] = {}
     conteo_otros_por_pieza: Dict[str, int] = {}
+    participantes_parte4_baja_calidad: List[str] = []
 
     for p_doc in participantes_validos:
         apodo_raw = str(p_doc.get("participante", {}).get("apodo", "")).strip()
         es_bruno = apodo_raw.lower() == "bruno"
-        votos4 = p_doc.get("parte_4_gusto", {}).get("votos", [])
+        p4_info = p_doc.get("parte_4_gusto", {})
+        votos4 = p4_info.get("votos", [])
+        es_baja_calidad_p4 = p4_info.get("calidad_parte_4") == "imagen_baja_calidad" or any(
+            v.get("calidad_imagen") == "imagen_baja_calidad"
+            or (
+                "px_lado_largo_mostrado" in v
+                and int(v.get("px_lado_largo_mostrado", 1200)) < 600
+            )
+            for v in votos4
+        )
+        if es_baja_calidad_p4:
+            participantes_parte4_baja_calidad.append(apodo_raw)
+
         for v in votos4:
             if v.get("corazon"):
-                item_c = {
+                item_c: Dict[str, Any] = {
                     "id_pieza": v["id_pieza"],
                     "sha256_imagen": v.get("sha256_imagen", ""),
                 }
+                if "px_lado_largo_mostrado" in v:
+                    item_c["px_lado_largo_mostrado"] = int(v["px_lado_largo_mostrado"])
+                if es_baja_calidad_p4:
+                    item_c["calidad_imagen"] = "imagen_baja_calidad"
                 if es_bruno:
                     corazones_bruno_lista.append(item_c)
                 else:
@@ -479,6 +498,7 @@ def analizar_respuestas_salon(
                 len(x) for x in corazones_otros_por_apodo.values()
             ),
             "archivo_corazones_otros_aparte": str(ruta_corazones_otros),
+            "participantes_parte_4_imagen_baja_calidad": participantes_parte4_baja_calidad,
         },
     }
 

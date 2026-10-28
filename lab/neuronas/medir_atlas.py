@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Suite de verificación determinista para FASE 5b, 5c, 5d-v3d.1 y 5e (N-1 v2, v3, v3b, v3c, v3d.1 y El salón para llevar).
+"""Suite de verificación determinista para FASE 5b, 5c, 5d-v3d.1, 5e y 5e.1 (N-1 v2, v3, v3b, v3c, v3d.1 y El salón para llevar con imágenes nítidas).
 
-Comprueba 16 invariantes estrictos:
+Comprueba 17 invariantes estrictos:
 1. Prerregistro v1 intacto (sha256 = a28a09f31e7ddbb9f2db9e65fd49a2d6306e3f6640a8b556c4e9be3ec1d9f388).
 2. Prerregistro v2 intacto (sha256 = 729bb150cc75e50e9ec5d2e43145f5e4d8876aa7119cc9b639f336d8c9ca1555).
 3. Prerregistro v3 intacto (sha256 = 230303d5388312ef30652ae09c97a1aef3ecd1ec647db0db58f07599371b78a8)
@@ -26,19 +26,27 @@ Comprueba 16 invariantes estrictos:
     conservador e informando `porcentaje_ninguno` por neurona y en los controles), control de
     brillo y separación estricta de los ♥ de Bruno frente a los demás.
 14. FASE 5e (`salon_para_llevar.html`): archivo único autocontenido < 12 MB, apto para celular a
-    400 px sin conexión, con las 20 indicaciones, preguntas, pares, orden al azar y botón «Ninguno»
-    idénticos a `2d94df9`, y cierre con código Base64 y botón «Copiar resultado».
+    400 px sin conexión, con los mosaicos de las partes 1 a 3, las 20 indicaciones, preguntas,
+    pares, orden al azar y botón «Ninguno» idénticos a `2d94df9`, y cierre con código Base64 y
+    botón «Copiar resultado».
 15. FASE 5e (`juntar_resultados.py`): rechaza códigos que no traen el `sha256` de v3d.1 y comprueba
     que el mismo conjunto de respuestas produce exactamente el mismo resultado en `analizar_salon.py`
     por las dos vías (`salon_sensaciones.html` JSON directo vs `salon_para_llevar.html` código Base64).
 16. Higiene de Git: ningún archivo de pesos (.pth, .pt) ni de imagen (.jpg, .png) ni .html pesado
     con imágenes embebidas está dentro de lab/neuronas/.
+17. FASE 5e.1 (imágenes nítidas en Parte 4): comprueba decodificando cada una de las 40 imágenes
+    embebidas en `salon_para_llevar.html` que toda imagen de la Parte 4 tiene >= 1200 px en el
+    lado largo (o su tamaño original exacto si el original del museo es menor, sin reescalar hacia
+    arriba), que el código de resultado y el JSON registran `px_lado_largo_mostrado` para cada
+    pieza, y que los resultados de la 5e siguen siendo válidos para las Partes 1 a 3 marcándose
+    como `imagen_baja_calidad` en la Parte 4.
 """
 
 from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import json
 import re
 import shutil
@@ -46,6 +54,8 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Set
+
+from PIL import Image
 
 sys.dont_write_bytecode = True
 
@@ -63,7 +73,9 @@ from lab.neuronas.generar_salon import (
     sortear_lados_equilibrados_mulberry32,
 )
 from lab.neuronas.juntar_resultados import (
+    _piezas_parte4_desde_prerregistro,
     codificar_resultado_a_base64,
+    decodificar_linea_base64,
     juntar_resultados_desde_txt,
 )
 
@@ -169,7 +181,7 @@ def _verificar_coleccion_fichas(
     }
 
 
-def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
+def _verificar_salon_v3d_5e_y_5e1(dir_neuronas: Path) -> Dict[str, Any]:
     ruta_v3b = dir_neuronas / "prerregistro_v3b.json"
     ruta_v3c = dir_neuronas / "prerregistro_v3c.json"
     ruta_v3d = dir_neuronas / "prerregistro_v3d.json"
@@ -218,20 +230,21 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
     assert sha_html_orig == SHA256_HTML_V3D1_ORIGINAL_ESPERADO
     assert sha_html_orig == diseno["sha256_html_local"]
 
-    # Verificar salon_para_llevar.html (FASE 5e)
+    # Verificar salon_para_llevar.html (FASE 5e + 5e.1)
     ruta_html_llevar = Path(diseno["ruta_html_para_llevar_local"])
     assert ruta_html_llevar.is_file()
     bytes_llevar = ruta_html_llevar.read_bytes()
     sha_html_llevar = hashlib.sha256(bytes_llevar).hexdigest()
     assert sha_html_llevar == diseno["sha256_html_para_llevar_local"]
-    assert len(bytes_llevar) < 12 * 1024 * 1024, f"salon_para_llevar.html supera 12 MB: {len(bytes_llevar)}"
+    assert len(bytes_llevar) <= 12_000_000, f"salon_para_llevar.html supera 12 MB: {len(bytes_llevar)}"
     html_llevar_txt = ruta_html_llevar.read_text(encoding="utf-8")
 
-    # Comprobar que las 20 indicaciones, las preguntas, los pares, el orden al azar y el botón
-    # «Ninguno / se sienten igual» de salon_para_llevar.html son 100% idénticos a 2d94df9
+    # Comprobar que los mosaicos de las partes 1 a 3, las 20 indicaciones, las preguntas, los pares,
+    # el orden al azar y el botón «Ninguno / se sienten igual» de salon_para_llevar.html son 100% idénticos a 2d94df9
     raw_orig = _extraer_raw_json_de_html(html_txt)
     raw_llevar = _extraer_raw_json_de_html(html_llevar_txt)
-    assert raw_orig == raw_llevar, "El payload RAW de salon_para_llevar.html difiere del de 2d94df9"
+    for k_p1_p3 in ("parte1_raw", "neuronas20_raw", "controles4_raw", "atencion2_raw", "parte3_raw"):
+        assert raw_orig[k_p1_p3] == raw_llevar[k_p1_p3], f"Diferencia en {k_p1_p3} respecto a 2d94df9"
 
     indicaciones_llevar = [x["indicacion_director"] for x in raw_llevar["neuronas20_raw"]]
     indicaciones_v3d1 = [x["indicacion_director"] for x in neuronas_20]
@@ -246,11 +259,38 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
     assert "Ninguno / se sienten igual" in html_llevar_txt
     assert "Copiar resultado" in html_llevar_txt
     assert "generarCodigoBase64" in html_llevar_txt
+    assert "px_lado_largo_mostrado" in html_llevar_txt
     assert SHA256_PRERREG_V3D_ESPERADO in html_llevar_txt
 
-    # Prueba de equivalencia exacta por las dos vías (JSON directo vs código Base64 + juntar_resultados.py)
-    # y rechazo de códigos sin el sha256 de v3d.1
+    # Prueba #17 (Fase 5e.1): comprobar que toda imagen de la Parte 4 embebida en salon_para_llevar.html
+    # tiene >= 1200 px en el lado largo, o su tamaño original exacto si el original es menor (sin reescalar hacia arriba)
+    assert len(raw_llevar["parte4_raw"]) == 40
+    cnt_1200_exactos = 0
+    cnt_original_menor_1200 = 0
+    for idx4, item4 in enumerate(raw_llevar["parte4_raw"]):
+        assert item4["id_pieza"] == raw_orig["parte4_raw"][idx4]["id_pieza"]
+        assert item4["sha256_imagen"] == raw_orig["parte4_raw"][idx4]["sha256_imagen"]
+        img_bytes = base64.b64decode(item4["b64_img"])
+        with Image.open(io.BytesIO(img_bytes)) as im_p4:
+            w_real, h_real = im_p4.size
+        lado_real = max(w_real, h_real)
+        lado_orig = int(item4["lado_largo_original_px"])
+        assert lado_real == int(item4["px_lado_largo_mostrado"])
+        assert lado_real <= lado_orig, f"Se agrandó una imagen más pequeña que 1200px: {item4['id_pieza']}"
+        if lado_orig >= 1200:
+            assert lado_real >= 1200, f"Pieza {item4['id_pieza']} con original {lado_orig}px quedó en {lado_real}px (< 1200px)"
+            cnt_1200_exactos += 1
+        else:
+            assert lado_real == lado_orig, f"Pieza {item4['id_pieza']} con original <1200px ({lado_orig}px) no conservó su tamaño ({lado_real}px)"
+            cnt_original_menor_1200 += 1
+
+    # Prueba de equivalencia exacta por las dos vías (JSON directo vs código Base64 + juntar_resultados.py),
+    # rechazo de códigos sin el sha256 de v3d.1, y compatibilidad de resultados de 5e (válidos en Partes 1-3 y
+    # marcados como `imagen_baja_calidad` en Parte 4)
     clave_data = json.loads(ruta_clave.read_text(encoding="utf-8"))
+    piezas_40_meta = _piezas_parte4_desde_prerregistro(
+        ruta_v3d, ruta_corpus, dir_neuronas / "atlas", dir_neuronas / "atlas_f5"
+    )
     with tempfile.TemporaryDirectory() as tmp_dir_json, tempfile.TemporaryDirectory() as tmp_dir_b64:
         path_json = Path(tmp_dir_json)
         path_b64 = Path(tmp_dir_b64)
@@ -266,7 +306,6 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
             lados_at_p = sortear_lados_equilibrados_mulberry32((seed_p + 303) & 0xFFFFFFFF, 2)
             lados_3_p = sortear_lados_equilibrados_mulberry32((seed_p + 404) & 0xFFFFFFFF, 6)
 
-            # Parte 1 en orden
             resp1 = []
             for i1, info1 in enumerate(clave_data["parte_1_clave"]):
                 lado_pos1 = lados_1_p[i1]
@@ -284,7 +323,6 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
                     }
                 )
 
-            # Parte 2 en el orden exacto de presentación (26 ítems: 20 neuronas + 4 controles + 2 atención intercalados)
             n20_items = []
             for i_n, n_item in enumerate(clave_data["parte_2_neuronas_20_clave"]):
                 lado_pos_mostrado = lados_20_p[i_n]
@@ -349,7 +387,6 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
                     }
                 )
 
-            # Intercalar exactamente igual que prepararSesionParaApodo
             p2_presentados = list(n20_items)
             p2_presentados.insert(4, c4_items[0])
             p2_presentados.insert(8, a2_items[0])
@@ -380,6 +417,7 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
                 {
                     "id_pieza": raw_llevar["parte4_raw"][k]["id_pieza"],
                     "sha256_imagen": raw_llevar["parte4_raw"][k]["sha256_imagen"],
+                    "px_lado_largo_mostrado": int(raw_llevar["parte4_raw"][k]["px_lado_largo_mostrado"]),
                     "corazon": k < n_corazones,
                 }
                 for k in range(40)
@@ -402,6 +440,7 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
                 "parte_3_ponerle_nombre": resp3,
                 "parte_4_gusto": {
                     "cuenta_para_n2_y_d8": apodo_p == "Bruno",
+                    "calidad_parte_4": "nitida_1200px",
                     "total_corazones": n_corazones,
                     "total_evaluadas": 40,
                     "votos": votos_p4,
@@ -411,10 +450,23 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
             (path_json / f"salon_respuesta_{apodo_p.lower()}_{idx_p + 1:02d}.json").write_text(
                 json.dumps(doc_sim, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
             )
-            lineas_codigos_b64.append(codificar_resultado_a_base64(doc_sim))
+            lineas_codigos_b64.append(codificar_resultado_a_base64(doc_sim, incluir_px_5e1=True))
+
+            # Verificar además que si un código viene de la 5e (sin `p4_px`), decodificar_linea_base64
+            # conserva intactas las Partes 1 a 3 y marca la Parte 4 como `imagen_baja_calidad`
+            if apodo_p == "Bruno":
+                b64_5e_bruno = codificar_resultado_a_base64(doc_sim, incluir_px_5e1=False)
+                doc_5e_dec = decodificar_linea_base64(b64_5e_bruno, clave_data, piezas_40_meta)
+                assert doc_5e_dec["parte_1_primer_golpe_vista"] == doc_sim["parte_1_primer_golpe_vista"]
+                assert doc_5e_dec["parte_2_sentir"] == doc_sim["parte_2_sentir"]
+                assert doc_5e_dec["parte_3_ponerle_nombre"] == doc_sim["parte_3_ponerle_nombre"]
+                assert doc_5e_dec["parte_4_gusto"]["calidad_parte_4"] == "imagen_baja_calidad"
+                assert all(
+                    v.get("calidad_imagen") == "imagen_baja_calidad" and v.get("px_lado_largo_mostrado") == 168
+                    for v in doc_5e_dec["parte_4_gusto"]["votos"]
+                )
 
         # Añadir 2 códigos inválidos que juntar_resultados.py DEBE rechazar:
-        # 1) Un código Base64 con sha256_prerregistro falso
         codigo_falso_sha = base64.b64encode(
             json.dumps(
                 {
@@ -425,7 +477,6 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
             ).encode("utf-8")
         ).decode("ascii")
         lineas_codigos_b64.append(codigo_falso_sha)
-        # 2) Una línea con texto corrupto no Base64
         lineas_codigos_b64.append("CODIGO_CORRUPTO_SIN_BASE64_###")
 
         ruta_txt = path_b64 / "codigos_whatsapp.txt"
@@ -447,8 +498,6 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
         res_analisis_orig = analizar_respuestas_salon(path_json, ruta_clave)
         res_analisis_b64 = res_juntar["analisis_salon"]
 
-        # Ignorar las rutas de directorio temporal al comparar ambos diccionarios de análisis
-        # y verificar además que los archivos de corazones generados son idénticos
         bruno_orig = json.loads(Path(res_analisis_orig["resumen_parte_4_gusto_corazones"]["archivo_corazones_bruno"]).read_text(encoding="utf-8"))
         bruno_b64 = json.loads(Path(res_analisis_b64["resumen_parte_4_gusto_corazones"]["archivo_corazones_bruno"]).read_text(encoding="utf-8"))
         assert bruno_orig == bruno_b64
@@ -481,7 +530,10 @@ def _verificar_salon_v3d_y_5e(dir_neuronas: Path) -> Dict[str, Any]:
         "ruta_html_salon_para_llevar": str(ruta_html_llevar),
         "sha256_html_salon_para_llevar": sha_html_llevar,
         "tamano_bytes_salon_para_llevar": len(bytes_llevar),
-        "identidad_20_indicaciones_y_preguntas_con_2d94df9": "OK (20/20 indicaciones, preguntas, pares, orden al azar y botón Ninguno idénticos)",
+        "calidad_jpeg_parte4_para_llevar": diseno["calidad_jpeg_parte4_para_llevar"],
+        "parte4_imagenes_nitidas_1200px": f"OK (40/40 verificadas: {cnt_1200_exactos} a 1200px en lado largo y {cnt_original_menor_1200} en su tamaño original <1200px sin agrandar)",
+        "compatibilidad_5e_baja_calidad": "OK (resultados 5e válidos en Partes 1-3 y marcados como imagen_baja_calidad en Parte 4)",
+        "identidad_20_indicaciones_y_mosaicos_p1_p3_con_2d94df9": "OK (mosaicos Partes 1-3, 20/20 indicaciones, preguntas, pares, orden al azar y botón Ninguno idénticos)",
         "equivalencia_dos_vias_y_rechazo_sha": "OK (mismo resultado exacto por JSON y por código Base64; 2/2 códigos sin sha256 v3d.1 rechazados)",
     }
 
@@ -517,7 +569,7 @@ def ejecutar_pruebas() -> int:
         prerreg_v3["modelo"]["neuronas_ids"],
         es_f5=True,
     )
-    res_salon = _verificar_salon_v3d_y_5e(dir_neuronas)
+    res_salon = _verificar_salon_v3d_5e_y_5e1(dir_neuronas)
 
     for pyc_dir in dir_neuronas.rglob("__pycache__"):
         if pyc_dir.is_dir():
@@ -529,10 +581,10 @@ def ejecutar_pruebas() -> int:
             assert p.suffix.lower() not in ext_prohibidas, f"Archivo prohibido en Git: {p}"
 
     salida = {
-        "pruebas_verificadas": "16/16 OK",
+        "pruebas_verificadas": "17/17 OK",
         "features_7_stage4": res_f7,
         "features_5_stage3": res_f5,
-        "el_salon_fase5d_y_5e": res_salon,
+        "el_salon_fase5d_5e_y_5e1": res_salon,
     }
     print(json.dumps(salida, indent=2, ensure_ascii=False))
     return 0
